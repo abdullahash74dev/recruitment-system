@@ -1,0 +1,1 @@
+ALTER VIEW public.recruitment_job_title_stats SET (security_invoker = true);

@@ -1,0 +1,257 @@
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 220 20% 97%;
+    --foreground: 220 40% 13%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 220 40% 13%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 40% 13%;
+
+    --primary: 220 55% 18%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 145 58% 45%;
+    --secondary-foreground: 0 0% 100%;
+
+    --muted: 220 15% 92%;
+    --muted-foreground: 220 10% 46%;
+
+    --accent: 145 58% 45%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 15% 88%;
+    --input: 220 15% 88%;
+    --ring: 145 58% 45%;
+
+    --radius: 0.75rem;
+
+    --sidebar-background: 220 55% 18%;
+    --sidebar-foreground: 0 0% 95%;
+    --sidebar-primary: 145 58% 45%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 55% 24%;
+    --sidebar-accent-foreground: 0 0% 95%;
+    --sidebar-border: 220 40% 25%;
+    --sidebar-ring: 145 58% 45%;
+
+    --font-heading: 'Cairo', sans-serif;
+    --font-body: 'Cairo', sans-serif;
+
+    --gradient-primary: linear-gradient(135deg, hsl(220, 55%, 18%), hsl(220, 55%, 28%));
+    --gradient-accent: linear-gradient(135deg, hsl(145, 58%, 40%), hsl(145, 58%, 55%));
+    --gradient-hero: linear-gradient(160deg, hsl(220, 55%, 14%), hsl(220, 55%, 22%), hsl(220, 40%, 28%));
+
+    --shadow-card: 0 1px 3px 0 hsl(220 15% 13% / 0.04), 0 1px 2px -1px hsl(220 15% 13% / 0.04);
+    --shadow-elevated: 0 10px 25px -5px hsl(220 15% 13% / 0.08), 0 8px 10px -6px hsl(220 15% 13% / 0.04);
+    --shadow-glow: 0 0 20px hsl(145, 58%, 45%, 0.15);
+
+    --chart-1: 220 55% 22%;
+    --chart-2: 145 48% 38%;
+    --chart-3: 214 82% 58%;
+    --chart-4: 44 88% 50%;
+    --chart-5: 269 82% 62%;
+    --chart-6: 0 78% 61%;
+    --chart-7: 188 84% 42%;
+    --chart-8: 24 92% 55%;
+  }
+
+  .dark {
+    --background: 220 40% 7%;
+    --foreground: 0 0% 95%;
+    --card: 220 40% 10%;
+    --card-foreground: 0 0% 95%;
+    --popover: 220 40% 10%;
+    --popover-foreground: 0 0% 95%;
+    --primary: 145 58% 45%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 220 40% 18%;
+    --secondary-foreground: 0 0% 95%;
+    --muted: 220 30% 15%;
+    --muted-foreground: 220 10% 60%;
+    --accent: 145 58% 45%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 62% 30%;
+    --destructive-foreground: 0 0% 95%;
+    --border: 220 30% 18%;
+    --input: 220 30% 18%;
+    --ring: 145 58% 45%;
+  }
+
+  /* ===================== THEME PALETTES =====================
+     Override on html.palette-* for high specificity. Also tints
+     background/card/muted/sidebar so the change is clearly visible. */
+
+  html.palette-midnight { --background: 240 30% 96%; --card: 240 30% 99%; --muted: 240 25% 92%; --border: 240 20% 86%; --input: 240 20% 86%; --primary: 240 60% 22%; --primary-foreground: 0 0% 100%; --secondary: 244 60% 94%; --accent: 244 84% 60%; --accent-foreground: 0 0% 100%; --ring: 244 84% 60%; --sidebar-background: 240 60% 14%; --sidebar-foreground: 0 0% 95%; --sidebar-accent: 244 60% 24%; --gradient-primary: linear-gradient(135deg, hsl(240 60% 16%), hsl(244 70% 32%)); --gradient-accent: linear-gradient(135deg, hsl(244 84% 55%), hsl(260 84% 65%)); --gradient-hero: linear-gradient(160deg, hsl(240 60% 8%), hsl(244 60% 20%), hsl(260 50% 30%)); }
+  html.palette-midnight.dark { --background: 240 40% 7%; --card: 240 40% 11%; --muted: 240 30% 16%; --primary: 244 84% 65%; --accent: 260 84% 70%; --sidebar-background: 240 50% 10%; --sidebar-accent: 244 50% 20%; }
+
+  html.palette-emerald { --background: 150 25% 96%; --card: 150 30% 99%; --muted: 150 20% 92%; --border: 150 18% 85%; --input: 150 18% 85%; --primary: 160 80% 18%; --primary-foreground: 0 0% 100%; --secondary: 160 30% 92%; --accent: 42 65% 48%; --accent-foreground: 0 0% 100%; --ring: 42 65% 48%; --sidebar-background: 160 80% 14%; --sidebar-foreground: 42 60% 88%; --sidebar-accent: 160 70% 24%; --gradient-primary: linear-gradient(135deg, hsl(160 80% 16%), hsl(160 70% 30%)); --gradient-accent: linear-gradient(135deg, hsl(42 70% 50%), hsl(42 80% 65%)); --gradient-hero: linear-gradient(160deg, hsl(160 80% 10%), hsl(160 60% 22%), hsl(42 50% 35%)); }
+  html.palette-emerald.dark { --background: 160 40% 7%; --card: 160 40% 11%; --muted: 160 30% 16%; --primary: 42 65% 56%; --accent: 160 60% 50%; --sidebar-background: 160 60% 10%; --sidebar-accent: 160 50% 20%; }
+
+  html.palette-rose { --background: 320 30% 97%; --card: 320 30% 99%; --muted: 320 20% 93%; --border: 320 18% 87%; --input: 320 18% 87%; --primary: 280 35% 50%; --primary-foreground: 0 0% 100%; --secondary: 340 50% 94%; --accent: 340 75% 62%; --accent-foreground: 0 0% 100%; --ring: 340 75% 62%; --sidebar-background: 280 35% 35%; --sidebar-foreground: 0 0% 95%; --sidebar-accent: 320 50% 45%; --gradient-primary: linear-gradient(135deg, hsl(280 35% 42%), hsl(320 50% 60%)); --gradient-accent: linear-gradient(135deg, hsl(340 70% 70%), hsl(280 50% 70%)); --gradient-hero: linear-gradient(160deg, hsl(280 35% 30%), hsl(320 40% 50%), hsl(340 50% 65%)); }
+  html.palette-rose.dark { --background: 300 30% 9%; --card: 300 30% 13%; --muted: 300 20% 18%; --primary: 340 75% 70%; --accent: 280 60% 72%; --sidebar-background: 300 35% 14%; --sidebar-accent: 320 40% 24%; }
+
+  html.palette-slate { --background: 215 16% 96%; --card: 215 20% 99%; --muted: 215 15% 92%; --border: 215 15% 85%; --input: 215 15% 85%; --primary: 220 25% 28%; --primary-foreground: 0 0% 100%; --secondary: 215 20% 92%; --accent: 215 40% 50%; --accent-foreground: 0 0% 100%; --ring: 215 40% 50%; --sidebar-background: 220 25% 20%; --sidebar-foreground: 0 0% 95%; --sidebar-accent: 215 25% 30%; --gradient-primary: linear-gradient(135deg, hsl(220 25% 22%), hsl(215 30% 38%)); --gradient-accent: linear-gradient(135deg, hsl(215 40% 48%), hsl(215 40% 65%)); --gradient-hero: linear-gradient(160deg, hsl(220 25% 18%), hsl(215 28% 32%), hsl(215 25% 48%)); }
+  html.palette-slate.dark { --background: 220 20% 9%; --card: 220 20% 13%; --muted: 220 15% 18%; --primary: 215 50% 65%; --accent: 215 55% 72%; --sidebar-background: 220 25% 12%; --sidebar-accent: 215 25% 22%; }
+
+  html.palette-sunset { --background: 30 35% 97%; --card: 30 40% 99%; --muted: 30 25% 93%; --border: 30 20% 87%; --input: 30 20% 87%; --primary: 16 85% 50%; --primary-foreground: 0 0% 100%; --secondary: 30 60% 93%; --accent: 330 75% 58%; --accent-foreground: 0 0% 100%; --ring: 16 85% 50%; --sidebar-background: 16 70% 35%; --sidebar-foreground: 0 0% 98%; --sidebar-accent: 16 70% 45%; --gradient-primary: linear-gradient(135deg, hsl(16 90% 50%), hsl(330 80% 60%)); --gradient-accent: linear-gradient(135deg, hsl(36 95% 55%), hsl(16 90% 60%)); --gradient-hero: linear-gradient(160deg, hsl(16 80% 35%), hsl(330 70% 50%), hsl(260 60% 50%)); }
+  html.palette-sunset.dark { --background: 16 25% 9%; --card: 16 25% 13%; --muted: 16 20% 18%; --primary: 16 85% 60%; --accent: 330 75% 65%; --sidebar-background: 16 40% 14%; --sidebar-accent: 16 40% 24%; }
+
+  html.palette-ocean { --background: 200 30% 96%; --card: 200 35% 99%; --muted: 200 22% 92%; --border: 200 18% 85%; --input: 200 18% 85%; --primary: 210 70% 20%; --primary-foreground: 0 0% 100%; --secondary: 188 40% 92%; --accent: 188 60% 42%; --accent-foreground: 0 0% 100%; --ring: 188 60% 42%; --sidebar-background: 210 70% 14%; --sidebar-foreground: 0 0% 95%; --sidebar-accent: 210 60% 24%; --gradient-primary: linear-gradient(135deg, hsl(210 70% 16%), hsl(210 55% 30%)); --gradient-accent: linear-gradient(135deg, hsl(188 56% 42%), hsl(180 50% 55%)); --gradient-hero: linear-gradient(160deg, hsl(210 70% 10%), hsl(210 55% 22%), hsl(188 50% 35%)); }
+  html.palette-ocean.dark { --background: 210 40% 8%; --card: 210 40% 12%; --muted: 210 30% 16%; --primary: 188 60% 52%; --accent: 180 60% 60%; --sidebar-background: 210 50% 10%; --sidebar-accent: 210 45% 20%; }
+
+  html.palette-noir { --background: 0 0% 96%; --card: 0 0% 100%; --muted: 0 0% 92%; --border: 0 0% 85%; --input: 0 0% 85%; --primary: 0 0% 8%; --primary-foreground: 42 55% 70%; --secondary: 42 30% 92%; --accent: 42 60% 50%; --accent-foreground: 0 0% 100%; --ring: 42 60% 50%; --sidebar-background: 0 0% 6%; --sidebar-foreground: 42 55% 80%; --sidebar-accent: 0 0% 14%; --gradient-primary: linear-gradient(135deg, hsl(0 0% 6%), hsl(0 0% 18%)); --gradient-accent: linear-gradient(135deg, hsl(42 55% 50%), hsl(42 70% 65%)); --gradient-hero: linear-gradient(160deg, hsl(0 0% 5%), hsl(0 0% 14%), hsl(42 40% 30%)); }
+  html.palette-noir.dark { --background: 0 0% 5%; --card: 0 0% 9%; --muted: 0 0% 13%; --primary: 42 65% 62%; --accent: 42 70% 70%; --sidebar-background: 0 0% 4%; --sidebar-accent: 42 40% 18%; }
+}
+
+/* ===================== DASHBOARD THEMES ===================== */
+.dashboard-analytics { --dash-surface: hsl(var(--card)); --dash-soft: hsl(var(--muted) / 0.55); --dash-border: hsl(var(--border)); }
+.dashboard-theme-executive { --chart-1: 220 55% 22%; --chart-2: 145 48% 38%; --chart-3: 214 82% 58%; --chart-4: 44 88% 50%; --chart-5: 269 82% 62%; --chart-6: 0 78% 61%; --chart-7: 188 84% 42%; --chart-8: 24 92% 55%; }
+.dashboard-theme-aurora { --chart-1: 190 85% 45%; --chart-2: 242 78% 62%; --chart-3: 270 70% 58%; --chart-4: 160 68% 47%; --chart-5: 330 78% 62%; --chart-6: 35 92% 58%; --chart-7: 210 88% 55%; --chart-8: 120 50% 48%; --primary: 242 70% 36%; --accent: 190 80% 44%; }
+.dashboard-theme-emerald { --chart-1: 160 80% 22%; --chart-2: 145 48% 42%; --chart-3: 42 68% 52%; --chart-4: 190 55% 42%; --chart-5: 90 42% 44%; --chart-6: 24 72% 54%; --chart-7: 220 42% 44%; --chart-8: 12 70% 56%; --primary: 160 80% 18%; --accent: 42 68% 48%; }
+.dashboard-theme-graphite { --chart-1: 215 24% 30%; --chart-2: 210 12% 56%; --chart-3: 199 62% 48%; --chart-4: 35 72% 55%; --chart-5: 260 35% 58%; --chart-6: 0 62% 58%; --chart-7: 155 42% 42%; --chart-8: 24 58% 54%; --primary: 215 24% 25%; --accent: 199 62% 46%; }
+.dashboard-theme-royal { --chart-1: 225 60% 22%; --chart-2: 42 70% 52%; --chart-3: 210 80% 50%; --chart-4: 160 55% 40%; --chart-5: 270 52% 58%; --chart-6: 350 65% 55%; --chart-7: 28 82% 56%; --chart-8: 190 58% 46%; --primary: 225 60% 22%; --accent: 42 70% 50%; }
+
+/* Futuristic themes */
+.dashboard-theme-cyberpunk { --chart-1: 320 95% 55%; --chart-2: 180 100% 50%; --chart-3: 280 90% 60%; --chart-4: 50 100% 55%; --chart-5: 340 95% 60%; --chart-6: 200 100% 55%; --chart-7: 140 90% 50%; --chart-8: 25 95% 58%; --primary: 320 90% 50%; --accent: 180 100% 48%; }
+.dashboard-theme-cyberpunk .dashboard-hero { background: radial-gradient(circle at 20% 0%, hsl(320 90% 35% / 0.35), transparent 60%), radial-gradient(circle at 90% 100%, hsl(180 100% 40% / 0.35), transparent 60%), linear-gradient(135deg, hsl(290 60% 8%), hsl(260 40% 14%)); color: hsl(0 0% 98%); border-color: hsl(320 80% 40% / 0.5); box-shadow: 0 0 30px hsl(320 90% 50% / 0.25), inset 0 0 30px hsl(180 100% 50% / 0.05); }
+.dashboard-theme-cyberpunk .dashboard-hero .dashboard-title { background: linear-gradient(90deg, hsl(180 100% 60%), hsl(320 95% 65%)); -webkit-background-clip: text; background-clip: text; color: transparent; text-shadow: 0 0 20px hsl(320 95% 55% / 0.4); }
+.dashboard-theme-cyberpunk .dashboard-hero .bg-background\/70 { background: hsl(260 50% 12% / 0.7); color: hsl(180 100% 75%); border: 1px solid hsl(320 80% 50% / 0.3); }
+
+.dashboard-theme-neon { --chart-1: 195 100% 55%; --chart-2: 140 90% 55%; --chart-3: 280 95% 65%; --chart-4: 50 100% 55%; --chart-5: 320 90% 60%; --chart-6: 175 95% 50%; --chart-7: 25 100% 58%; --chart-8: 220 95% 65%; --primary: 195 100% 50%; --accent: 140 90% 50%; }
+.dashboard-theme-neon .dashboard-hero { background: linear-gradient(135deg, hsl(220 60% 6%), hsl(210 50% 10%) 50%, hsl(180 40% 12%)); color: hsl(0 0% 98%); border: 1px solid hsl(195 100% 50% / 0.4); box-shadow: 0 0 40px hsl(195 100% 50% / 0.25); position: relative; overflow: hidden; }
+.dashboard-theme-neon .dashboard-hero::before { content: ""; position: absolute; inset: 0; background-image: linear-gradient(hsl(195 100% 50% / 0.06) 1px, transparent 1px), linear-gradient(90deg, hsl(195 100% 50% / 0.06) 1px, transparent 1px); background-size: 24px 24px; pointer-events: none; mask-image: radial-gradient(ellipse at center, black, transparent 80%); }
+.dashboard-theme-neon .dashboard-hero .dashboard-title { background: linear-gradient(90deg, hsl(195 100% 65%), hsl(140 90% 60%)); -webkit-background-clip: text; background-clip: text; color: transparent; text-shadow: 0 0 24px hsl(195 100% 50% / 0.5); }
+.dashboard-theme-neon .dashboard-hero .bg-background\/70 { background: hsl(210 50% 8% / 0.75); color: hsl(195 100% 80%); border: 1px solid hsl(195 100% 50% / 0.35); backdrop-filter: blur(8px); }
+
+.dashboard-theme-holographic { --chart-1: 260 90% 65%; --chart-2: 180 85% 55%; --chart-3: 320 85% 65%; --chart-4: 45 95% 60%; --chart-5: 200 90% 60%; --chart-6: 290 80% 65%; --chart-7: 150 75% 55%; --chart-8: 15 90% 62%; --primary: 260 80% 55%; --accent: 320 85% 60%; }
+.dashboard-theme-holographic .dashboard-hero { background: linear-gradient(120deg, hsl(260 90% 65% / 0.85), hsl(200 85% 60% / 0.85) 33%, hsl(320 85% 65% / 0.85) 66%, hsl(45 95% 60% / 0.85)); background-size: 200% 200%; animation: holo-shift 12s ease infinite; color: hsl(0 0% 100%); border: 1px solid hsl(0 0% 100% / 0.25); box-shadow: 0 10px 40px hsl(260 80% 40% / 0.4); }
+.dashboard-theme-holographic .dashboard-hero .dashboard-title { color: hsl(0 0% 100%); text-shadow: 0 2px 20px hsl(260 80% 30% / 0.6); }
+.dashboard-theme-holographic .dashboard-hero p { color: hsl(0 0% 100% / 0.85); }
+.dashboard-theme-holographic .dashboard-hero .bg-background\/70 { background: hsl(0 0% 100% / 0.18); color: hsl(0 0% 100%); backdrop-filter: blur(10px); border: 1px solid hsl(0 0% 100% / 0.3); }
+@keyframes holo-shift { 0%,100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
+
+.dashboard-theme-matrix { --chart-1: 140 95% 50%; --chart-2: 120 90% 45%; --chart-3: 160 85% 50%; --chart-4: 100 80% 50%; --chart-5: 175 90% 50%; --chart-6: 90 75% 50%; --chart-7: 130 95% 55%; --chart-8: 180 85% 50%; --primary: 140 95% 40%; --accent: 120 90% 45%; }
+.dashboard-theme-matrix .dashboard-hero { background: linear-gradient(135deg, hsl(120 100% 4%), hsl(140 60% 7%)); color: hsl(140 95% 75%); border: 1px solid hsl(140 95% 40% / 0.5); font-family: 'JetBrains Mono', 'Courier New', monospace; box-shadow: 0 0 30px hsl(140 95% 40% / 0.3), inset 0 0 50px hsl(140 95% 40% / 0.08); }
+.dashboard-theme-matrix .dashboard-hero .dashboard-title { color: hsl(140 100% 65%); text-shadow: 0 0 18px hsl(140 95% 50% / 0.8); letter-spacing: 0.02em; }
+.dashboard-theme-matrix .dashboard-hero .bg-background\/70 { background: hsl(120 80% 5% / 0.8); color: hsl(140 95% 70%); border: 1px solid hsl(140 95% 40% / 0.4); }
+
+/* Scale variants */
+.dashboard-scale-sm { font-size: 0.88rem; }
+.dashboard-scale-sm .dashboard-hero h2 { font-size: 1.4rem; }
+.dashboard-scale-md { font-size: 1rem; }
+.dashboard-scale-lg { font-size: 1.08rem; }
+.dashboard-scale-lg .dashboard-hero h2 { font-size: 2rem; }
+.dashboard-scale-lg .recharts-wrapper { font-size: 0.95rem; }
+.dashboard-scale-xl { font-size: 1.18rem; }
+.dashboard-scale-xl .dashboard-hero h2 { font-size: 2.4rem; }
+.dashboard-scale-xl .recharts-wrapper { font-size: 1.05rem; }
+
+.dashboard-analytics .dashboard-hero { background: linear-gradient(135deg, hsl(var(--primary) / 0.12), hsl(var(--accent) / 0.08), hsl(var(--card))); }
+.dashboard-analytics .recharts-wrapper { direction: ltr; }
+.dashboard-analytics .recharts-cartesian-axis-tick text { fill: hsl(var(--muted-foreground)); }
+.dashboard-analytics .recharts-cartesian-grid line { stroke: hsl(var(--border)); stroke-opacity: .8; }
+.dashboard-analytics .recharts-tooltip-wrapper { direction: rtl; }
+.dashboard-analytics .recharts-sector { outline: none; }
+
+/* ===================== ICON STYLES ===================== */
+html.icons-thin svg { stroke-width: 1.25; }
+html.icons-regular svg { stroke-width: 2; }
+html.icons-bold svg { stroke-width: 2.5; }
+html.icons-rounded svg { stroke-linecap: round; stroke-linejoin: round; stroke-width: 2.25; }
+html.icons-sharp svg { stroke-linecap: square; stroke-linejoin: miter; stroke-width: 2; }
+
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html {
+    font-family: var(--font-body);
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: var(--font-body);
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-heading);
+  }
+}
+
+@layer utilities {
+  .gradient-primary {
+    background: var(--gradient-primary);
+  }
+  .gradient-accent {
+    background: var(--gradient-accent);
+  }
+  .gradient-hero {
+    background: var(--gradient-hero);
+  }
+  .shadow-card {
+    box-shadow: var(--shadow-card);
+  }
+  .shadow-elevated {
+    box-shadow: var(--shadow-elevated);
+  }
+  .shadow-glow {
+    box-shadow: var(--shadow-glow);
+  }
+}
+
+/* Switch custom sizing, positioning, and labeled wrappers */
+.switch-custom {
+  width: var(--switch-track-width, 36px) !important;
+  height: var(--switch-track-height, 20px) !important;
+}
+
+.switch-thumb-custom {
+  width: var(--switch-thumb-size, 14px) !important;
+  height: var(--switch-thumb-size, 14px) !important;
+}
+
+.switch-custom[data-state="checked"] .switch-thumb-custom,
+.switch-thumb-custom[data-state="checked"] {
+  transform: translateX(var(--switch-thumb-checked-x, 16px)) !important;
+}
+
+.switch-custom[data-state="unchecked"] .switch-thumb-custom,
+.switch-thumb-custom[data-state="unchecked"] {
+  transform: translateX(var(--switch-thumb-unchecked-x, 2px)) !important;
+}
+
+.ui-switch-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.ui-switch-chip {
+  display: inline-flex;
+  max-width: 100%;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: var(--switch-container-gap, 6px);
+  padding: var(--switch-container-pad-y, 4px) var(--switch-container-pad-x, 8px);
+}
+
+.ui-switch-label {
+  white-space: nowrap;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1;
+}
