@@ -71,26 +71,8 @@ const AdminLoginPage = () => {
     // log success (current session is still active before signOut)
     await logAudit({ action: "LOGIN", summary: `Successful login for ${email}` });
 
-    // Step 2: Sign out and send magic link for 2FA
-    await supabase.auth.signOut();
-
-    const { error: otpError } = await supabase.auth.signInWithOtp({
-      email,
-      options: {
-        shouldCreateUser: false,
-        emailRedirectTo: `${window.location.origin}/admin`,
-      },
-    });
-
-    if (otpError) {
-      toast.error(t("admin.otpSendError"));
+      navigate("/admin", { replace: true });
       setLoading(false);
-      setIsLoggingIn(false);
-      return;
-    }
-
-    toast.success(t("admin.otpSent"));
-    setStep("waiting");
     setResendTimer(60);
     setLoading(false);
   };
