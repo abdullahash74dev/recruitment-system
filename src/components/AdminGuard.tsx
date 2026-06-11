@@ -7,16 +7,20 @@ import { Button } from "@/components/ui/button";
 const AdminGuard = ({ children }: { children: React.ReactNode }) => {
   const { t } = useLanguage();
   const [status, setStatus] = useState<"loading" | "allowed" | "denied" | "unauthorized">("loading");
+  const [debugInfo, setDebugInfo] = useState("");
 
   useEffect(() => {
     let mounted = true;
 
     const checkUser = async (userId: string) => {
-      const { data: roles } = await supabase
+      const { data: roles, error } = await supabase
         .from("user_roles")
         .select("role")
         .eq("user_id", userId);
       if (!mounted) return;
+      setDebugInfo(
+        `url=${import.meta.env.VITE_SUPABASE_URL} uid=${userId} rows=${roles?.length ?? "null"} error=${error?.message ?? "none"}`
+      );
       setStatus(roles && roles.length > 0 ? "allowed" : "unauthorized");
     };
 
@@ -49,6 +53,8 @@ const AdminGuard = ({ children }: { children: React.ReactNode }) => {
       <div className="text-center space-y-4 max-w-md">
         <h1 className="text-2xl font-bold">{t("admin.noAccess")}</h1>
         <p className="text-muted-foreground">{t("admin.noAccessDesc")}</p>
+        {/* Temporary diagnostics - remove once root cause is confirmed */}
+        <p className="text-xs text-muted-foreground break-all">{debugInfo}</p>
         <Button onClick={() => supabase.auth.signOut()}>{t("dash.logout")}</Button>
       </div>
     </div>
