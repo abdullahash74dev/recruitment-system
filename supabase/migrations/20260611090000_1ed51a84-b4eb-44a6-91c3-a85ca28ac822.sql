@@ -3,5 +3,7 @@
 -- and nobody could grant roles via the app, since role management itself
 -- requires an existing admin).
 INSERT INTO public.user_roles (user_id, role)
-VALUES ('544312b8-daf0-4f11-bc8c-2ddc78b8945c', 'admin')
+SELECT id, 'admin'::app_role
+FROM auth.users
+WHERE email = 'abdullahash745@gmail.com'
 ON CONFLICT (user_id, role) DO NOTHING;
