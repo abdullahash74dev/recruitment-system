@@ -12,13 +12,12 @@ const AdminGuard = ({ children }: { children: React.ReactNode }) => {
     let mounted = true;
 
     const checkUser = async (userId: string) => {
-      const { data: role } = await supabase
+      const { data: roles } = await supabase
         .from("user_roles")
         .select("role")
-        .eq("user_id", userId)
-        .maybeSingle();
+        .eq("user_id", userId);
       if (!mounted) return;
-      setStatus(role?.role ? "allowed" : "unauthorized");
+      setStatus(roles && roles.length > 0 ? "allowed" : "unauthorized");
     };
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
