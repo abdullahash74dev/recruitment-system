@@ -385,6 +385,8 @@ const translations: Record<Lang, Record<string, string>> = {
     "admin.verifyOtp": "تحقق",
     "admin.resendOtp": "إعادة إرسال الرابط",
     "admin.emailNotRegistered": "هذا البريد الإلكتروني غير مسجل في النظام",
+    "admin.noAccess": "ليس لديك صلاحية الوصول",
+    "admin.noAccessDesc": "حسابك مسجل ولكن لا يملك صلاحية الدخول إلى لوحة التحكم. يرجى التواصل مع مسؤول النظام لمنحك صلاحية، أو تسجيل الخروج وتجربة حساب آخر.",
   },
   en: {
     // Navbar & general
@@ -761,6 +763,8 @@ const translations: Record<Lang, Record<string, string>> = {
     "admin.verifyOtp": "Verify",
     "admin.resendOtp": "Resend link",
     "admin.emailNotRegistered": "This email is not registered in the system",
+    "admin.noAccess": "Access Denied",
+    "admin.noAccessDesc": "Your account is registered but does not have permission to access the dashboard. Please contact a system administrator, or sign out and try a different account.",
   },
 };
 
