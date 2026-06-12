@@ -29,14 +29,14 @@ const PALETTES: ThemePalette[] = ["default", "midnight", "emerald", "rose", "sla
 const ICON_STYLES: IconStyle[] = ["regular", "thin", "bold", "rounded", "sharp"];
 
 export const DEFAULT_CUSTOM_THEME: CustomThemeColors = {
-  primary: "#1a365d",
-  accent: "#2f855a",
-  background: "#f5f7fb",
+  primary: "#3b82f6",
+  accent: "#22d3ee",
+  background: "#f8fafc",
   card: "#ffffff",
 };
 
 export const PALETTE_LABELS: Record<ThemePalette, { ar: string; en: string; swatch: string[] }> = {
-  default:  { ar: "الخولي الافتراضي", en: "AlKholi Default", swatch: ["#1a365d", "#2f855a"] },
+  default:  { ar: "كوانتم الأزرق",     en: "Quantum Blue",     swatch: ["#3b82f6", "#22d3ee"] },
   midnight: { ar: "منتصف الليل",       en: "Midnight Indigo", swatch: ["#1e1b4b", "#4f46e5"] },
   emerald:  { ar: "الزمرد الفاخر",     en: "Emerald Prestige", swatch: ["#064e3b", "#c9a84c"] },
   rose:     { ar: "الورد والخزامى",   en: "Blush & Lavender", swatch: ["#9b72cf", "#e8c5d0"] },
@@ -44,7 +44,7 @@ export const PALETTE_LABELS: Record<ThemePalette, { ar: string; en: string; swat
   sunset:   { ar: "الغروب المتوهج",   en: "Sunset Blaze",     swatch: ["#ff6b35", "#e84393"] },
   ocean:    { ar: "أعماق المحيط",      en: "Ocean Deep",       swatch: ["#0c2340", "#2d8a9e"] },
   noir:     { ar: "الأسود الذهبي",     en: "Noir & Gold",      swatch: ["#0d0d0d", "#c9a84c"] },
-  custom:   { ar: "ثيمي الخاص",        en: "My Custom Theme",  swatch: ["#1a365d", "#2f855a"] },
+  custom:   { ar: "ثيمي الخاص",        en: "My Custom Theme",  swatch: ["#3b82f6", "#22d3ee"] },
 };
 
 export const ICON_STYLE_LABELS: Record<IconStyle, { ar: string; en: string }> = {
@@ -58,21 +58,21 @@ export const ICON_STYLE_LABELS: Record<IconStyle, { ar: string; en: string }> = 
 type ThemeTokens = Record<string, string>;
 
 const DEFAULT_LIGHT_TOKENS: ThemeTokens = {
-  "--background": "220 20% 97%", "--foreground": "220 40% 13%", "--card": "0 0% 100%", "--card-foreground": "220 40% 13%",
-  "--popover": "0 0% 100%", "--popover-foreground": "220 40% 13%", "--primary": "220 55% 18%", "--primary-foreground": "0 0% 100%",
-  "--secondary": "145 58% 45%", "--secondary-foreground": "0 0% 100%", "--muted": "220 15% 92%", "--muted-foreground": "220 10% 46%",
-  "--accent": "145 58% 45%", "--accent-foreground": "0 0% 100%", "--border": "220 15% 88%", "--input": "220 15% 88%", "--ring": "145 58% 45%",
-  "--sidebar-background": "220 55% 18%", "--sidebar-foreground": "0 0% 95%", "--sidebar-primary": "145 58% 45%", "--sidebar-primary-foreground": "0 0% 100%",
-  "--sidebar-accent": "220 55% 24%", "--sidebar-accent-foreground": "0 0% 95%", "--sidebar-border": "220 40% 25%", "--sidebar-ring": "145 58% 45%",
-  "--gradient-primary": "linear-gradient(135deg, hsl(220 55% 18%), hsl(220 55% 28%))", "--gradient-accent": "linear-gradient(135deg, hsl(145 58% 40%), hsl(145 58% 55%))", "--gradient-hero": "linear-gradient(160deg, hsl(220 55% 14%), hsl(220 55% 22%), hsl(220 40% 28%))",
+  "--background": "210 40% 98%", "--foreground": "222 47% 11%", "--card": "0 0% 100%", "--card-foreground": "222 47% 11%",
+  "--popover": "0 0% 100%", "--popover-foreground": "222 47% 11%", "--primary": "217 91% 58%", "--primary-foreground": "0 0% 100%",
+  "--secondary": "214 32% 91%", "--secondary-foreground": "222 47% 11%", "--muted": "214 32% 95%", "--muted-foreground": "215 20% 45%",
+  "--accent": "189 94% 50%", "--accent-foreground": "222 47% 11%", "--border": "214 32% 88%", "--input": "214 32% 88%", "--ring": "217 91% 58%",
+  "--sidebar-background": "222 47% 11%", "--sidebar-foreground": "210 40% 96%", "--sidebar-primary": "217 91% 60%", "--sidebar-primary-foreground": "0 0% 100%",
+  "--sidebar-accent": "222 39% 18%", "--sidebar-accent-foreground": "210 40% 96%", "--sidebar-border": "222 30% 22%", "--sidebar-ring": "189 94% 50%",
+  "--gradient-primary": "linear-gradient(135deg, hsl(222 47% 11%), hsl(217 91% 45%))", "--gradient-accent": "linear-gradient(135deg, hsl(217 91% 60%), hsl(189 94% 50%))", "--gradient-hero": "linear-gradient(160deg, hsl(222 47% 7%), hsl(222 55% 14%), hsl(217 70% 24%))",
 };
 
 const DEFAULT_DARK_TOKENS: ThemeTokens = {
-  "--background": "220 40% 7%", "--foreground": "0 0% 95%", "--card": "220 40% 10%", "--card-foreground": "0 0% 95%",
-  "--popover": "220 40% 10%", "--popover-foreground": "0 0% 95%", "--primary": "145 58% 45%", "--secondary": "220 40% 18%",
-  "--secondary-foreground": "0 0% 95%", "--muted": "220 30% 15%", "--muted-foreground": "220 10% 60%", "--accent": "145 58% 45%",
-  "--border": "220 30% 18%", "--input": "220 30% 18%", "--ring": "145 58% 45%", "--sidebar-background": "220 45% 9%",
-  "--sidebar-accent": "220 35% 16%", "--sidebar-border": "220 30% 20%",
+  "--background": "222 47% 6%", "--foreground": "210 40% 96%", "--card": "222 44% 9%", "--card-foreground": "210 40% 96%",
+  "--popover": "222 44% 9%", "--popover-foreground": "210 40% 96%", "--primary": "217 91% 60%", "--primary-foreground": "222 47% 8%", "--secondary": "222 30% 16%",
+  "--secondary-foreground": "210 40% 96%", "--muted": "222 30% 14%", "--muted-foreground": "215 20% 65%", "--accent": "189 94% 55%", "--accent-foreground": "222 47% 8%",
+  "--border": "222 30% 18%", "--input": "222 30% 18%", "--ring": "189 94% 55%", "--sidebar-background": "222 50% 5%",
+  "--sidebar-accent": "222 35% 14%", "--sidebar-border": "222 30% 16%",
 };
 
 const PALETTE_TOKENS: Record<ThemePalette, { light: ThemeTokens; dark: ThemeTokens }> = {
@@ -114,7 +114,7 @@ const getCustomTokens = (theme: ThemeMode, colors: CustomThemeColors): ThemeToke
     const hue = primary.split(" ")[0];
     return { "--background": `${hue} 32% 7%`, "--card": `${hue} 28% 11%`, "--muted": `${hue} 20% 16%`, "--border": `${hue} 18% 22%`, "--input": `${hue} 18% 22%`, "--primary": accent, "--accent": primary, "--ring": accent, "--sidebar-background": `${hue} 38% 9%`, "--sidebar-accent": `${hue} 28% 18%`, "--gradient-primary": `linear-gradient(135deg, hsl(${primary}), hsl(${accent}))`, "--gradient-accent": `linear-gradient(135deg, hsl(${accent}), hsl(${primary}))`, "--gradient-hero": `linear-gradient(160deg, hsl(${hue} 42% 7%), hsl(${primary}), hsl(${accent}))` };
   }
-  return { "--background": background, "--card": card, "--muted": background, "--border": "220 15% 86%", "--input": "220 15% 86%", "--primary": primary, "--accent": accent, "--ring": accent, "--sidebar-background": primary, "--sidebar-accent": accent, "--gradient-primary": `linear-gradient(135deg, hsl(${primary}), hsl(${accent}))`, "--gradient-accent": `linear-gradient(135deg, hsl(${accent}), hsl(${primary}))`, "--gradient-hero": `linear-gradient(160deg, hsl(${primary}), hsl(${accent}))` };
+  return { "--background": background, "--card": card, "--muted": background, "--border": "214 32% 88%", "--input": "214 32% 88%", "--primary": primary, "--accent": accent, "--ring": accent, "--sidebar-background": primary, "--sidebar-accent": accent, "--gradient-primary": `linear-gradient(135deg, hsl(${primary}), hsl(${accent}))`, "--gradient-accent": `linear-gradient(135deg, hsl(${accent}), hsl(${primary}))`, "--gradient-hero": `linear-gradient(160deg, hsl(${primary}), hsl(${accent}))` };
 };
 
 const applyThemeTokens = (theme: ThemeMode, palette: ThemePalette, customTheme: CustomThemeColors) => {

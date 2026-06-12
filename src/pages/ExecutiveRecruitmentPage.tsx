@@ -22,7 +22,7 @@ import {
 } from "recharts";
 import SiteLogo from "@/components/SiteLogo";
 
-const COLORS = ["#1a365d", "#2f855a", "#d69e2e", "#9f1239", "#7c3aed", "#0891b2", "#ea580c", "#0d9488", "#be185d"];
+const COLORS = ["#3b82f6", "#22d3ee", "#d69e2e", "#9f1239", "#7c3aed", "#0891b2", "#ea580c", "#0d9488", "#be185d"];
 type ChartType = "bar" | "pie" | "donut" | "line" | "area" | "radar" | "stacked";
 type Lang = "ar" | "en";
 
@@ -60,7 +60,7 @@ const T = {
     saveDefaults: "حفظ كإعدادات افتراضية",
     savedOk: "تم حفظ الإعدادات الافتراضية للرابط",
     saveFail: "تعذّر الحفظ — يتطلب صلاحية مسؤول",
-    footer: "مجموعة الخولي — تقرير سري للعرض التنفيذي",
+    footer: "منصة التوظيف الذكية — تقرير سري للعرض التنفيذي",
   },
   en: {
     title: "Executive Recruitment Report", subtitle: "تقرير التوظيف التنفيذي",
@@ -83,7 +83,7 @@ const T = {
     saveDefaults: "Save as defaults",
     savedOk: "Default preferences saved for this link",
     saveFail: "Save failed — admin access required",
-    footer: "AlKholi Group — Confidential Executive Report",
+    footer: "NexHire AI — Confidential Executive Report",
   },
 };
 
@@ -417,8 +417,8 @@ export default function ExecutiveRecruitmentPage() {
           <CardHeader><CardTitle>{t.projectPerf}</CardTitle></CardHeader>
           <CardContent>
             {renderChart(projectChart, [
-              { key: "target", color: "#1a365d", label: t.target },
-              { key: "hired", color: "#2f855a", label: t.hired },
+              { key: "target", color: "#3b82f6", label: t.target },
+              { key: "hired", color: "#22d3ee", label: t.hired },
               { key: "gap", color: "#d69e2e", label: t.remaining },
             ])}
           </CardContent>
@@ -430,7 +430,7 @@ export default function ExecutiveRecruitmentPage() {
         <Card className="print-break">
           <CardHeader><CardTitle>{t.statusDist}</CardTitle></CardHeader>
           <CardContent>
-            {renderChart(statusChart, [{ key: "value", color: "#1a365d", label: t.status }])}
+            {renderChart(statusChart, [{ key: "value", color: "#3b82f6", label: t.status }])}
           </CardContent>
         </Card>
         )}

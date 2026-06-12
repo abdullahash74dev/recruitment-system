@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import fallbackLogo from "@/assets/logo.jpg";
+import BrandMark from "@/components/BrandMark";
 
 interface LogoData {
   logo_url: string | null;
@@ -63,7 +63,7 @@ export const SiteLogo = ({ alt = "Logo", className = "", heightOverride }: Props
     };
   }, []);
 
-  const url = data?.logo_url || fallbackLogo;
+  const url = data?.logo_url || null;
   const desktopH = heightOverride ?? parseInt(data?.logo_height || "56") ?? 56;
   const mobileH = data?.logo_height_mobile ?? Math.max(32, Math.round(desktopH * 0.75));
   const h = isMobile ? mobileH : desktopH;
@@ -102,16 +102,20 @@ export const SiteLogo = ({ alt = "Logo", className = "", heightOverride }: Props
         transition: "all 0.2s ease",
       }}
     >
-      <img
-        src={url}
-        alt={altName}
-        style={{
-          height: `${h}px`,
-          width: w ? `${w}px` : "auto",
-          objectFit: (data?.logo_fit as any) || "contain",
-          display: "block",
-        }}
-      />
+      {url ? (
+        <img
+          src={url}
+          alt={altName}
+          style={{
+            height: `${h}px`,
+            width: w ? `${w}px` : "auto",
+            objectFit: (data?.logo_fit as any) || "contain",
+            display: "block",
+          }}
+        />
+      ) : (
+        <BrandMark size={h} aria-label={altName} />
+      )}
     </div>
   );
 };

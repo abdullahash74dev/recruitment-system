@@ -17,7 +17,7 @@ import { toast } from "sonner";
 import { Users, UserPlus, Phone, CheckCircle2, Download, LogOut, Search, Eye, BarChart3, Briefcase, FileText, ExternalLink, Plus, Pencil, Trash2, FolderOpen, Settings, Database, Archive, RotateCcw, Shield, Sparkles, Stethoscope } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from "recharts";
 import * as XLSX from "xlsx";
-import logo from "@/assets/logo.jpg";
+import SiteLogo from "@/components/SiteLogo";
 import { MAX_INLINE_IMAGE_SIZE, readImageAsDataUrl } from "@/lib/imageUpload";
 import { Link } from "react-router-dom";
 import CustomQuestionsSettings from "@/components/Dashboard/CustomQuestionsSettings";
@@ -635,7 +635,7 @@ const DashboardPage = () => {
       <header className="gradient-hero py-4 px-6 sticky top-0 z-30">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Link to="/"><img src={logo} alt="AlKholi Group" className="h-10 object-contain" /></Link>
+            <Link to="/"><SiteLogo heightOverride={40} /></Link>
             <h1 className="text-primary-foreground font-bold text-lg hidden md:block">{t("dash.title")}</h1>
           </div>
           <div className="flex items-center gap-3">

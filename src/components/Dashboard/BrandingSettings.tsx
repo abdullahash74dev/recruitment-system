@@ -69,8 +69,8 @@ const BrandingSettings = () => {
     if (data) setSettings({
       id: data.id,
       logo_url: data.logo_url,
-      primary_color: data.primary_color || "#1a365d",
-      accent_color: data.accent_color || "#2f855a",
+      primary_color: data.primary_color || "#3b82f6",
+      accent_color: data.accent_color || "#22d3ee",
       site_name_ar: data.site_name_ar || "",
       site_name_en: data.site_name_en || "",
       logo_height: (data as any).logo_height || "56",

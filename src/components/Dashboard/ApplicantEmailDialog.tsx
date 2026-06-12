@@ -56,8 +56,8 @@ export default function ApplicantEmailDialog({
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
-  const [companyAr, setCompanyAr] = useState("مجموعة الخولي");
-  const [companyEn, setCompanyEn] = useState("AlKholi Group");
+  const [companyAr, setCompanyAr] = useState("منصة التوظيف الذكية");
+  const [companyEn, setCompanyEn] = useState("NexHire AI");
 
   useEffect(() => {
     if (!open) return;
@@ -70,8 +70,8 @@ export default function ApplicantEmailDialog({
         .select("site_name_ar, site_name_en")
         .maybeSingle();
       if (settings) {
-        setCompanyAr(settings.site_name_ar || "مجموعة الخولي");
-        setCompanyEn(settings.site_name_en || "AlKholi Group");
+        setCompanyAr(settings.site_name_ar || "منصة التوظيف الذكية");
+        setCompanyEn(settings.site_name_en || "NexHire AI");
       }
       if (status === "rejected") {
         const { data } = await (supabase as any)

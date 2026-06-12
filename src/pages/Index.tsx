@@ -8,7 +8,6 @@ import { useSiteContent } from "@/hooks/useSiteContent";
 import { supabase } from "@/integrations/supabase/client";
 import StorageImage from "@/components/StorageImage";
 import ProjectLogo from "@/components/ProjectLogo";
-import logo from "@/assets/logo.jpg";
 import SiteLogo from "@/components/SiteLogo";
 import heroBg from "@/assets/hero-bg.jpg";
 
@@ -246,16 +245,7 @@ const Index = () => {
       {/* Footer */}
       <footer className="bg-card py-8 px-6 border-t border-border">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
-          {content.logo_url ? (
-            <img 
-              src={content.logo_url} 
-              alt={bi(content.site_name_ar, content.site_name_en)} 
-              style={{ borderRadius: `${parseInt(content.logo_border_radius) || 8}px` }}
-              className="h-8 object-contain" 
-            />
-          ) : (
-            <img src={logo} alt="AlKholi Group" className="h-8 object-contain" />
-          )}
+          <SiteLogo heightOverride={32} />
           <p className="text-muted-foreground text-sm">
             © {new Date().getFullYear()} {bi(content.site_name_ar, content.site_name_en)} — {bi("جميع الحقوق محفوظة", "All Rights Reserved")}
           </p>

@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { ArrowLeft, ArrowRight, Mail } from "lucide-react";
-import logo from "@/assets/logo.jpg";
+import SiteLogo from "@/components/SiteLogo";
 
 const ForgotPasswordPage = () => {
   const { t, dir, lang } = useLanguage();
@@ -33,7 +33,7 @@ const ForgotPasswordPage = () => {
     <div className="min-h-screen bg-background flex items-center justify-center" dir={dir}>
       <Card className="w-full max-w-md mx-4">
         <CardHeader className="text-center">
-          <img src={logo} alt="AlKholi Group" className="h-16 mx-auto mb-4 object-contain" />
+          <SiteLogo heightOverride={64} className="mx-auto mb-4" />
           <CardTitle className="text-2xl">{t("admin.forgotPassword")}</CardTitle>
           <p className="text-sm text-muted-foreground mt-2">{t("admin.forgotDesc")}</p>
         </CardHeader>

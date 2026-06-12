@@ -14,10 +14,10 @@ export interface SiteSettings {
 const DEFAULT_SETTINGS: SiteSettings = {
   id: "",
   logo_url: null,
-  primary_color: "#1a365d",
-  accent_color: "#2f855a",
-  site_name_ar: "مجموعة الخولي",
-  site_name_en: "AlKholi Group",
+  primary_color: "#3b82f6",
+  accent_color: "#22d3ee",
+  site_name_ar: "منصة التوظيف الذكية",
+  site_name_en: "NexHire AI",
   // Fail open if settings can't be loaded, so a fetch error never locks
   // admins out behind a 2FA prompt they can't complete.
   two_factor_enabled: false,

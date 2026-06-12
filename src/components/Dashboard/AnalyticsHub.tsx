@@ -29,7 +29,7 @@ import { toast } from "sonner";
 import DashboardCustomizer from "./DashboardCustomizer";
 import { useDashboardPrefs, ChartType, DashboardPrefs } from "@/hooks/useDashboardPrefs";
 
-const COLORS = ["#1a365d", "#2f855a", "#3b82f6", "#eab308", "#a855f7", "#ef4444", "#06b6d4", "#f97316", "#ec4899", "#14b8a6"];
+const COLORS = ["#3b82f6", "#22d3ee", "#3b82f6", "#eab308", "#a855f7", "#ef4444", "#06b6d4", "#f97316", "#ec4899", "#14b8a6"];
 const CHART_COLORS = [
   "hsl(var(--chart-1))",
   "hsl(var(--chart-2))",
@@ -387,8 +387,8 @@ const AnalyticsHub = ({ applicants, jobs = [] }: Props) => {
 
       {/* KPIs */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-        <Kpi icon={Users} label={lang === "ar" ? "إجمالي المتقدمين" : "Total Applicants"} value={filtered.length.toLocaleString()} trend={periodChange?.pct} color="#1a365d" />
-        <Kpi icon={Globe} label={lang === "ar" ? "نسبة السعودة" : "Saudization"} value={`${saudizationRate}%`} sub={`${saudiCount} / ${filtered.length}`} trend={prevSaudization !== null ? saudizationRate - prevSaudization : null} color="#2f855a" />
+        <Kpi icon={Users} label={lang === "ar" ? "إجمالي المتقدمين" : "Total Applicants"} value={filtered.length.toLocaleString()} trend={periodChange?.pct} color="#3b82f6" />
+        <Kpi icon={Globe} label={lang === "ar" ? "نسبة السعودة" : "Saudization"} value={`${saudizationRate}%`} sub={`${saudiCount} / ${filtered.length}`} trend={prevSaudization !== null ? saudizationRate - prevSaudization : null} color="#22d3ee" />
         <Kpi icon={Target} label={lang === "ar" ? "نسبة التحويل" : "Conversion"} value={`${conversionRate}%`} sub={lang === "ar" ? "تقديم → توظيف" : "Apply → Hire"} color="#a855f7" />
         <Kpi icon={Briefcase} label={lang === "ar" ? "وظائف نشطة" : "Active Jobs"} value={stats.activeJobs} sub={`${stats.totalVacancies} ${lang === "ar" ? "شاغر" : "vacancies"}`} color="#3b82f6" />
         <Kpi icon={DollarSign} label={lang === "ar" ? "متوسط الراتب المتوقع" : "Avg Expected Salary"} value={stats.avgSalary > 0 ? `${(stats.avgSalary / 1000).toFixed(1)}K` : "-"} sub="SAR" color="#eab308" />
@@ -516,7 +516,7 @@ const AnalyticsHub = ({ applicants, jobs = [] }: Props) => {
                 {cityHeatmap.map((c, i) => {
                   const intensity = c.value / maxCity;
                   return (
-                    <div key={i} className="rounded-lg p-3 text-center transition-transform hover:scale-105 cursor-default" style={{ background: `rgba(26, 54, 93, ${0.15 + intensity * 0.85})`, color: intensity > 0.5 ? "#fff" : "#1a365d" }}>
+                    <div key={i} className="rounded-lg p-3 text-center transition-transform hover:scale-105 cursor-default" style={{ background: `rgba(59, 130, 246, ${0.15 + intensity * 0.85})`, color: intensity > 0.5 ? "#fff" : "#3b82f6" }}>
                       <div className="text-xs font-medium truncate">{c.name}</div>
                       <div className="text-xl font-bold mt-1">{c.value}</div>
                     </div>
@@ -528,11 +528,11 @@ const AnalyticsHub = ({ applicants, jobs = [] }: Props) => {
           <div className="grid md:grid-cols-2 gap-3">
             <Card>
               <CardHeader className="pb-1"><CardTitle className="text-sm">{lang === "ar" ? "مدينة السكن الحالية" : "Current City"}</CardTitle></CardHeader>
-              <CardContent><div className="h-[260px]"><ResponsiveContainer><BarChart data={cityData}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="name" tick={{ fontSize: 10 }} angle={-30} textAnchor="end" height={60} /><YAxis /><Tooltip /><Bar dataKey="value" fill="#1a365d" radius={[4, 4, 0, 0]} /></BarChart></ResponsiveContainer></div></CardContent>
+              <CardContent><div className="h-[260px]"><ResponsiveContainer><BarChart data={cityData}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="name" tick={{ fontSize: 10 }} angle={-30} textAnchor="end" height={60} /><YAxis /><Tooltip /><Bar dataKey="value" fill="#3b82f6" radius={[4, 4, 0, 0]} /></BarChart></ResponsiveContainer></div></CardContent>
             </Card>
             <Card>
               <CardHeader className="pb-1"><CardTitle className="text-sm">{lang === "ar" ? "المدينة المفضلة" : "Preferred City"}</CardTitle></CardHeader>
-              <CardContent><div className="h-[260px]"><ResponsiveContainer><BarChart data={preferredCityData}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="name" tick={{ fontSize: 10 }} angle={-30} textAnchor="end" height={60} /><YAxis /><Tooltip /><Bar dataKey="value" fill="#2f855a" radius={[4, 4, 0, 0]} /></BarChart></ResponsiveContainer></div></CardContent>
+              <CardContent><div className="h-[260px]"><ResponsiveContainer><BarChart data={preferredCityData}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="name" tick={{ fontSize: 10 }} angle={-30} textAnchor="end" height={60} /><YAxis /><Tooltip /><Bar dataKey="value" fill="#22d3ee" radius={[4, 4, 0, 0]} /></BarChart></ResponsiveContainer></div></CardContent>
             </Card>
           </div>
         </TabsContent>
@@ -545,8 +545,8 @@ const AnalyticsHub = ({ applicants, jobs = [] }: Props) => {
               {jobsAnalysis.length === 0 ? <p className="text-center text-muted-foreground text-sm py-8">{lang === "ar" ? "لا توجد وظائف نشطة" : "No active jobs"}</p> : (
                 <div className="h-[340px]"><ResponsiveContainer><ComposedChart data={jobsAnalysis}>
                   <CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="name" tick={{ fontSize: 9 }} angle={-25} textAnchor="end" height={70} /><YAxis yAxisId="left" /><YAxis yAxisId="right" orientation="right" /><Tooltip /><Legend />
-                  <Bar yAxisId="left" dataKey="applicants" fill="#1a365d" name={lang === "ar" ? "متقدمون" : "Applicants"} radius={[4, 4, 0, 0]} />
-                  <Bar yAxisId="left" dataKey="vacancies" fill="#2f855a" name={lang === "ar" ? "شواغر" : "Vacancies"} radius={[4, 4, 0, 0]} />
+                  <Bar yAxisId="left" dataKey="applicants" fill="#3b82f6" name={lang === "ar" ? "متقدمون" : "Applicants"} radius={[4, 4, 0, 0]} />
+                  <Bar yAxisId="left" dataKey="vacancies" fill="#22d3ee" name={lang === "ar" ? "شواغر" : "Vacancies"} radius={[4, 4, 0, 0]} />
                   <Line yAxisId="right" dataKey="ratio" stroke="#eab308" strokeWidth={2} name={lang === "ar" ? "نسبة التغطية" : "Coverage Ratio"} />
                 </ComposedChart></ResponsiveContainer></div>
               )}
@@ -577,10 +577,10 @@ const AnalyticsHub = ({ applicants, jobs = [] }: Props) => {
             <CardHeader className="pb-1"><CardTitle className="text-sm flex items-center gap-1.5"><TrendingUp className="w-4 h-4" />{lang === "ar" ? "حركة التقديم - 30 يوم" : "Application Trend - 30 days"}</CardTitle></CardHeader>
             <CardContent>
               <div className="h-[280px]"><ResponsiveContainer><AreaChart data={dailyTrend}>
-                <defs><linearGradient id="g1" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#1a365d" stopOpacity={0.4} /><stop offset="95%" stopColor="#1a365d" stopOpacity={0} /></linearGradient><linearGradient id="g2" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#2f855a" stopOpacity={0.4} /><stop offset="95%" stopColor="#2f855a" stopOpacity={0} /></linearGradient></defs>
+                <defs><linearGradient id="g1" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#3b82f6" stopOpacity={0.4} /><stop offset="95%" stopColor="#3b82f6" stopOpacity={0} /></linearGradient><linearGradient id="g2" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#22d3ee" stopOpacity={0.4} /><stop offset="95%" stopColor="#22d3ee" stopOpacity={0} /></linearGradient></defs>
                 <CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="date" tick={{ fontSize: 9 }} interval="preserveStartEnd" /><YAxis /><Tooltip /><Legend />
-                <Area type="monotone" dataKey="total" stroke="#1a365d" fill="url(#g1)" name={lang === "ar" ? "الإجمالي" : "Total"} />
-                <Area type="monotone" dataKey="saudi" stroke="#2f855a" fill="url(#g2)" name={lang === "ar" ? "سعودي" : "Saudi"} />
+                <Area type="monotone" dataKey="total" stroke="#3b82f6" fill="url(#g1)" name={lang === "ar" ? "الإجمالي" : "Total"} />
+                <Area type="monotone" dataKey="saudi" stroke="#22d3ee" fill="url(#g2)" name={lang === "ar" ? "سعودي" : "Saudi"} />
               </AreaChart></ResponsiveContainer></div>
             </CardContent>
           </Card>
@@ -609,14 +609,14 @@ const AnalyticsHub = ({ applicants, jobs = [] }: Props) => {
           <div className="space-y-4">
             <h2 className="text-2xl font-bold text-center">{lang === "ar" ? "لوحة العرض التنفيذي" : "Executive Dashboard"}</h2>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <Kpi icon={Users} label={lang === "ar" ? "إجمالي" : "Total"} value={filtered.length} color="#1a365d" />
-              <Kpi icon={Globe} label={lang === "ar" ? "السعودة" : "Saudization"} value={`${saudizationRate}%`} color="#2f855a" />
+              <Kpi icon={Users} label={lang === "ar" ? "إجمالي" : "Total"} value={filtered.length} color="#3b82f6" />
+              <Kpi icon={Globe} label={lang === "ar" ? "السعودة" : "Saudization"} value={`${saudizationRate}%`} color="#22d3ee" />
               <Kpi icon={Target} label={lang === "ar" ? "تحويل" : "Conversion"} value={`${conversionRate}%`} color="#a855f7" />
               <Kpi icon={Briefcase} label={lang === "ar" ? "وظائف" : "Jobs"} value={stats.activeJobs} color="#3b82f6" />
             </div>
             <div className="grid md:grid-cols-2 gap-3">
               <Card><CardContent className="p-3"><div className="h-[300px]"><ResponsiveContainer><FunnelChart><Tooltip /><Funnel dataKey="value" data={funnelData}><LabelList position="right" fill="#000" dataKey="name" /><LabelList position="center" fill="#fff" dataKey="value" /></Funnel></FunnelChart></ResponsiveContainer></div></CardContent></Card>
-              <Card><CardContent className="p-3"><div className="h-[300px]"><ResponsiveContainer><AreaChart data={dailyTrend}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="date" tick={{ fontSize: 9 }} /><YAxis /><Tooltip /><Area dataKey="total" stroke="#1a365d" fill="#1a365d" fillOpacity={0.2} /></AreaChart></ResponsiveContainer></div></CardContent></Card>
+              <Card><CardContent className="p-3"><div className="h-[300px]"><ResponsiveContainer><AreaChart data={dailyTrend}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="date" tick={{ fontSize: 9 }} /><YAxis /><Tooltip /><Area dataKey="total" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.2} /></AreaChart></ResponsiveContainer></div></CardContent></Card>
             </div>
           </div>
         </DialogContent>

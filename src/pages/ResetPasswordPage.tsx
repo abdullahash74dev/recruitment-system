@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { CheckCircle2 } from "lucide-react";
-import logo from "@/assets/logo.jpg";
+import SiteLogo from "@/components/SiteLogo";
 
 const ResetPasswordPage = () => {
   const { t, dir } = useLanguage();
@@ -84,7 +84,7 @@ const ResetPasswordPage = () => {
     <div className="min-h-screen bg-background flex items-center justify-center" dir={dir}>
       <Card className="w-full max-w-md mx-4">
         <CardHeader className="text-center">
-          <img src={logo} alt="AlKholi Group" className="h-16 mx-auto mb-4 object-contain" />
+          <SiteLogo heightOverride={64} className="mx-auto mb-4" />
           <CardTitle className="text-2xl">{t("admin.newPassword")}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">

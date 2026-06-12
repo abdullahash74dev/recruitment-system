@@ -16,17 +16,17 @@ const translations: Record<Lang, Record<string, string>> = {
     "nav.formTitle": "نموذج التقديم الوظيفي",
     "nav.jobs": "الوظائف الشاغرة",
     "nav.dashboard": "لوحة التحكم",
-    "footer.rights": "مجموعة الخولي — جميع الحقوق محفوظة",
+    "footer.rights": "منصة التوظيف الذكية — جميع الحقوق محفوظة",
 
     // Hero
     "hero.title1": "ابنِ مستقبلك المهني",
-    "hero.title2": "مع مجموعة الخولي",
+    "hero.title2": "مع منصة التوظيف الذكية",
     "hero.desc": "نبحث عن كفاءات متميزة للانضمام لفريقنا. قدّم طلبك الآن واكتشف الفرص الوظيفية المتاحة.",
     "hero.cta": "تقدم للوظيفة",
     "hero.viewJobs": "تصفح الوظائف الشاغرة",
 
     // Features
-    "features.title": "لماذا مجموعة الخولي؟",
+    "features.title": "لماذا منصة التوظيف الذكية؟",
     "features.desc": "نقدم بيئة عمل محفزة وفرص نمو حقيقية لكل فرد في فريقنا",
     "features.env.title": "بيئة عمل احترافية",
     "features.env.desc": "نوفر بيئة عمل محفزة تساعدك على الإبداع والتطور المهني المستمر.",
@@ -41,7 +41,7 @@ const translations: Record<Lang, Record<string, string>> = {
     "cta.button": "ابدأ التقديم الآن",
 
     // Apply page
-    "apply.title": "انضم لفريق مجموعة الخولي",
+    "apply.title": "انضم لفريق منصة التوظيف الذكية",
     "apply.desc": "يرجى تعبئة النموذج التالي بدقة. سيتم التواصل معك بعد مراجعة طلبك.",
 
     // Steps
@@ -61,7 +61,7 @@ const translations: Record<Lang, Record<string, string>> = {
 
     // Success
     "success.title": "تم إرسال طلبك بنجاح!",
-    "success.desc": "شكراً لتقديمك على الوظيفة في مجموعة الخولي. سيتم مراجعة طلبك والتواصل معك في أقرب وقت.",
+    "success.desc": "شكراً لتقديمك على الوظيفة في منصة التوظيف الذكية. سيتم مراجعة طلبك والتواصل معك في أقرب وقت.",
 
     // Validation
     "validation.required": "يرجى تعبئة جميع الحقول المطلوبة",
@@ -293,7 +293,7 @@ const translations: Record<Lang, Record<string, string>> = {
     "jobDetail.additionalDetails": "تفاصيل إضافية",
     "jobDetail.vacancies": "عدد الشواغر",
     "jobDetail.interestedTitle": "مهتم بهذه الوظيفة؟",
-    "jobDetail.interestedDesc": "قدّم طلبك الآن وانضم لفريق مجموعة الخولي",
+    "jobDetail.interestedDesc": "قدّم طلبك الآن وانضم لفريق منصة التوظيف الذكية",
     "jobDetail.postedOn": "تاريخ النشر:",
 
     // Settings / Custom Questions
@@ -347,7 +347,7 @@ const translations: Record<Lang, Record<string, string>> = {
     // Training page
     "nav.training": "التدريب التعاوني / تمهير",
     "training.title": "فرص التدريب التعاوني وتمهير",
-    "training.desc": "انضم لبرامج التدريب التعاوني وتمهير في مجموعة الخولي",
+    "training.desc": "انضم لبرامج التدريب التعاوني وتمهير في منصة التوظيف الذكية",
     "training.noJobs": "لا توجد فرص تدريب متاحة حالياً",
     "training.applyNow": "قدم على الفرصة",
 
@@ -399,17 +399,17 @@ const translations: Record<Lang, Record<string, string>> = {
     "nav.formTitle": "Job Application Form",
     "nav.jobs": "Job Openings",
     "nav.dashboard": "Dashboard",
-    "footer.rights": "AlKholi Group — All Rights Reserved",
+    "footer.rights": "NexHire AI — All Rights Reserved",
 
     // Hero
     "hero.title1": "Build Your Career",
-    "hero.title2": "With AlKholi Group",
+    "hero.title2": "With NexHire AI",
     "hero.desc": "We are looking for outstanding talents to join our team. Apply now and explore available opportunities.",
     "hero.cta": "Apply for a Job",
     "hero.viewJobs": "Browse Job Openings",
 
     // Features
-    "features.title": "Why AlKholi Group?",
+    "features.title": "Why NexHire AI?",
     "features.desc": "We provide a motivating work environment and real growth opportunities for every team member",
     "features.env.title": "Professional Environment",
     "features.env.desc": "We provide a motivating work environment that helps you innovate and grow professionally.",
@@ -424,7 +424,7 @@ const translations: Record<Lang, Record<string, string>> = {
     "cta.button": "Start Applying Now",
 
     // Apply page
-    "apply.title": "Join AlKholi Group Team",
+    "apply.title": "Join the NexHire AI Team",
     "apply.desc": "Please fill out the following form carefully. We will contact you after reviewing your application.",
 
     // Steps
@@ -444,7 +444,7 @@ const translations: Record<Lang, Record<string, string>> = {
 
     // Success
     "success.title": "Application Submitted Successfully!",
-    "success.desc": "Thank you for applying at AlKholi Group. Your application will be reviewed and we will contact you soon.",
+    "success.desc": "Thank you for applying at NexHire AI. Your application will be reviewed and we will contact you soon.",
 
     // Validation
     "validation.required": "Please fill in all required fields",
@@ -676,7 +676,7 @@ const translations: Record<Lang, Record<string, string>> = {
     "jobDetail.additionalDetails": "Additional Details",
     "jobDetail.vacancies": "Vacancies",
     "jobDetail.interestedTitle": "Interested in this role?",
-    "jobDetail.interestedDesc": "Apply now and join the AlKholi Group team",
+    "jobDetail.interestedDesc": "Apply now and join the NexHire AI team",
     "jobDetail.postedOn": "Posted on:",
 
     // Settings / Custom Questions
@@ -730,7 +730,7 @@ const translations: Record<Lang, Record<string, string>> = {
     // Training page
     "nav.training": "Co-op / Tamheer",
     "training.title": "Co-op Training & Tamheer Opportunities",
-    "training.desc": "Join our Co-op and Tamheer training programs at AlKholi Group",
+    "training.desc": "Join our Co-op and Tamheer training programs at NexHire AI",
     "training.noJobs": "No training opportunities available right now",
     "training.applyNow": "Apply for this opportunity",
 
