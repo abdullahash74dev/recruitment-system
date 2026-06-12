@@ -12,6 +12,7 @@ import JobsPage from "./pages/JobsPage.tsx";
 import JobDetailPage from "./pages/JobDetailPage.tsx";
 import TrainingPage from "./pages/TrainingPage.tsx";
 import AdminLoginPage from "./pages/AdminLoginPage.tsx";
+import AdminVerifyPage from "./pages/AdminVerifyPage.tsx";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage.tsx";
 import ResetPasswordPage from "./pages/ResetPasswordPage.tsx";
 import DashboardPage from "./pages/DashboardPage.tsx";
@@ -51,6 +52,7 @@ const App = () => (
 
               {/* HR / Admin routes */}
               <Route path="/admin/login" element={<AdminLoginPage />} />
+              <Route path="/admin/verify" element={<AdminVerifyPage />} />
               <Route path="/admin/forgot-password" element={<ForgotPasswordPage />} />
               <Route path="/admin/reset-password" element={<ResetPasswordPage />} />
               <Route path="/admin" element={<AdminGuard><DashboardPage /></AdminGuard>} />

@@ -35,6 +35,7 @@ import ApplicantsMappedImport from "@/components/Dashboard/ApplicantsMappedImpor
 import UIStylingSettings from "@/components/Dashboard/UIStylingSettings";
 import JobPageSettings from "@/components/Dashboard/JobPageSettings";
 import DeletePinSettings from "@/components/Dashboard/DeletePinSettings";
+import TwoFactorSettings from "@/components/Dashboard/TwoFactorSettings";
 import JobsExcelTools from "@/components/Dashboard/JobsExcelTools";
 import SystemLog from "@/components/Dashboard/SystemLog";
 import TrashBin from "@/components/Dashboard/TrashBin";
@@ -1068,6 +1069,11 @@ const DashboardPage = () => {
               <Card className="border-destructive/40">
                 <CardContent className="p-6">
                   <DeletePinSettings />
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-6">
+                  <TwoFactorSettings />
                 </CardContent>
               </Card>
               <Card>

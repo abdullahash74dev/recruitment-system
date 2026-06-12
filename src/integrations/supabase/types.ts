@@ -1561,6 +1561,7 @@ export type Database = {
           training_page_desc_en: string | null
           training_page_title_ar: string | null
           training_page_title_en: string | null
+          two_factor_enabled: boolean
           ui_styles: Json | null
           updated_at: string
         }
@@ -1676,6 +1677,7 @@ export type Database = {
           training_page_desc_en?: string | null
           training_page_title_ar?: string | null
           training_page_title_en?: string | null
+          two_factor_enabled?: boolean
           ui_styles?: Json | null
           updated_at?: string
         }
@@ -1791,6 +1793,7 @@ export type Database = {
           training_page_desc_en?: string | null
           training_page_title_ar?: string | null
           training_page_title_en?: string | null
+          two_factor_enabled?: boolean
           ui_styles?: Json | null
           updated_at?: string
         }
