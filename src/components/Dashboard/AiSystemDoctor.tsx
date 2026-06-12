@@ -5,8 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Stethoscope, AlertTriangle, CheckCircle2, RefreshCw, ShieldAlert, Lightbulb, Wrench } from "lucide-react";
+import { Stethoscope, AlertTriangle, CheckCircle2, RefreshCw, ShieldAlert, Lightbulb, Wrench, History, Clock } from "lucide-react";
 import { toast } from "sonner";
+import { formatDistanceToNow } from "date-fns";
+import { ar as arLocale, enUS } from "date-fns/locale";
 
 interface Issue {
   title: string;
@@ -23,6 +25,17 @@ interface DoctorResult {
   analyzed_count?: number;
   client_error_count?: number;
 }
+interface DoctorRun {
+  id: string;
+  health_score: number | null;
+  summary: string | null;
+  issues: Issue[] | null;
+  recommendations: string[] | null;
+  analyzed_count: number;
+  client_error_count: number;
+  triggered_by: string;
+  created_at: string;
+}
 
 const SEV_COLOR: Record<string, string> = {
   low: "bg-blue-500/15 text-blue-700 dark:text-blue-400",
@@ -31,11 +44,15 @@ const SEV_COLOR: Record<string, string> = {
   critical: "bg-destructive/15 text-destructive",
 };
 
+const scoreColorFor = (score: number) => (score >= 80 ? "text-green-500" : score >= 60 ? "text-amber-500" : "text-destructive");
+
 const AiSystemDoctor = () => {
   const { lang } = useLanguage();
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<DoctorResult | null>(null);
+  const [history, setHistory] = useState<DoctorRun[]>([]);
   const clientErrorsRef = useRef<{ message: string; source?: string; ts: string }[]>([]);
+  const locale = lang === "ar" ? arLocale : enUS;
 
   // Capture browser errors in real-time
   useEffect(() => {
@@ -55,6 +72,27 @@ const AiSystemDoctor = () => {
     };
   }, []);
 
+  const loadHistory = async () => {
+    const { data } = await supabase.from("system_doctor_runs")
+      .select("id, health_score, summary, issues, recommendations, analyzed_count, client_error_count, triggered_by, created_at")
+      .order("created_at", { ascending: false })
+      .limit(10);
+    const rows = (data as DoctorRun[]) || [];
+    setHistory(rows);
+    if (rows.length > 0) {
+      setResult((prev) => prev ?? {
+        health_score: rows[0].health_score ?? undefined,
+        summary: rows[0].summary ?? undefined,
+        issues: rows[0].issues ?? [],
+        recommendations: rows[0].recommendations ?? [],
+        analyzed_count: rows[0].analyzed_count,
+        client_error_count: rows[0].client_error_count,
+      });
+    }
+  };
+
+  useEffect(() => { loadHistory(); }, []);
+
   const runDiagnosis = async () => {
     setLoading(true);
     try {
@@ -66,6 +104,7 @@ const AiSystemDoctor = () => {
       if (data?.error === "credits_exhausted") { toast.error(lang === "ar" ? "نفدت الأرصدة" : "Credits exhausted"); return; }
       setResult(data);
       toast.success(lang === "ar" ? "اكتمل الفحص" : "Diagnosis complete");
+      loadHistory();
     } catch (e: any) {
       toast.error(e.message || "Error");
     } finally {
@@ -74,7 +113,8 @@ const AiSystemDoctor = () => {
   };
 
   const score = result?.health_score ?? 0;
-  const scoreColor = score >= 80 ? "text-green-500" : score >= 60 ? "text-amber-500" : "text-destructive";
+  const scoreColor = scoreColorFor(score);
+  const lastRun = history[0];
 
   return (
     <Card>
@@ -93,9 +133,22 @@ const AiSystemDoctor = () => {
       <CardContent className="space-y-4">
         <p className="text-sm text-muted-foreground">
           {lang === "ar"
-            ? "يحلّل الذكاء الاصطناعي سجل النظام وأخطاء الواجهة ويقدّم تشخيصاً وخطوات الإصلاح."
-            : "AI analyzes system logs and browser errors and provides diagnosis and fix steps."}
+            ? "يحلّل الذكاء الاصطناعي سجل النظام وأخطاء الواجهة ويقدّم تشخيصاً وخطوات الإصلاح. يتم تشغيل فحص تلقائي كل 6 ساعات، وتُرسل تنبيهات للمشرفين عند رصد مشاكل تحتاج مراجعة."
+            : "AI analyzes system logs and browser errors and provides diagnosis and fix steps. An automatic check also runs every 6 hours, and admins are notified when issues need attention."}
         </p>
+
+        {lastRun && (
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Clock className="w-3.5 h-3.5" />
+            {lang === "ar" ? "آخر فحص:" : "Last check:"}{" "}
+            {formatDistanceToNow(new Date(lastRun.created_at), { addSuffix: true, locale })}
+            {" • "}
+            {lastRun.triggered_by === "cron" ? (lang === "ar" ? "تلقائي" : "automatic") : (lang === "ar" ? "يدوي" : "manual")}
+            {typeof lastRun.health_score === "number" && (
+              <span className={scoreColorFor(lastRun.health_score)}> • {lastRun.health_score}/100</span>
+            )}
+          </div>
+        )}
 
         {!result && !loading && (
           <div className="text-center py-8 text-muted-foreground text-sm">
@@ -171,6 +224,27 @@ const AiSystemDoctor = () => {
                 </CardContent>
               </Card>
             )}
+          </div>
+        )}
+
+        {/* Run history */}
+        {history.length > 0 && (
+          <div className="space-y-2">
+            <h3 className="font-semibold flex items-center gap-2"><History className="w-4 h-4" />{lang === "ar" ? "سجل الفحوصات" : "Check history"}</h3>
+            <ul className="divide-y rounded-md border">
+              {history.map((r) => (
+                <li key={r.id} className="flex items-center justify-between px-3 py-2 text-sm">
+                  <div className="text-muted-foreground">
+                    {formatDistanceToNow(new Date(r.created_at), { addSuffix: true, locale })}
+                    {" • "}
+                    {r.triggered_by === "cron" ? (lang === "ar" ? "تلقائي" : "automatic") : (lang === "ar" ? "يدوي" : "manual")}
+                  </div>
+                  {typeof r.health_score === "number" && (
+                    <span className={`font-semibold ${scoreColorFor(r.health_score)}`}>{r.health_score}/100</span>
+                  )}
+                </li>
+              ))}
+            </ul>
           </div>
         )}
       </CardContent>
