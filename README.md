@@ -1,3 +1,3 @@
-# Welcome to your Lovable project
+# AlKholi Group Recruitment System
 
 TODO: Document your project here

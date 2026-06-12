@@ -1,4 +1,4 @@
-// AI-powered analytics insights via Lovable AI Gateway (with Gemini fallback)
+// AI-powered analytics insights via direct Gemini API
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
@@ -27,9 +27,8 @@ serve(async (req) => {
     if (!isHr) return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
     const { stats, lang = "ar" } = await req.json();
-    const apiKey = Deno.env.get("LOVABLE_API_KEY");
     const geminiKey = Deno.env.get("GEMINI_API_KEY");
-    if (!apiKey && !geminiKey) throw new Error("No AI key configured");
+    if (!geminiKey) throw new Error("No AI key configured");
 
     const sysPrompt = lang === "ar"
       ? "أنت محلل بيانات توظيف خبير. تعطي رؤى دقيقة وعملية. الرد JSON فقط بدون أي شرح."

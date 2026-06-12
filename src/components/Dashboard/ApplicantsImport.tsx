@@ -181,7 +181,7 @@ const ApplicantsImport = ({ onChanged }: Props) => {
               </label>
               <label className="flex items-center gap-2 text-sm">
                 <input type="checkbox" checked={downloadAtt} onChange={e => setDownloadAtt(e.target.checked)} />
-                {lang === "ar" ? "تنزيل المرفقات من الروابط لتخزين Lovable Cloud الداخلي" : "Download attachments from links to internal Cloud storage"}
+                {lang === "ar" ? "تنزيل المرفقات من الروابط لتخزين Supabase الداخلي" : "Download attachments from links to internal Supabase storage"}
               </label>
             </div>
 

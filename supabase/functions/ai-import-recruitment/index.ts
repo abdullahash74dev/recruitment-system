@@ -25,10 +25,8 @@ Deno.serve(async (req) => {
     const url = Deno.env.get("SUPABASE_URL")!;
     const anon = Deno.env.get("SUPABASE_ANON_KEY")!;
     const svc = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const aiKey = Deno.env.get("LOVABLE_API_KEY");
     const geminiKey = Deno.env.get("GEMINI_API_KEY");
-    if (!aiKey && !geminiKey) return new Response(JSON.stringify({ error: "No AI key configured" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-
+    if (!geminiKey) return new Response(JSON.stringify({ error: "No AI key configured" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
     const userClient = createClient(url, anon, { global: { headers: { Authorization: authHeader } } });
     const { data: { user } } = await userClient.auth.getUser();

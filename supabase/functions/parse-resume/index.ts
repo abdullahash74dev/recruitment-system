@@ -55,9 +55,8 @@ Deno.serve(async (req) => {
       });
     }
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
-    if (!LOVABLE_API_KEY && !GEMINI_API_KEY) {
+    if (!GEMINI_API_KEY) {
       return new Response(JSON.stringify({ error: "API key not configured" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
