@@ -10,6 +10,7 @@ import StorageImage from "@/components/StorageImage";
 import ProjectLogo from "@/components/ProjectLogo";
 import SiteLogo from "@/components/SiteLogo";
 import AINetworkBackground from "@/components/AINetworkBackground";
+import AuroraBackground from "@/components/AuroraBackground";
 import heroBg from "@/assets/hero-bg.jpg";
 
 interface Project {
@@ -59,10 +60,11 @@ const Index = () => {
   const bi = (ar: string, en: string) => lang === "ar" ? ar : en;
 
   return (
-    <div className="min-h-screen bg-background" dir={dir}>
+    <div className="min-h-screen bg-background relative" dir={dir}>
+      <AuroraBackground />
       {/* Navbar */}
-      <nav className="absolute top-0 left-0 right-0 z-20 py-5 px-6">
-        <div className="max-w-6xl mx-auto flex items-center justify-between relative">
+      <nav className="absolute top-4 md:top-6 left-4 md:left-6 right-4 md:right-6 z-20">
+        <div className="max-w-6xl mx-auto flex items-center justify-between relative rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl shadow-lg px-4 md:px-6 py-2.5">
           <div className={content.logo_alignment === "center" ? "absolute left-1/2 -translate-x-1/2" : ""}>
             <SiteLogo />
           </div>
@@ -94,10 +96,18 @@ const Index = () => {
         <div className="absolute inset-0">
           <img src={heroBg} alt="" className="w-full h-full object-cover" width={1920} height={1080} />
           {!content.hero_bg_color && <div className="absolute inset-0 gradient-hero opacity-85" />}
+          {!content.hero_bg_color && <div className="absolute inset-0 bg-grid-dots opacity-40" />}
           {!content.hero_bg_color && <AINetworkBackground />}
         </div>
         <div className="relative z-10 max-w-6xl mx-auto px-6 py-20">
           <div className="max-w-2xl space-y-6 animate-fade-in">
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-white/15 bg-white/5 backdrop-blur-sm text-sm font-semibold text-primary-foreground animate-scale-in">
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full rounded-full bg-accent opacity-75 animate-ping" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-accent" />
+              </span>
+              <span className="text-gradient">{bi("مدعوم بالذكاء الاصطناعي", "AI-Powered Recruitment")}</span>
+            </div>
             <h1 className="text-4xl md:text-6xl font-black text-primary-foreground leading-tight">
               {bi(content.hero_title1_ar, content.hero_title1_en)}
               <br />
@@ -108,7 +118,7 @@ const Index = () => {
             </p>
             <div className="flex flex-wrap gap-4 pt-4">
               <Link to="/apply">
-                <Button size="lg" className="gradient-accent text-accent-foreground hover:opacity-90 gap-2 text-lg px-8 py-6 font-bold shadow-glow">
+                <Button size="lg" className="gradient-accent text-accent-foreground hover:opacity-90 gap-2 text-lg px-8 py-6 font-bold shadow-glow animate-glow-pulse">
                   {t("hero.cta")}
                   <Arrow className="w-5 h-5" />
                 </Button>
@@ -236,7 +246,7 @@ const Index = () => {
             {bi(content.cta_desc_ar, content.cta_desc_en)}
           </p>
           <Link to="/apply">
-            <Button size="lg" className="gradient-accent text-accent-foreground hover:opacity-90 gap-2 text-lg px-10 py-6 font-bold shadow-glow mt-4">
+            <Button size="lg" className="gradient-accent text-accent-foreground hover:opacity-90 gap-2 text-lg px-10 py-6 font-bold shadow-glow animate-glow-pulse mt-4">
               {t("cta.button")}
               <Arrow className="w-5 h-5" />
             </Button>

@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useLanguage } from "@/contexts/LanguageContext";
 import TopBar from "@/components/TopBar";
+import AuroraBackground from "@/components/AuroraBackground";
 import SiteLogo from "@/components/SiteLogo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -115,7 +116,8 @@ const TrackApplicationPage = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background" dir={dir}>
+    <div className="min-h-screen bg-background relative" dir={dir}>
+      <AuroraBackground />
       <header className="gradient-hero py-6 px-6">
         <div className="max-w-3xl mx-auto flex items-center justify-between">
           <Link to="/"><SiteLogo heightOverride={40} /></Link>

@@ -8,6 +8,7 @@ import { InputOTP, InputOTPGroup, InputOTPSlot } from "@/components/ui/input-otp
 import { toast } from "sonner";
 import { ShieldCheck } from "lucide-react";
 import SiteLogo from "@/components/SiteLogo";
+import AuroraBackground from "@/components/AuroraBackground";
 import { logAudit } from "@/lib/audit";
 import { TWO_FACTOR_SESSION_KEY } from "@/components/AdminGuard";
 
@@ -85,7 +86,8 @@ export default function AdminVerifyPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4" dir={dir}>
+    <div className="min-h-screen flex items-center justify-center bg-background p-4 relative" dir={dir}>
+      <AuroraBackground />
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4"><SiteLogo /></div>

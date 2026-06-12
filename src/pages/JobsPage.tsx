@@ -4,6 +4,7 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import SiteLogo from "@/components/SiteLogo";
+import AuroraBackground from "@/components/AuroraBackground";
 import { useSiteContent } from "@/hooks/useSiteContent";
 import TopBar from "@/components/TopBar";
 import { Button } from "@/components/ui/button";
@@ -190,7 +191,8 @@ const JobsPage = () => {
   const totalActive = filtered.length;
 
   return (
-    <div className="min-h-screen bg-background" dir={dir}>
+    <div className="min-h-screen bg-background relative" dir={dir}>
+      <AuroraBackground />
       <nav className="sticky top-0 z-30 bg-card border-b border-border shadow-sm">
         <div className="max-w-6xl mx-auto flex items-center justify-between py-3 px-6">
           <div className="flex items-center gap-6">

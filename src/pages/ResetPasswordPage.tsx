@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { CheckCircle2 } from "lucide-react";
 import SiteLogo from "@/components/SiteLogo";
+import AuroraBackground from "@/components/AuroraBackground";
 
 const ResetPasswordPage = () => {
   const { t, dir } = useLanguage();
@@ -81,7 +82,8 @@ const ResetPasswordPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center" dir={dir}>
+    <div className="min-h-screen bg-background flex items-center justify-center relative" dir={dir}>
+      <AuroraBackground />
       <Card className="w-full max-w-md mx-4">
         <CardHeader className="text-center">
           <SiteLogo heightOverride={64} className="mx-auto mb-4" />

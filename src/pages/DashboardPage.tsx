@@ -61,6 +61,8 @@ import ReportBuilder from "@/components/Dashboard/ReportBuilder";
 import SynonymsManager from "@/components/Dashboard/SynonymsManager";
 import JobCategoriesManager from "@/components/Dashboard/JobCategoriesManager";
 import { useDeletePin } from "@/components/DeletePinDialog";
+import AINetworkBackground from "@/components/AINetworkBackground";
+import AuroraBackground from "@/components/AuroraBackground";
 import type { ApplicantEmailStatus } from "@/lib/applicantEmailTemplates";
 import { STATUSES_WITH_EMAIL } from "@/lib/applicantEmailTemplates";
 import { Mail, Activity, Bot } from "lucide-react";
@@ -631,9 +633,11 @@ const DashboardPage = () => {
   if (tabAllowed("tab.ai_settings")) visibleTabs.push({ value: "ai_settings", label: <span className="flex items-center gap-1"><Bot className="w-3 h-3" />{lang === "ar" ? "إعدادات الذكاء" : "AI Settings"}</span> });
 
   return (
-    <div className="min-h-screen bg-background" dir={dir}>
+    <div className="min-h-screen bg-background relative" dir={dir}>
+      <AuroraBackground />
       {/* Header */}
       <header className="gradient-hero py-4 px-6 sticky top-0 z-30 border-b border-white/10 shadow-elevated relative overflow-hidden">
+        <AINetworkBackground className="opacity-40" />
         <div
           className="absolute inset-0 pointer-events-none opacity-60"
           style={{ background: "radial-gradient(circle at 15% 30%, hsl(var(--accent) / 0.25), transparent 55%)" }}
@@ -643,7 +647,7 @@ const DashboardPage = () => {
             <Link to="/"><SiteLogo heightOverride={40} /></Link>
             <div className="hidden md:flex items-center gap-2">
               <h1 className="text-primary-foreground font-bold text-lg">{t("dash.title")}</h1>
-              <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-accent bg-white/10 border border-white/15 rounded-full px-2.5 py-1 backdrop-blur-sm animate-scale-in">
+              <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-accent bg-white/10 border border-white/15 rounded-full px-2.5 py-1 backdrop-blur-sm shadow-glow animate-scale-in">
                 <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
                 AI
               </span>

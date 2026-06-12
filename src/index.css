@@ -49,12 +49,12 @@
     --font-body: 'Cairo', sans-serif;
 
     --gradient-primary: linear-gradient(135deg, hsl(222, 47%, 11%), hsl(217, 91%, 45%));
-    --gradient-accent: linear-gradient(135deg, hsl(217, 91%, 60%), hsl(189, 94%, 50%));
-    --gradient-hero: linear-gradient(160deg, hsl(222, 47%, 7%), hsl(222, 55%, 14%), hsl(217, 70%, 24%));
+    --gradient-accent: linear-gradient(135deg, hsl(217, 91%, 60%), hsl(258, 90%, 66%) 50%, hsl(189, 94%, 50%));
+    --gradient-hero: linear-gradient(160deg, hsl(222, 47%, 6%), hsl(243, 55%, 16%) 45%, hsl(258, 60%, 20%) 72%, hsl(189, 70%, 28%));
 
     --shadow-card: 0 1px 3px 0 hsl(222 47% 11% / 0.06), 0 1px 2px -1px hsl(222 47% 11% / 0.06);
     --shadow-elevated: 0 10px 25px -5px hsl(222 47% 11% / 0.12), 0 8px 10px -6px hsl(222 47% 11% / 0.06);
-    --shadow-glow: 0 0 24px hsl(217, 91%, 60%, 0.35);
+    --shadow-glow: 0 0 28px hsl(217, 91%, 60%, 0.35), 0 0 56px hsl(258, 90%, 66%, 0.2);
 
     --chart-1: 217 91% 55%;
     --chart-2: 189 94% 48%;
@@ -294,6 +294,29 @@ html.icons-sharp svg { stroke-linecap: square; stroke-linejoin: miter; stroke-wi
   }
   .animate-float {
     animation: float-y 6s ease-in-out infinite;
+  }
+  .animate-aurora-drift {
+    animation: aurora-drift 30s ease-in-out infinite;
+  }
+  .animate-aurora-drift-slow {
+    animation: aurora-drift 42s ease-in-out infinite;
+    animation-delay: -15s;
+  }
+  .animate-glow-pulse {
+    animation: glow-pulse 3s ease-in-out infinite;
+  }
+  .bg-grid-dots {
+    background-image: radial-gradient(circle at 1px 1px, hsl(0 0% 100% / 0.08) 1px, transparent 0);
+    background-size: 28px 28px;
+  }
+  @keyframes aurora-drift {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    33% { transform: translate(6%, -8%) scale(1.1); }
+    66% { transform: translate(-8%, 5%) scale(0.95); }
+  }
+  @keyframes glow-pulse {
+    0%, 100% { box-shadow: 0 0 20px hsl(var(--primary) / 0.35), 0 0 40px hsl(var(--accent) / 0.15); }
+    50% { box-shadow: 0 0 36px hsl(var(--primary) / 0.55), 0 0 70px hsl(var(--accent) / 0.3); }
   }
   @keyframes fade-in-up {
     from { opacity: 0; transform: translateY(24px); }
