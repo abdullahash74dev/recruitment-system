@@ -599,10 +599,10 @@ const DashboardPage = () => {
 
 
   const stats = [
-    { label: t("dash.totalApplicants"), value: activeApplicants.length, icon: Users, color: "text-blue-500" },
-    { label: t("dash.newApplicants"), value: activeApplicants.filter(a => a.status === "new").length, icon: UserPlus, color: "text-yellow-500" },
-    { label: t("dash.inInterview"), value: activeApplicants.filter(a => ["phone_interview", "in_person_interview"].includes(a.status)).length, icon: Phone, color: "text-purple-500" },
-    { label: t("dash.hired"), value: activeApplicants.filter(a => a.status === "hired").length, icon: CheckCircle2, color: "text-green-500" },
+    { label: t("dash.totalApplicants"), value: activeApplicants.length, icon: Users, color: "text-blue-500", bg: "bg-blue-500/10" },
+    { label: t("dash.newApplicants"), value: activeApplicants.filter(a => a.status === "new").length, icon: UserPlus, color: "text-yellow-500", bg: "bg-yellow-500/10" },
+    { label: t("dash.inInterview"), value: activeApplicants.filter(a => ["phone_interview", "in_person_interview"].includes(a.status)).length, icon: Phone, color: "text-purple-500", bg: "bg-purple-500/10" },
+    { label: t("dash.hired"), value: activeApplicants.filter(a => a.status === "hired").length, icon: CheckCircle2, color: "text-green-500", bg: "bg-green-500/10" },
   ];
 
   const isAdmin = currentUserRole === "admin";
@@ -633,11 +633,21 @@ const DashboardPage = () => {
   return (
     <div className="min-h-screen bg-background" dir={dir}>
       {/* Header */}
-      <header className="gradient-hero py-4 px-6 sticky top-0 z-30">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
+      <header className="gradient-hero py-4 px-6 sticky top-0 z-30 border-b border-white/10 shadow-elevated relative overflow-hidden">
+        <div
+          className="absolute inset-0 pointer-events-none opacity-60"
+          style={{ background: "radial-gradient(circle at 15% 30%, hsl(var(--accent) / 0.25), transparent 55%)" }}
+        />
+        <div className="max-w-7xl mx-auto flex items-center justify-between relative z-10">
           <div className="flex items-center gap-4">
             <Link to="/"><SiteLogo heightOverride={40} /></Link>
-            <h1 className="text-primary-foreground font-bold text-lg hidden md:block">{t("dash.title")}</h1>
+            <div className="hidden md:flex items-center gap-2">
+              <h1 className="text-primary-foreground font-bold text-lg">{t("dash.title")}</h1>
+              <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-accent bg-white/10 border border-white/15 rounded-full px-2.5 py-1 backdrop-blur-sm animate-scale-in">
+                <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
+                AI
+              </span>
+            </div>
           </div>
           <div className="flex items-center gap-3">
             <TopBar variant="light" allowCustomization />
@@ -658,14 +668,16 @@ const DashboardPage = () => {
         {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {stats.map((stat, i) => (
-            <Card key={i} className="hover:shadow-elevated transition-shadow">
+            <Card key={i} className="group overflow-hidden hover:shadow-elevated hover:-translate-y-0.5">
               <CardContent className="p-4 md:p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-muted-foreground text-xs md:text-sm">{stat.label}</p>
-                    <p className="text-2xl md:text-3xl font-bold mt-1">{stat.value}</p>
+                    <p className="text-muted-foreground text-xs md:text-sm font-medium">{stat.label}</p>
+                    <p className="text-2xl md:text-3xl font-bold mt-1 tracking-tight">{stat.value}</p>
                   </div>
-                  <stat.icon className={`w-8 h-8 md:w-10 md:h-10 ${stat.color} opacity-80`} />
+                  <div className={`w-12 h-12 md:w-14 md:h-14 rounded-2xl ${stat.bg} flex items-center justify-center transition-transform duration-300 group-hover:scale-110`}>
+                    <stat.icon className={`w-6 h-6 md:w-7 md:h-7 ${stat.color}`} />
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -675,12 +687,12 @@ const DashboardPage = () => {
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           {/* Unified tab bar — auto-flows to grid so future tabs match style. */}
-          <TabsList className="flex flex-wrap w-full h-auto gap-2 p-2 bg-muted rounded-lg justify-start">
+          <TabsList className="flex flex-wrap w-full h-auto gap-1.5 p-1.5 bg-muted/60 backdrop-blur-sm border border-border/50 rounded-xl justify-start shadow-sm">
             {visibleTabs.map(tab => (
               <TabsTrigger
                 key={tab.value}
                 value={tab.value}
-                className="h-9 px-4 text-sm font-medium rounded-md flex items-center gap-1.5 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
+                className="h-9 px-4 text-sm font-medium rounded-lg flex items-center gap-1.5 transition-all duration-300 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-md hover:text-foreground"
               >
                 {tab.label}
               </TabsTrigger>

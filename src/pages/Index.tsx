@@ -101,7 +101,7 @@ const Index = () => {
             <h1 className="text-4xl md:text-6xl font-black text-primary-foreground leading-tight">
               {bi(content.hero_title1_ar, content.hero_title1_en)}
               <br />
-              <span className="text-accent">{bi(content.hero_title2_ar, content.hero_title2_en)}</span>
+              <span className="text-gradient">{bi(content.hero_title2_ar, content.hero_title2_en)}</span>
             </h1>
             <p className="text-lg md:text-xl text-primary-foreground/80 leading-relaxed max-w-lg">
               {bi(content.hero_desc_ar, content.hero_desc_en)}
@@ -141,8 +141,8 @@ const Index = () => {
                 { icon: FolderOpen, value: `+${content.projects_count}`, label: bi("مشروع", "Projects") },
                 { icon: Briefcase, value: `${jobCount}`, label: bi("وظيفة شاغرة", "Open Positions") },
               ].map((stat, i) => (
-                <div key={i} className="text-center space-y-2 rounded-xl p-4 bg-card/60 backdrop-blur-md border border-border/50 hover:shadow-glow transition-shadow duration-300">
-                  <div className="w-14 h-14 rounded-xl gradient-accent flex items-center justify-center mx-auto shadow-glow">
+                <div key={i} className="text-center space-y-2 rounded-xl p-4 glass-panel hover-lift hover:shadow-glow animate-fade-in-up" style={{ animationDelay: `${i * 0.1}s` }}>
+                  <div className="w-14 h-14 rounded-xl gradient-accent flex items-center justify-center mx-auto shadow-glow animate-float" style={{ animationDelay: `${i * 0.3}s` }}>
                     <stat.icon className="w-7 h-7 text-accent-foreground" />
                   </div>
                   <p className="text-3xl md:text-4xl font-black text-primary">{stat.value}</p>
@@ -165,9 +165,9 @@ const Index = () => {
               {bi("نعمل على مشاريع رائدة في مختلف القطاعات", "We work on leading projects across various sectors")}
             </p>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-              {projects.map(project => (
-                <div key={project.id} className="group">
-                  <div className="bg-card rounded-xl border border-border p-6 hover:shadow-elevated transition-all duration-300 text-center h-full flex flex-col items-center justify-center gap-4">
+              {projects.map((project, i) => (
+                <div key={project.id} className="group animate-fade-in-up" style={{ animationDelay: `${i * 0.06}s` }}>
+                  <div className="bg-card rounded-xl border border-border p-6 hover-lift hover:shadow-elevated text-center h-full flex flex-col items-center justify-center gap-4">
                     <ProjectLogo
                       path={project.logo_url}
                       alt={bi(project.name_ar, project.name_en || project.name_ar)}
@@ -214,7 +214,7 @@ const Index = () => {
               { icon: Users, title: bi(content.feature2_title_ar, content.feature2_title_en), desc: bi(content.feature2_desc_ar, content.feature2_desc_en) },
               { icon: TrendingUp, title: bi(content.feature3_title_ar, content.feature3_title_en), desc: bi(content.feature3_desc_ar, content.feature3_desc_en) },
             ].map((feature, i) => (
-              <div key={i} className="bg-card/60 backdrop-blur-md rounded-xl p-8 shadow-card border border-border/50 hover:shadow-glow transition-shadow duration-300 text-center">
+              <div key={i} className="glass-panel rounded-xl p-8 shadow-card hover-lift hover:shadow-glow text-center animate-fade-in-up" style={{ animationDelay: `${i * 0.1}s` }}>
                 <div className="w-14 h-14 rounded-xl gradient-accent flex items-center justify-center mx-auto mb-5 shadow-glow">
                   <feature.icon className="w-7 h-7 text-accent-foreground" />
                 </div>
