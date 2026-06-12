@@ -687,16 +687,16 @@ export default function RecruitmentDashboard() {
                   {chartType === "pie" || chartType === "donut" ? (
                     <PieChart>
                       <Pie data={rejectionChartData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={120} innerRadius={chartType==="donut"?60:0} label={(e:any)=>`${e.name}: ${e.value}`}>
-                        {rejectionChartData.map((_,i)=><Cell key={i} fill={["#1a365d","#2f855a","#d69e2e","#9f1239","#7c3aed","#0891b2","#ea580c"][i%7]}/>)}
+                        {rejectionChartData.map((_,i)=><Cell key={i} fill={["#3b82f6","#22d3ee","#d69e2e","#9f1239","#7c3aed","#0891b2","#ea580c"][i%7]}/>)}
                       </Pie>
                       <Tooltip/><Legend/>
                     </PieChart>
                   ) : chartType === "line" ? (
-                    <LineChart data={rejectionChartData}><CartesianGrid strokeDasharray="3 3"/><XAxis dataKey="name" tick={{fontSize:11}}/><YAxis/><Tooltip/><Line type="monotone" dataKey="value" stroke="#1a365d" strokeWidth={2}/></LineChart>
+                    <LineChart data={rejectionChartData}><CartesianGrid strokeDasharray="3 3"/><XAxis dataKey="name" tick={{fontSize:11}}/><YAxis/><Tooltip/><Line type="monotone" dataKey="value" stroke="#3b82f6" strokeWidth={2}/></LineChart>
                   ) : chartType === "area" ? (
-                    <AreaChart data={rejectionChartData}><CartesianGrid strokeDasharray="3 3"/><XAxis dataKey="name" tick={{fontSize:11}}/><YAxis/><Tooltip/><Area type="monotone" dataKey="value" stroke="#1a365d" fill="#1a365d" fillOpacity={0.5}/></AreaChart>
+                    <AreaChart data={rejectionChartData}><CartesianGrid strokeDasharray="3 3"/><XAxis dataKey="name" tick={{fontSize:11}}/><YAxis/><Tooltip/><Area type="monotone" dataKey="value" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.5}/></AreaChart>
                   ) : (
-                    <BarChart data={rejectionChartData}><CartesianGrid strokeDasharray="3 3"/><XAxis dataKey="name" tick={{fontSize:11}}/><YAxis allowDecimals={false}/><Tooltip/><Bar dataKey="value" fill="#1a365d"/></BarChart>
+                    <BarChart data={rejectionChartData}><CartesianGrid strokeDasharray="3 3"/><XAxis dataKey="name" tick={{fontSize:11}}/><YAxis allowDecimals={false}/><Tooltip/><Bar dataKey="value" fill="#3b82f6"/></BarChart>
                   )}
                 </ResponsiveContainer>
               ) : <div className="text-center text-muted-foreground py-8">{ar?"لا توجد بيانات رفض":"No rejection data"}</div>}

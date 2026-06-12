@@ -89,7 +89,7 @@ const JobDetailPage = () => {
     color: s.job_page_apply_btn_text_color || undefined,
   };
 
-  const brandText = bi(s.job_page_brand_text_ar || "ALKHOLI GROUP", s.job_page_brand_text_en || "ALKHOLI GROUP");
+  const brandText = bi(s.job_page_brand_text_ar || "NEXHIRE AI", s.job_page_brand_text_en || "NEXHIRE AI");
   const descTitle = bi(s.job_page_description_title_ar, s.job_page_description_title_en) || t("jobDetail.description");
   const reqTitle = bi(s.job_page_requirements_title_ar, s.job_page_requirements_title_en) || t("jobDetail.requirements");
   const addTitle = bi(s.job_page_additional_title_ar, s.job_page_additional_title_en) || t("jobDetail.additionalDetails");

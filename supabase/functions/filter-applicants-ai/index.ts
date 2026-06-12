@@ -1,7 +1,9 @@
-// AI-powered applicant filter via direct Gemini API - Accurate & Structured
+// AI-powered applicant filter - uses the configured AI provider (Gemini
+// by default, or Claude if selected) - Accurate & Structured
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { callAI } from "../_shared/ai-helper.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -176,6 +178,94 @@ function findSpecialty(prompt: string): { key: string; aliases: string[] } | nul
   return null;
 }
 
+// ---------- Extra normalization dictionaries: strengthen the local (no-AI) filter ----------
+const JOB_TYPE_MAP: Record<string, string> = {
+  "دوام كامل": "full_time", "فل تايم": "full_time", "full time": "full_time", "full-time": "full_time", "fulltime": "full_time",
+  "دوام جزئي": "part_time", "بارت تايم": "part_time", "part time": "part_time", "part-time": "part_time", "parttime": "part_time",
+  "تعاقد": "contract", "عقد": "contract", "contract": "contract",
+  "فريلانس": "freelance", "عمل حر": "freelance", "freelance": "freelance",
+  "تدريب صيفي": "internship", "تدريب": "internship", "internship": "internship",
+};
+
+const MARITAL_MAP: Record<string, string> = {
+  "غير متزوج": "single", "غير متزوجه": "single", "اعزب": "single", "عزباء": "single", "single": "single",
+  "متزوج": "married", "متزوجه": "married", "married": "married",
+  "مطلق": "divorced", "مطلقه": "divorced", "divorced": "divorced",
+  "ارمل": "widowed", "ارمله": "widowed", "widowed": "widowed", "widow": "widowed",
+};
+
+const YES_NO_MAP: Record<string, string> = {
+  "نعم": "yes", "yes": "yes", "متوفر": "yes", "متوفره": "yes", "يوجد": "yes", "available": "yes", "true": "yes", "1": "yes",
+  "لا يوجد": "no", "غير متوفر": "no", "غير متوفره": "no", "لا": "no", "no": "no", "not available": "no", "false": "no", "0": "no",
+};
+
+// Language proficiency: ordinal so "at least intermediate" matches intermediate/very_good/excellent.
+const LANGUAGE_LEVEL_MAP: Record<string, string> = {
+  "ممتاز": "excellent", "ممتازه": "excellent", "بطلاقه": "excellent", "اللغه الام": "excellent", "fluent": "excellent", "native": "excellent", "excellent": "excellent",
+  "جيد جدا": "very_good", "very good": "very_good",
+  "جيد": "good", "good": "good",
+  "متوسط": "intermediate", "متوسطه": "intermediate", "intermediate": "intermediate", "medium": "intermediate",
+  "مبتدئ": "beginner", "ضعيف": "beginner", "ضعيفه": "beginner", "beginner": "beginner", "basic": "beginner", "weak": "beginner",
+};
+const LANGUAGE_LEVEL_RANK: Record<string, number> = { beginner: 1, intermediate: 2, good: 3, very_good: 4, excellent: 5 };
+
+const LANGUAGE_NAME_TOKENS: Record<"arabic" | "english", string[]> = {
+  arabic: ["اللغه العربيه", "اللغه العربية", "العربيه", "عربي", "arabic"],
+  english: ["اللغه الانجليزيه", "اللغه الانجليزية", "الانجليزيه", "انجليزي", "english"],
+};
+
+function langRank(v: any): number {
+  const canonical = normalizeWith(LANGUAGE_LEVEL_MAP, v);
+  return LANGUAGE_LEVEL_RANK[canonical] || 0;
+}
+
+// Finds "<language> at least/exactly <level>" requirements in the prompt,
+// e.g. "انجليزي ممتاز" or "english at least intermediate".
+function findLanguageRequirement(prompt: string, which: "arabic" | "english"): number | null {
+  const p = cleanText(prompt);
+  for (const name of LANGUAGE_NAME_TOKENS[which].map(cleanText)) {
+    const idx = p.indexOf(name);
+    if (idx === -1) continue;
+    const window = p.slice(idx, idx + name.length + 25);
+    for (const [alias, canonical] of Object.entries(LANGUAGE_LEVEL_MAP).sort((a, b) => b[0].length - a[0].length)) {
+      if (window.includes(cleanText(alias))) return LANGUAGE_LEVEL_RANK[canonical];
+    }
+  }
+  return null;
+}
+
+// Detects "has transport/car/driving license" requirements, handling negation
+// ("no car") before the positive form ("has car"), since the negative phrase
+// contains the positive phrase as a substring.
+function findTransportRequirement(prompt: string): "yes" | "no" | null {
+  const p = cleanText(prompt);
+  const noPatterns = ["لا يملك سياره", "لا يوجد لديه سياره", "بدون سياره", "ليس لديه سياره", "لا يمتلك سياره", "بدون رخصه قياده", "no car", "without car", "no transport", "no driving license", "doesn't have a car"];
+  const yesPatterns = ["يملك سياره", "لديه سياره", "عنده سياره", "يمتلك سياره", "يملك رخصه قياده", "لديه رخصه قياده", "رخصه قياده", "وسيله نقل خاصه", "has car", "has a car", "own car", "driving license", "has transport"];
+  if (noPatterns.some((x) => p.includes(cleanText(x)))) return "no";
+  if (yesPatterns.some((x) => p.includes(cleanText(x)))) return "yes";
+  return null;
+}
+
+function parseSalaryValue(v: any): number | null {
+  const s = cleanText(v);
+  const m = s.match(/\d{3,7}/);
+  return m ? Number(m[0]) : null;
+}
+
+// Parses an expected-salary range from the prompt, e.g.
+// "راتب متوقع اقل من 6000" or "salary between 4000 and 6000".
+function parseSalaryRange(prompt: string): { min: number | null; max: number | null } | null {
+  const p = cleanText(prompt);
+  if (!/راتب|salary|اجر/.test(p)) return null;
+  let m = p.match(/(?:من|between)\s*(\d{3,7})\s*(?:الى|إلى|to|and|-)\s*(\d{3,7})/i);
+  if (m) return { min: Number(m[1]), max: Number(m[2]) };
+  m = p.match(/(?:اقل من|less than|under|حتى|up to|لا يتجاوز|اقصى)\s*(\d{3,7})/i);
+  if (m) return { min: null, max: Number(m[1]) };
+  m = p.match(/(?:اكثر من|فوق|اعلى من|over|more than|لا يقل عن|minimum)\s*(\d{3,7})/i);
+  if (m) return { min: Number(m[1]), max: null };
+  return null;
+}
+
 function localFilter(prompt: string, rows: any[], lang: string) {
   const q = cleanText(prompt);
   const nationality = findCanonicalInPrompt(NATIONALITY_MAP, q);
@@ -185,6 +275,12 @@ function localFilter(prompt: string, rows: any[], lang: string) {
   const yearsRange = parseYearsRange(q);
   const city = findCity(q);
   const specialty = findSpecialty(q);
+  const jobType = findCanonicalInPrompt(JOB_TYPE_MAP, q);
+  const marital = findCanonicalInPrompt(MARITAL_MAP, q);
+  const transport = findTransportRequirement(q);
+  const arabicMin = findLanguageRequirement(q, "arabic");
+  const englishMin = findLanguageRequirement(q, "english");
+  const salaryRange = parseSalaryRange(q);
   const qTokens = q.split(" ").filter((t) => t.length >= 3 && !["اعطني", "ابغى", "ارغب", "لدي", "في", "من", "على", "with", "and", "the", "years"].includes(t));
 
   const found: { id: string; score: number; reason: string }[] = [];
@@ -204,6 +300,12 @@ function localFilter(prompt: string, rows: any[], lang: string) {
     if (city) { required++; if (normalizeCity(`${a.preferred_city || ""} ${a.current_city || ""}`) === city) { passed++; score += 16; reasons.push(lang === "ar" ? "المدينة مطابقة" : "City matches"); } }
     if (specialty) { required++; const excludes = (SPECIALTY_EXCLUDE[specialty.key] || []).map(cleanText); const hasExcluded = excludes.some((x) => searchable.includes(x)); const hit = specialty.aliases.some((x) => searchable.includes(x)); if (hit && !hasExcluded) { passed++; score += 22; reasons.push(lang === "ar" ? "التخصص مطابق" : "Specialty matches"); } }
     if (domain) { required++; const aliases = Object.entries(DOMAIN_MAP).filter(([, c]) => c === domain).map(([k]) => cleanText(k)); if (aliases.some((x) => searchable.includes(x))) { passed++; score += 18; reasons.push(lang === "ar" ? "المجال مطابق" : "Domain matches"); } }
+    if (jobType) { required++; if (a._norm?.job_type === jobType) { passed++; score += 10; reasons.push(lang === "ar" ? "نوع العمل مطابق" : "Job type matches"); } }
+    if (marital) { required++; if (a._norm?.marital_status === marital) { passed++; score += 8; reasons.push(lang === "ar" ? "الحالة الاجتماعية مطابقة" : "Marital status matches"); } }
+    if (transport) { required++; if (a._norm?.has_transport === transport) { passed++; score += 8; reasons.push(lang === "ar" ? "توفر وسيلة النقل مطابق" : "Transport availability matches"); } }
+    if (arabicMin != null) { required++; if (a._norm?.arabic_rank >= arabicMin) { passed++; score += 10; reasons.push(lang === "ar" ? "مستوى اللغة العربية يطابق" : "Arabic level matches"); } }
+    if (englishMin != null) { required++; if (a._norm?.english_rank >= englishMin) { passed++; score += 10; reasons.push(lang === "ar" ? "مستوى اللغة الإنجليزية يطابق" : "English level matches"); } }
+    if (salaryRange) { required++; const sal = a._norm?.expected_salary; if (sal != null && (salaryRange.min == null || sal >= salaryRange.min) && (salaryRange.max == null || sal <= salaryRange.max)) { passed++; score += 14; reasons.push(lang === "ar" ? `الراتب المتوقع ${sal}` : `Expected salary ${sal}`); } }
 
     const tokenHits = qTokens.filter((t) => searchable.includes(t)).length;
     if (tokenHits) score += Math.min(15, tokenHits * 3);
@@ -223,6 +325,12 @@ function normalizeRecord(a: any) {
       gender: normalizeWith(GENDER_MAP, a.gender),
       city: normalizeCity(`${a.preferred_city || ""} ${a.current_city || ""}`),
       years: parseExperienceYears(a.years_experience),
+      job_type: normalizeWith(JOB_TYPE_MAP, a.job_type),
+      marital_status: normalizeWith(MARITAL_MAP, a.marital_status),
+      has_transport: normalizeWith(YES_NO_MAP, a.has_transport),
+      arabic_rank: langRank(a.arabic_level),
+      english_rank: langRank(a.english_level),
+      expected_salary: parseSalaryValue(a.expected_salary),
     },
   };
 }
@@ -250,7 +358,7 @@ serve(async (req) => {
 
     // Normalize ahead of time
     const enriched = applicants.map(normalizeRecord);
-    const geminiKey = Deno.env.get("GEMINI_API_KEY");
+    const hasAiKey = !!(Deno.env.get("GEMINI_API_KEY") || Deno.env.get("ANTHROPIC_API_KEY"));
     const fallbackMatches = () => {
       const local = localFilter(prompt, enriched, lang);
       const matchedRows = enriched.filter((a: any) => local.some((m) => m.id === a.id));
@@ -273,10 +381,10 @@ serve(async (req) => {
           by_city: countBy("preferred_city"),
           by_position: countBy("desired_position"),
         },
-        warnings: geminiKey ? ["ai_gateway_unavailable_local_filter_used"] : ["local_filter_used"],
+        warnings: hasAiKey ? ["ai_gateway_unavailable_local_filter_used"] : ["local_filter_used"],
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     };
-    if (!geminiKey) return fallbackMatches();
+    if (!hasAiKey) return fallbackMatches();
 
     const CHUNK = 80;
     const matched = new Map<string, { id: string; reason: string; score: number }>();
@@ -290,6 +398,12 @@ serve(async (req) => {
       yearsRange: parseYearsRange(prompt),
       city: findCity(prompt),
       specialty: findSpecialty(prompt),
+      jobType: findCanonicalInPrompt(JOB_TYPE_MAP, prompt),
+      marital: findCanonicalInPrompt(MARITAL_MAP, prompt),
+      transport: findTransportRequirement(prompt),
+      arabicMin: findLanguageRequirement(prompt, "arabic"),
+      englishMin: findLanguageRequirement(prompt, "english"),
+      salaryRange: parseSalaryRange(prompt),
       multiEducation: /دبلوم.*بكالوريوس|بكالوريوس.*دبلوم|او\s*(?:دبلوم|بكالوريوس|ماجستير)/i.test(cleanText(prompt)),
     };
 
@@ -340,66 +454,34 @@ Call filter_results.`;
       },
     }];
 
-    let totalPromptTokens = 0;
-    let totalCompletionTokens = 0;
-    let usedFallback = false;
-    const t0 = Date.now();
-
-    const logUsage = async (extra: Record<string, any> = {}) => {
-      try {
-        const supa = createClient(
-          Deno.env.get("SUPABASE_URL")!,
-          Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
-        );
-        // Approx pricing Gemini 2.5 Pro: $1.25/M input, $10/M output
-        const cost = (totalPromptTokens * 1.25 + totalCompletionTokens * 10) / 1_000_000;
-        await supa.from("ai_usage_log").insert({
-          service: "filter-applicants-ai",
-          model: "google/gemini-2.5-pro",
-          prompt_tokens: totalPromptTokens,
-          completion_tokens: totalCompletionTokens,
-          total_tokens: totalPromptTokens + totalCompletionTokens,
-          estimated_cost_usd: cost,
-          status: extra.status || (chunkErrors.length ? "partial" : "success"),
-          error_code: extra.error_code || null,
-          duration_ms: Date.now() - t0,
-          metadata: { chunk_errors: chunkErrors, lang, total_scanned: applicants.length },
-        });
-      } catch (e) { console.error("logUsage failed:", e); }
-    };
-
     for (let i = 0; i < enriched.length; i += CHUNK) {
       const slice = enriched.slice(i, i + CHUNK);
       const userMsg = `Criterion / المعيار: ${prompt}\n\nCandidates (JSON):\n${JSON.stringify(slice)}`;
 
       try {
-        const reqBody = {
-          model: "gemini-2.5-pro",
-          messages: [{ role: "system", content: sys }, { role: "user", content: userMsg }],
-          tools,
-          tool_choice: { type: "function", function: { name: "filter_results" } },
-        };
-        const res = await fetch("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${geminiKey}` },
-          body: JSON.stringify(reqBody),
+        const aiResult = await callAI({
+          service: "filter-applicants-ai",
+          model: "google/gemini-2.5-pro",
+          userId: u.user.id,
+          userEmail: u.user.email,
+          metadata: { chunk_index: i, lang, total_scanned: applicants.length },
+          body: {
+            messages: [{ role: "system", content: sys }, { role: "user", content: userMsg }],
+            tools,
+            tool_choice: { type: "function", function: { name: "filter_results" } },
+          },
         });
 
-        if (!res.ok) {
-          if (res.status === 429 || res.status === 402) {
-            usedFallback = true;
-            await logUsage({ status: res.status === 402 ? "credits_exhausted" : "rate_limited", error_code: String(res.status) });
+        if (!aiResult.ok) {
+          if (aiResult.status === 429 || aiResult.status === 402) {
             return fallbackMatches();
           }
-          const txt = await res.text();
-          console.error(`Chunk ${i} AI error:`, res.status, txt);
-          chunkErrors.push(`chunk@${i}: ${res.status}`);
+          console.error(`Chunk ${i} AI error:`, aiResult.status, aiResult.errorText);
+          chunkErrors.push(`chunk@${i}: ${aiResult.status}`);
           continue;
         }
 
-        const data = await res.json();
-        totalPromptTokens += Number(data.usage?.prompt_tokens || 0);
-        totalCompletionTokens += Number(data.usage?.completion_tokens || 0);
+        const data = aiResult.data;
         const call = data.choices?.[0]?.message?.tool_calls?.[0];
         const args = call?.function?.arguments;
         if (!args) continue;
@@ -417,8 +499,6 @@ Call filter_results.`;
         continue;
       }
     }
-
-    if (!usedFallback) await logUsage();
 
     // ===== HARD POST-AI VALIDATION: drop anything that doesn't truly match =====
     const rejected: { id: string; reason: string }[] = [];
@@ -454,6 +534,32 @@ Call filter_results.`;
         if (excludes.some((x) => text.includes(x))) return { ok: false, reason: "specialty_excluded" };
         const hit = hardCriteria.specialty.aliases.some(x => text.includes(x));
         if (!hit) return { ok: false, reason: "specialty_mismatch" };
+      }
+      // Job type
+      if (hardCriteria.jobType && a._norm?.job_type !== hardCriteria.jobType) {
+        return { ok: false, reason: "job_type_mismatch" };
+      }
+      // Marital status
+      if (hardCriteria.marital && a._norm?.marital_status !== hardCriteria.marital) {
+        return { ok: false, reason: "marital_status_mismatch" };
+      }
+      // Transport / driving license availability
+      if (hardCriteria.transport && a._norm?.has_transport !== hardCriteria.transport) {
+        return { ok: false, reason: "transport_mismatch" };
+      }
+      // Language levels (minimum required)
+      if (hardCriteria.arabicMin != null && (a._norm?.arabic_rank ?? 0) < hardCriteria.arabicMin) {
+        return { ok: false, reason: "arabic_level_below_min" };
+      }
+      if (hardCriteria.englishMin != null && (a._norm?.english_rank ?? 0) < hardCriteria.englishMin) {
+        return { ok: false, reason: "english_level_below_min" };
+      }
+      // Expected salary range
+      if (hardCriteria.salaryRange) {
+        const sal = a._norm?.expected_salary;
+        if (sal == null) return { ok: false, reason: "salary_unknown" };
+        if (hardCriteria.salaryRange.min != null && sal < hardCriteria.salaryRange.min) return { ok: false, reason: "salary_below_min" };
+        if (hardCriteria.salaryRange.max != null && sal > hardCriteria.salaryRange.max) return { ok: false, reason: "salary_above_max" };
       }
       return { ok: true };
     };

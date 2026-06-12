@@ -17,7 +17,7 @@ import { toast } from "sonner";
 import { Users, UserPlus, Phone, CheckCircle2, Download, LogOut, Search, Eye, BarChart3, Briefcase, FileText, ExternalLink, Plus, Pencil, Trash2, FolderOpen, Settings, Database, Archive, RotateCcw, Shield, Sparkles, Stethoscope } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from "recharts";
 import * as XLSX from "xlsx";
-import logo from "@/assets/logo.jpg";
+import SiteLogo from "@/components/SiteLogo";
 import { MAX_INLINE_IMAGE_SIZE, readImageAsDataUrl } from "@/lib/imageUpload";
 import { Link } from "react-router-dom";
 import CustomQuestionsSettings from "@/components/Dashboard/CustomQuestionsSettings";
@@ -52,6 +52,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useUserPermissions } from "@/hooks/useUserPermissions";
 import AiSystemDoctor from "@/components/Dashboard/AiSystemDoctor";
 import { AiUsageMonitor } from "@/components/Dashboard/AiUsageMonitor";
+import AiProviderSettings from "@/components/Dashboard/AiProviderSettings";
+import AiInsightsPanel from "@/components/Dashboard/AiInsightsPanel";
 import NotificationsBell from "@/components/Dashboard/NotificationsBell";
 import ExecutiveKPIs from "@/components/Dashboard/ExecutiveKPIs";
 import ScheduledReports from "@/components/Dashboard/ScheduledReports";
@@ -61,7 +63,7 @@ import JobCategoriesManager from "@/components/Dashboard/JobCategoriesManager";
 import { useDeletePin } from "@/components/DeletePinDialog";
 import type { ApplicantEmailStatus } from "@/lib/applicantEmailTemplates";
 import { STATUSES_WITH_EMAIL } from "@/lib/applicantEmailTemplates";
-import { Mail, Activity } from "lucide-react";
+import { Mail, Activity, Bot } from "lucide-react";
 
 type ApplicantStatus = "new" | "reviewing" | "phone_interview" | "in_person_interview" | "accepted" | "hired" | "rejected" | "withdrawn";
 
@@ -626,6 +628,7 @@ const DashboardPage = () => {
   if (tabAllowed("tab.trash")) visibleTabs.push({ value: "trash", label: <span className="flex items-center gap-1"><Trash2 className="w-3 h-3" />{lang === "ar" ? "سلة المحذوفات" : "Trash"}</span> });
   if (tabAllowed("tab.ai_doctor")) visibleTabs.push({ value: "ai_doctor", label: <span className="flex items-center gap-1"><Stethoscope className="w-3 h-3" />{lang === "ar" ? "طبيب النظام AI" : "AI Doctor"}</span> });
   if (tabAllowed("tab.ai_usage")) visibleTabs.push({ value: "ai_usage", label: <span className="flex items-center gap-1"><Activity className="w-3 h-3" />{lang === "ar" ? "استهلاك الذكاء" : "AI Usage"}</span> });
+  if (tabAllowed("tab.ai_settings")) visibleTabs.push({ value: "ai_settings", label: <span className="flex items-center gap-1"><Bot className="w-3 h-3" />{lang === "ar" ? "إعدادات الذكاء" : "AI Settings"}</span> });
 
   return (
     <div className="min-h-screen bg-background" dir={dir}>
@@ -633,7 +636,7 @@ const DashboardPage = () => {
       <header className="gradient-hero py-4 px-6 sticky top-0 z-30">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Link to="/"><img src={logo} alt="AlKholi Group" className="h-10 object-contain" /></Link>
+            <Link to="/"><SiteLogo heightOverride={40} /></Link>
             <h1 className="text-primary-foreground font-bold text-lg hidden md:block">{t("dash.title")}</h1>
           </div>
           <div className="flex items-center gap-3">
@@ -1057,6 +1060,7 @@ const DashboardPage = () => {
 
           {/* ANALYTICS TAB */}
           <TabsContent value="analytics" className="space-y-6">
+            <AiInsightsPanel />
             <ExecutiveKPIs />
             <ReportBuilder />
             <SynonymsManager />
@@ -1162,6 +1166,10 @@ const DashboardPage = () => {
 
           <TabsContent value="ai_usage">
             <AiUsageMonitor lang={lang} />
+          </TabsContent>
+
+          <TabsContent value="ai_settings">
+            <AiProviderSettings />
           </TabsContent>
         </Tabs>
       </main>

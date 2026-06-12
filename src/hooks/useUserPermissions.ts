@@ -10,7 +10,7 @@ export const PERMISSION_GROUPS = [
     items: [
       "tab.applicants", "tab.jobs", "tab.projects", "tab.analytics", "tab.recruitment",
       "tab.settings", "tab.jobpage", "tab.backup", "tab.auditlog", "tab.rejection_reasons",
-      "tab.job_ads", "tab.trash", "tab.ai_doctor", "tab.ai_usage", "tab.users",
+      "tab.job_ads", "tab.trash", "tab.ai_doctor", "tab.ai_usage", "tab.ai_settings", "tab.users",
     ],
   },
   {
@@ -64,6 +64,7 @@ export const PERMISSION_LABELS: Record<string, { ar: string; en: string }> = {
   "tab.trash": { ar: "تبويب سلة المحذوفات", en: "Trash tab" },
   "tab.ai_doctor": { ar: "تبويب طبيب النظام", en: "AI Doctor tab" },
   "tab.ai_usage": { ar: "تبويب استهلاك الذكاء", en: "AI Usage tab" },
+  "tab.ai_settings": { ar: "تبويب إعدادات الذكاء الاصطناعي", en: "AI Settings tab" },
   "tab.users": { ar: "تبويب إدارة المستخدمين", en: "Users tab" },
   // applicants
   view_applicants: { ar: "عرض المتقدمين", en: "View applicants" },

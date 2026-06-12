@@ -8,8 +8,8 @@ import { useSiteContent } from "@/hooks/useSiteContent";
 import { supabase } from "@/integrations/supabase/client";
 import StorageImage from "@/components/StorageImage";
 import ProjectLogo from "@/components/ProjectLogo";
-import logo from "@/assets/logo.jpg";
 import SiteLogo from "@/components/SiteLogo";
+import AINetworkBackground from "@/components/AINetworkBackground";
 import heroBg from "@/assets/hero-bg.jpg";
 
 interface Project {
@@ -94,6 +94,7 @@ const Index = () => {
         <div className="absolute inset-0">
           <img src={heroBg} alt="" className="w-full h-full object-cover" width={1920} height={1080} />
           {!content.hero_bg_color && <div className="absolute inset-0 gradient-hero opacity-85" />}
+          {!content.hero_bg_color && <AINetworkBackground />}
         </div>
         <div className="relative z-10 max-w-6xl mx-auto px-6 py-20">
           <div className="max-w-2xl space-y-6 animate-fade-in">
@@ -140,8 +141,8 @@ const Index = () => {
                 { icon: FolderOpen, value: `+${content.projects_count}`, label: bi("مشروع", "Projects") },
                 { icon: Briefcase, value: `${jobCount}`, label: bi("وظيفة شاغرة", "Open Positions") },
               ].map((stat, i) => (
-                <div key={i} className="text-center space-y-2">
-                  <div className="w-14 h-14 rounded-xl gradient-accent flex items-center justify-center mx-auto">
+                <div key={i} className="text-center space-y-2 rounded-xl p-4 bg-card/60 backdrop-blur-md border border-border/50 hover:shadow-glow transition-shadow duration-300">
+                  <div className="w-14 h-14 rounded-xl gradient-accent flex items-center justify-center mx-auto shadow-glow">
                     <stat.icon className="w-7 h-7 text-accent-foreground" />
                   </div>
                   <p className="text-3xl md:text-4xl font-black text-primary">{stat.value}</p>
@@ -213,8 +214,8 @@ const Index = () => {
               { icon: Users, title: bi(content.feature2_title_ar, content.feature2_title_en), desc: bi(content.feature2_desc_ar, content.feature2_desc_en) },
               { icon: TrendingUp, title: bi(content.feature3_title_ar, content.feature3_title_en), desc: bi(content.feature3_desc_ar, content.feature3_desc_en) },
             ].map((feature, i) => (
-              <div key={i} className="bg-card rounded-xl p-8 shadow-card border border-border hover:shadow-elevated transition-shadow duration-300 text-center">
-                <div className="w-14 h-14 rounded-xl gradient-accent flex items-center justify-center mx-auto mb-5">
+              <div key={i} className="bg-card/60 backdrop-blur-md rounded-xl p-8 shadow-card border border-border/50 hover:shadow-glow transition-shadow duration-300 text-center">
+                <div className="w-14 h-14 rounded-xl gradient-accent flex items-center justify-center mx-auto mb-5 shadow-glow">
                   <feature.icon className="w-7 h-7 text-accent-foreground" />
                 </div>
                 <h3 className="text-xl font-bold text-foreground mb-3">{feature.title}</h3>
@@ -246,19 +247,13 @@ const Index = () => {
       {/* Footer */}
       <footer className="bg-card py-8 px-6 border-t border-border">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
-          {content.logo_url ? (
-            <img 
-              src={content.logo_url} 
-              alt={bi(content.site_name_ar, content.site_name_en)} 
-              style={{ borderRadius: `${parseInt(content.logo_border_radius) || 8}px` }}
-              className="h-8 object-contain" 
-            />
-          ) : (
-            <img src={logo} alt="AlKholi Group" className="h-8 object-contain" />
-          )}
+          <SiteLogo heightOverride={32} />
           <p className="text-muted-foreground text-sm">
             © {new Date().getFullYear()} {bi(content.site_name_ar, content.site_name_en)} — {bi("جميع الحقوق محفوظة", "All Rights Reserved")}
           </p>
+          <Link to="/track" className="text-sm text-primary hover:underline font-medium">
+            {t("nav.track")}
+          </Link>
         </div>
       </footer>
     </div>

@@ -14,6 +14,27 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_settings: {
+        Row: {
+          id: string
+          provider: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          id?: string
+          provider?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          id?: string
+          provider?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       ai_usage_log: {
         Row: {
           completion_tokens: number | null
@@ -2029,6 +2050,16 @@ export type Database = {
         Returns: number
       }
       restore_deleted_item: { Args: { _deleted_id: string }; Returns: Json }
+      track_application_status: {
+        Args: { _email: string; _phone: string }
+        Returns: {
+          created_at: string
+          desired_position: string
+          id: string
+          status: Database["public"]["Enums"]["applicant_status"]
+          updated_at: string
+        }[]
+      }
       update_existing_application: {
         Args: {
           _applicant_id: string

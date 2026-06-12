@@ -19,7 +19,7 @@ import {
   Upload, X, Wand2, ImageIcon, Palette, QrCode, LayoutGrid, Download, Type,
 } from "lucide-react";
 import { toPng, toJpeg } from "html-to-image";
-import alkholiOfficialLogo from "@/assets/alkholi-logo-official.jpg";
+import BrandMark from "@/components/BrandMark";
 
 interface JobPosting {
   id: string;
@@ -70,7 +70,7 @@ interface Advertisement {
 }
 
 const DESIGN_STYLES = [
-  { value: "alkholi-official", label_ar: "قالب الخولي الرسمي", label_en: "AlKholi Official" },
+  { value: "alkholi-official", label_ar: "القالب المميز", label_en: "Premium Template" },
   { value: "modern", label_ar: "عصري", label_en: "Modern" },
   { value: "elegant", label_ar: "أنيق كلاسيكي", label_en: "Elegant" },
   { value: "bold", label_ar: "قوي وجريء", label_en: "Bold" },
@@ -128,14 +128,14 @@ const JobAdvertisements = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [titleAr, setTitleAr] = useState("فرص وظيفية مميزة");
   const [titleEn, setTitleEn] = useState("Exciting Job Opportunities");
-  const [subtitleAr, setSubtitleAr] = useState("انضم إلى فريق مجموعة الخولي");
-  const [subtitleEn, setSubtitleEn] = useState("Join the AlKholi Group Team");
+  const [subtitleAr, setSubtitleAr] = useState("انضم إلى فريق منصة التوظيف الذكية");
+  const [subtitleEn, setSubtitleEn] = useState("Join the NexHire AI Team");
   const [selectedJobs, setSelectedJobs] = useState<string[]>([]);
   const [manualJobs, setManualJobs] = useState<ManualJob[]>([]);
   const [designStyle, setDesignStyle] = useState("modern");
   const [layoutType, setLayoutType] = useState("grid");
-  const [accentColor, setAccentColor] = useState("#1a365d");
-  const [secondaryColor, setSecondaryColor] = useState("#2f855a");
+  const [accentColor, setAccentColor] = useState("#3b82f6");
+  const [secondaryColor, setSecondaryColor] = useState("#22d3ee");
   const [textColor, setTextColor] = useState("#ffffff");
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
   const [removingBgMode, setRemovingBgMode] = useState<null | "transparent" | "white-png" | "white-jpg">(null);
@@ -150,7 +150,7 @@ const JobAdvertisements = () => {
   const [totalVacancies, setTotalVacancies] = useState<number | "">("");
   const [showTotalVacancies, setShowTotalVacancies] = useState(true);
 
-  // ====== AlKholi template fine controls ======
+  // ====== Premium template fine controls ======
   const [akHeaderHeight, setAkHeaderHeight] = useState(150);
   const [akHeaderChevronPos, setAkHeaderChevronPos] = useState(45); // % left start of white wedge
   const [akShowFooterChevron, setAkShowFooterChevron] = useState(true);
@@ -201,7 +201,7 @@ const JobAdvertisements = () => {
   // ====== Font family ======
   const [fontFamily, setFontFamily] = useState<string>("system");
 
-  // ====== Title alignment & spacing (AlKholi template) ======
+  // ====== Title alignment & spacing (Premium template) ======
   const [titleAlignAr, setTitleAlignAr] = useState<"start" | "center" | "end">("end");
   const [titleAlignEn, setTitleAlignEn] = useState<"start" | "center" | "end">("start");
   const [titleOffsetX, setTitleOffsetX] = useState(0);
@@ -242,14 +242,14 @@ const JobAdvertisements = () => {
     setEditingId(null);
     setTitleAr("فرص وظيفية مميزة");
     setTitleEn("Exciting Job Opportunities");
-    setSubtitleAr("انضم إلى فريق مجموعة الخولي");
-    setSubtitleEn("Join the AlKholi Group Team");
+    setSubtitleAr("انضم إلى فريق منصة التوظيف الذكية");
+    setSubtitleEn("Join the NexHire AI Team");
     setSelectedJobs([]);
     setManualJobs([]);
     setDesignStyle("modern");
     setLayoutType("grid");
-    setAccentColor("#1a365d");
-    setSecondaryColor("#2f855a");
+    setAccentColor("#3b82f6");
+    setSecondaryColor("#22d3ee");
     setTextColor("#ffffff");
     setLogoUrl(null);
     setBackgroundUrl(null);
@@ -286,8 +286,8 @@ const JobAdvertisements = () => {
     setManualJobs(Array.isArray(ad.manual_jobs) ? ad.manual_jobs : []);
     setDesignStyle(ad.design_style);
     setLayoutType(ad.layout_type || "grid");
-    setAccentColor(ad.accent_color || "#1a365d");
-    setSecondaryColor(ad.secondary_color || "#2f855a");
+    setAccentColor(ad.accent_color || "#3b82f6");
+    setSecondaryColor(ad.secondary_color || "#22d3ee");
     setTextColor(ad.text_color || "#ffffff");
     setLogoUrl(ad.logo_url);
     setBackgroundUrl(ad.background_url);
@@ -299,7 +299,7 @@ const JobAdvertisements = () => {
     setShowVacancyPerJob(!!meta.show_vacancy_per_job);
     setShowTotalVacancies(meta.show_total_vacancies !== false);
     setTotalVacancies(meta.total_vacancies ?? "");
-    // AlKholi tuning
+    // Premium tuning
     if (meta.ak_header_height != null) setAkHeaderHeight(meta.ak_header_height);
     if (meta.ak_header_chevron_pos != null) setAkHeaderChevronPos(meta.ak_header_chevron_pos);
     if (meta.ak_show_footer_chevron != null) setAkShowFooterChevron(meta.ak_show_footer_chevron);
@@ -406,7 +406,7 @@ const JobAdvertisements = () => {
         show_vacancy_per_job: showVacancyPerJob,
         show_total_vacancies: showTotalVacancies,
         total_vacancies: totalVacancies === "" ? null : Number(totalVacancies),
-        // AlKholi tuning
+        // Premium tuning
         ak_header_height: akHeaderHeight,
         ak_header_chevron_pos: akHeaderChevronPos,
         ak_show_footer_chevron: akShowFooterChevron,
@@ -659,7 +659,7 @@ const JobAdvertisements = () => {
               <TabsTrigger value="branding" className="gap-1"><ImageIcon className="w-4 h-4" />{ar ? "الشعار والخلفية" : "Branding"}</TabsTrigger>
               <TabsTrigger value="qr" className="gap-1"><QrCode className="w-4 h-4" />QR</TabsTrigger>
               <TabsTrigger value="style" className="gap-1"><Type className="w-4 h-4" />{ar ? "خطوط ومحاذاة" : "Fonts & Layout"}</TabsTrigger>
-              <TabsTrigger value="alkholi" className="gap-1"><Sparkles className="w-4 h-4" />{ar ? "ضبط القالب الرسمي" : "AlKholi Tuning"}</TabsTrigger>
+              <TabsTrigger value="alkholi" className="gap-1"><Sparkles className="w-4 h-4" />{ar ? "ضبط القالب المميز" : "Premium Tuning"}</TabsTrigger>
             </TabsList>
 
             {/* CONTENT */}
@@ -1067,7 +1067,7 @@ const JobAdvertisements = () => {
                   style={{ fontFamily: getFontStack(fontFamily) }}
                 >
                   <div className="text-lg font-bold">{ar ? "نموذج: فرص وظيفية مميزة" : "Sample: Job Opportunities"}</div>
-                  <div className="text-sm text-muted-foreground mt-1">AlKholi Group · مجموعة الخولي</div>
+                  <div className="text-sm text-muted-foreground mt-1">NexHire AI · منصة التوظيف الذكية</div>
                 </div>
               </div>
 
@@ -1112,12 +1112,12 @@ const JobAdvertisements = () => {
               </div>
             </TabsContent>
 
-            {/* ALKHOLI TUNING */}
+            {/* PREMIUM TEMPLATE TUNING */}
             <TabsContent value="alkholi" className="space-y-5">
               <div className="rounded-md bg-muted/30 p-3 text-xs text-muted-foreground">
                 {ar
-                  ? "هذه الإعدادات تؤثر على «قالب الخولي الرسمي» فقط. اختر النمط من تبويب التصميم أولاً."
-                  : "These controls affect the AlKholi Official template only. Pick that style from the Design tab first."}
+                  ? "هذه الإعدادات تؤثر على «القالب المميز» فقط. اختر النمط من تبويب التصميم أولاً."
+                  : "These controls affect the Premium template only. Pick that style from the Design tab first."}
               </div>
 
               {/* Header IMAGE upload */}
@@ -1662,7 +1662,7 @@ const AdRenderer = (props: AdRendererProps) => {
   const renderJobsByLayout = () => {
     const cols = layout === "two-col" ? 2 : n > 12 ? 3 : n > 4 ? 2 : 1;
 
-    // AlKholi official template body
+    // Premium template body
     if (style === "alkholi-official") {
       const colCount = n > 22 ? 2 : 1;
       const fs = ak?.bodyFontSize ?? (n > 30 ? 10 : n > 22 ? 11 : n > 14 ? 12 : 13);
@@ -2036,7 +2036,7 @@ const AdRenderer = (props: AdRendererProps) => {
     header = (
       <div style={{ padding: "28px 36px 24px", background: "white", borderBottom: `2px solid #0f172a` }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", borderBottom: "1px solid #e2e8f0", paddingBottom: 12, marginBottom: 16 }}>
-          {logoUrl ? <img src={logoUrl} alt="logo" style={{ height: 36, maxWidth: 110, objectFit: "contain" }} /> : <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: 4 }}>{ar ? "مجموعة الخولي" : "ALKHOLI GROUP"}</div>}
+          {logoUrl ? <img src={logoUrl} alt="logo" style={{ height: 36, maxWidth: 110, objectFit: "contain" }} /> : <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: 4 }}>{ar ? "منصة التوظيف الذكية" : "NEXHIRE AI"}</div>}
           <div style={{ fontSize: 9, color: "#64748b", letterSpacing: 2 }}>{ar ? tag.ar : tag.en} · {new Date().getFullYear()}</div>
         </div>
         <h1 style={{ fontSize: 44, fontWeight: 900, margin: 0, color: "#0f172a", lineHeight: 0.95, letterSpacing: -1.5, fontFamily: "Georgia, serif" }} dir={bilingualMode === "en" ? "ltr" : "rtl"}>{headerTitle.primary}</h1>
@@ -2108,22 +2108,26 @@ const AdRenderer = (props: AdRendererProps) => {
               background: logoTransparentBg ? "transparent" : (logoUseCustomBg ? logoBgColor : "white"),
               transform: (logoOffsetX || logoOffsetY) ? `translate(${logoOffsetX}px, ${logoOffsetY}px)` : undefined,
             }}>
-              <img
-                src={logoUrl || alkholiOfficialLogo}
-                alt="AlKholi Group"
-                crossOrigin="anonymous"
-                style={{
-                  height: logoSize,
-                  maxWidth: 260,
-                  objectFit: "contain",
-                  display: "block",
-                  mixBlendMode: logoTransparentBg ? "multiply" : "normal",
-                }}
-              />
+              {logoUrl ? (
+                <img
+                  src={logoUrl}
+                  alt="NexHire AI"
+                  crossOrigin="anonymous"
+                  style={{
+                    height: logoSize,
+                    maxWidth: 260,
+                    objectFit: "contain",
+                    display: "block",
+                    mixBlendMode: logoTransparentBg ? "multiply" : "normal",
+                  }}
+                />
+              ) : (
+                <BrandMark size={logoSize} aria-label="NexHire AI" />
+              )}
             </div>
           </div>
           <div style={{ textAlign: "right", color: "#64748b", fontSize: 14, fontWeight: 500 }} dir="ltr">
-            www.alkholi.com
+            {qrUrl ? qrUrl.replace(/^https?:\/\//, "") : (ar ? "منصة التوظيف الذكية" : "NexHire AI")}
           </div>
         </div>
         {/* Dual title (alignment + offsets) */}
@@ -2261,7 +2265,7 @@ const CompactMeta = ({ job, ar, accent, fs = 10 }: { job: RenderJob; ar: boolean
 const Footer = ({ accent, secondary, ar, showQr, qrUrl, totalVacancies }: { accent: string; secondary: string; ar: boolean; showQr: boolean; qrUrl: string; totalVacancies: number | null }) => (
   <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "14px 36px", borderTop: `3px solid ${accent}`, background: "#f8fafc", fontSize: 11, color: "#475569", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
     <div>
-      <div style={{ fontWeight: 800, color: accent, fontSize: 14 }}>{ar ? "مجموعة الخولي" : "AlKholi Group"}</div>
+      <div style={{ fontWeight: 800, color: accent, fontSize: 14 }}>{ar ? "منصة التوظيف الذكية" : "NexHire AI"}</div>
       <div style={{ fontSize: 10, marginTop: 2 }}>{ar ? "للتقديم امسح الباركود أو زر موقعنا" : "Scan QR or visit our website"}</div>
       <div style={{ fontSize: 9, marginTop: 2, color: secondary, fontWeight: 600 }}>
         {ar ? `تاريخ النشر: ${new Date().toLocaleDateString("ar-EG")}` : `Posted: ${new Date().toLocaleDateString("en-US")}`}
