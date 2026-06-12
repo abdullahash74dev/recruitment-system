@@ -27,6 +27,7 @@ import { Slider } from "@/components/ui/slider";
 import DropdownOptionsSettings from "@/components/Dashboard/DropdownOptionsSettings";
 import BrandingSettings from "@/components/Dashboard/BrandingSettings";
 import BackupSettings from "@/components/Dashboard/BackupSettings";
+import ScheduledBackups from "@/components/Dashboard/ScheduledBackups";
 import FormFieldsSettings from "@/components/Dashboard/FormFieldsSettings";
 import SiteContentSettings from "@/components/Dashboard/SiteContentSettings";
 import AnalyticsHub from "@/components/Dashboard/AnalyticsHub";
@@ -1124,7 +1125,8 @@ const DashboardPage = () => {
           </TabsContent>
 
 
-          <TabsContent value="backup">
+          <TabsContent value="backup" className="space-y-6">
+            <ScheduledBackups />
             <Card>
               <CardContent className="p-6">
                 <BackupSettings />
