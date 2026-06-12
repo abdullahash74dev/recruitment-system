@@ -1,4 +1,4 @@
-// AI-powered applicant filter via Lovable AI Gateway - Accurate & Structured
+// AI-powered applicant filter via direct Gemini API - Accurate & Structured
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
@@ -250,7 +250,7 @@ serve(async (req) => {
 
     // Normalize ahead of time
     const enriched = applicants.map(normalizeRecord);
-    const apiKey = Deno.env.get("LOVABLE_API_KEY");
+    const geminiKey = Deno.env.get("GEMINI_API_KEY");
     const fallbackMatches = () => {
       const local = localFilter(prompt, enriched, lang);
       const matchedRows = enriched.filter((a: any) => local.some((m) => m.id === a.id));
@@ -273,10 +273,10 @@ serve(async (req) => {
           by_city: countBy("preferred_city"),
           by_position: countBy("desired_position"),
         },
-        warnings: apiKey ? ["ai_gateway_unavailable_local_filter_used"] : ["local_filter_used"],
+        warnings: geminiKey ? ["ai_gateway_unavailable_local_filter_used"] : ["local_filter_used"],
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     };
-    if (!apiKey) return fallbackMatches();
+    if (!geminiKey) return fallbackMatches();
 
     const CHUNK = 80;
     const matched = new Map<string, { id: string; reason: string; score: number }>();
@@ -373,29 +373,17 @@ Call filter_results.`;
       const userMsg = `Criterion / المعيار: ${prompt}\n\nCandidates (JSON):\n${JSON.stringify(slice)}`;
 
       try {
-        const geminiKey = Deno.env.get("GEMINI_API_KEY");
         const reqBody = {
-          model: "google/gemini-2.5-pro",
+          model: "gemini-2.5-pro",
           messages: [{ role: "system", content: sys }, { role: "user", content: userMsg }],
           tools,
           tool_choice: { type: "function", function: { name: "filter_results" } },
         };
-        let res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+        const res = await fetch("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", {
           method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${geminiKey}` },
           body: JSON.stringify(reqBody),
         });
-
-        // Fallback to direct Gemini API if Lovable AI is rate-limited or out of credits
-        if ((res.status === 429 || res.status === 402) && geminiKey) {
-          console.log(`Chunk ${i}: Lovable AI ${res.status}, switching to direct Gemini`);
-          res = await fetch("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", {
-            method: "POST",
-            headers: { "Content-Type": "application/json", Authorization: `Bearer ${geminiKey}` },
-            body: JSON.stringify({ ...reqBody, model: "gemini-2.5-pro" }),
-          });
-          if (res.ok) chunkErrors.push(`chunk@${i}: used_direct_gemini`);
-        }
 
         if (!res.ok) {
           if (res.status === 429 || res.status === 402) {

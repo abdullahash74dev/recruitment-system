@@ -34,9 +34,8 @@ async function runDiagnosis(lang: string, clientErrors: any[], userId: string | 
     return r.action === "LOGIN_FAILED" || r.action === "DELETE" || s.includes("error") || s.includes("fail") || s.includes("خطأ") || s.includes("فشل");
   }).slice(0, 80);
 
-  const apiKey = Deno.env.get("LOVABLE_API_KEY");
   const geminiKey = Deno.env.get("GEMINI_API_KEY");
-  if (!apiKey && !geminiKey) throw new Error("No AI key configured");
+  if (!geminiKey) throw new Error("No AI key configured");
 
   const sys = lang === "ar"
     ? "أنت مهندس موثوقية أنظمة خبير. حلّل الأخطاء وقدّم تشخيصاً وحلولاً عملية واضحة. الرد JSON فقط."

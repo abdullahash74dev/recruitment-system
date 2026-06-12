@@ -1,4 +1,5 @@
-// Edge function: removes the background of a logo using Lovable AI (Gemini image edit)
+// Edge function: removes the background of a logo using the Gemini image-edit API
+// (model: gemini-2.5-flash-image, called directly via GEMINI_API_KEY).
 // Returns the processed image as a public URL stored in the ad-assets bucket.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
@@ -46,10 +47,10 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+    const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
     const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY not configured");
+    if (!GEMINI_API_KEY) throw new Error("GEMINI_API_KEY not configured");
 
     // Auth: must be admin/HR
     const authHeader = req.headers.get("Authorization");
@@ -105,14 +106,14 @@ Deno.serve(async (req) => {
     for (let i = 0; i < srcBuf.length; i++) bin += String.fromCharCode(srcBuf[i]);
     const srcDataUrl = `data:${srcMime};base64,${btoa(bin)}`;
 
-    const aiResp = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const aiResp = await fetch("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        Authorization: `Bearer ${GEMINI_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3.1-flash-image-preview",
+        model: "gemini-2.5-flash-image",
         messages: [
           {
             role: "user",
@@ -138,7 +139,7 @@ Deno.serve(async (req) => {
         });
       }
       if (aiResp.status === 402) {
-        return new Response(JSON.stringify({ error: "AI credits exhausted. Add credits in Settings → Workspace → Usage." }), {
+        return new Response(JSON.stringify({ error: "AI credits exhausted. Check your Gemini API plan/billing." }), {
           status: 402,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });

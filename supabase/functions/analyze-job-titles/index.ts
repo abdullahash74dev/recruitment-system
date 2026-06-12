@@ -24,9 +24,8 @@ Deno.serve(async (req) => {
       });
     }
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
-    if (!LOVABLE_API_KEY && !GEMINI_API_KEY) throw new Error("No AI key configured");
+    if (!GEMINI_API_KEY) throw new Error("No AI key configured");
 
     const systemPrompt = `أنت خبير موارد بشرية. ستستلم قائمة مسميات وظيفية مختلطة (عربي/إنجليزي، قد تحتوي أخطاء إملائية أو ترتيب فوضوي).
 مهمتك:

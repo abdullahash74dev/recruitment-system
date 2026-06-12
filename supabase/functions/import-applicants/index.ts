@@ -180,15 +180,15 @@ async function downloadAttachment(supabase: any, url: string, applicantSlug: str
 }
 
 async function aiAnalyze(rows: any[]): Promise<{ insights: string; flags: Record<number, string[]> }> {
-  const apiKey = Deno.env.get("LOVABLE_API_KEY");
+  const apiKey = Deno.env.get("GEMINI_API_KEY");
   if (!apiKey) return { insights: "", flags: {} };
   const sample = rows.slice(0, 50).map((r, i) => ({ i, full_name: r.full_name, email: r.email, phone: r.phone, current_salary: r.current_salary, expected_salary: r.expected_salary, education_level: r.education_level }));
   try {
-    const r = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const r = await fetch("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", {
       method: "POST",
       headers: { "Authorization": `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
+        model: "gemini-2.5-flash",
         messages: [
           { role: "system", content: "You are a recruitment data validator. Check rows for: invalid emails, suspicious salaries (zero/negative/extreme), placeholder names. Return JSON {flags: {rowIndex: [reasons]}, summary: \"...\"}. Reasons in Arabic." },
           { role: "user", content: JSON.stringify(sample) },

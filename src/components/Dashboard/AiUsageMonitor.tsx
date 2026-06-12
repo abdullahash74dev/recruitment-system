@@ -88,8 +88,8 @@ export const AiUsageMonitor = ({ lang }: { lang: "ar" | "en" }) => {
           <AlertDescription className="flex flex-wrap items-center gap-3 mt-2">
             <span>{isAr ? "اشحن رصيدك أو ارفع السقف للمتابعة." : "Top up or raise the cap to continue."}</span>
             <Button size="sm" variant="default" asChild>
-              <a href="https://lovable.dev/settings/workspace" target="_blank" rel="noreferrer" className="gap-1">
-                <CreditCard className="w-3 h-3" />{isAr ? "شحن الرصيد" : "Top up"}<ExternalLink className="w-3 h-3" />
+              <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="gap-1">
+                <CreditCard className="w-3 h-3" />{isAr ? "إدارة مفتاح Gemini" : "Manage Gemini key"}<ExternalLink className="w-3 h-3" />
               </a>
             </Button>
           </AlertDescription>
@@ -161,12 +161,12 @@ export const AiUsageMonitor = ({ lang }: { lang: "ar" | "en" }) => {
           <div className="font-semibold flex items-center gap-2"><CreditCard className="w-4 h-4" />{isAr ? "كيف أشحن الرصيد؟" : "How to top up?"}</div>
           <p className="text-sm text-muted-foreground">
             {isAr
-              ? "يحصل كل حساب على $1 مجاناً للذكاء و $25 للسحابة شهرياً. عند النفاد، اشحن من إعدادات Lovable. الفائدة المباشرة: استئناف الفلترة الذكية، تحليل أعمق، تنبيهات أدق، ودعم القرار في التوظيف."
-              : "Each account gets $1 free AI + $25 Cloud monthly. When exhausted, top up via Lovable Settings. You get: smart filtering resumed, deeper analysis, accurate alerts, hiring decision support."}
+              ? "تعمل ميزات الذكاء الاصطناعي عبر Google Gemini API مباشرة (مفتاح GEMINI_API_KEY في إعدادات Supabase). الفائدة المباشرة: استئناف الفلترة الذكية، تحليل أعمق، تنبيهات أدق، ودعم القرار في التوظيف."
+              : "AI features run directly on the Google Gemini API (GEMINI_API_KEY in your Supabase secrets). You get: smart filtering, deeper analysis, accurate alerts, and hiring decision support."}
           </p>
           <div className="flex flex-wrap gap-2">
-            <Button asChild size="sm"><a href="https://lovable.dev/settings/workspace" target="_blank" rel="noreferrer" className="gap-1"><CreditCard className="w-3 h-3" />{isAr ? "فتح صفحة الشحن" : "Open billing"}<ExternalLink className="w-3 h-3" /></a></Button>
-            <Button asChild size="sm" variant="outline"><a href="https://docs.lovable.dev/integrations/cloud" target="_blank" rel="noreferrer" className="gap-1">{isAr ? "تفاصيل الأسعار" : "Pricing details"}<ExternalLink className="w-3 h-3" /></a></Button>
+            <Button asChild size="sm"><a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noreferrer" className="gap-1"><CreditCard className="w-3 h-3" />{isAr ? "مفاتيح Gemini" : "Gemini API keys"}<ExternalLink className="w-3 h-3" /></a></Button>
+            <Button asChild size="sm" variant="outline"><a href="https://ai.google.dev/gemini-api/docs/pricing" target="_blank" rel="noreferrer" className="gap-1">{isAr ? "تفاصيل الأسعار" : "Pricing details"}<ExternalLink className="w-3 h-3" /></a></Button>
           </div>
         </CardContent>
       </Card>

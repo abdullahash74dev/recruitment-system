@@ -132,8 +132,8 @@ const BackupSettings = () => {
           <p className="text-sm">
             <strong>{lang === "ar" ? "💡 ملاحظة:" : "💡 Note:"}</strong>{" "}
             {lang === "ar"
-              ? "للحصول على نسخ احتياطية تلقائية للكود والملفات، اربط المشروع بـ GitHub من إعدادات Lovable."
-              : "For automatic code backups, connect your project to GitHub from Lovable settings."}
+              ? "يتم نسخ الكود والملفات احتياطياً تلقائياً عبر مستودع GitHub الخاص بالمشروع."
+              : "Your code and files are automatically backed up via the project's GitHub repository."}
           </p>
         </CardContent>
       </Card>
