@@ -14,6 +14,27 @@ export type Database = {
   }
   public: {
     Tables: {
+      ai_settings: {
+        Row: {
+          id: string
+          provider: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          id?: string
+          provider?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          id?: string
+          provider?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       ai_usage_log: {
         Row: {
           completion_tokens: number | null

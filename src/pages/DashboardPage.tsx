@@ -52,6 +52,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useUserPermissions } from "@/hooks/useUserPermissions";
 import AiSystemDoctor from "@/components/Dashboard/AiSystemDoctor";
 import { AiUsageMonitor } from "@/components/Dashboard/AiUsageMonitor";
+import AiProviderSettings from "@/components/Dashboard/AiProviderSettings";
 import NotificationsBell from "@/components/Dashboard/NotificationsBell";
 import ExecutiveKPIs from "@/components/Dashboard/ExecutiveKPIs";
 import ScheduledReports from "@/components/Dashboard/ScheduledReports";
@@ -61,7 +62,7 @@ import JobCategoriesManager from "@/components/Dashboard/JobCategoriesManager";
 import { useDeletePin } from "@/components/DeletePinDialog";
 import type { ApplicantEmailStatus } from "@/lib/applicantEmailTemplates";
 import { STATUSES_WITH_EMAIL } from "@/lib/applicantEmailTemplates";
-import { Mail, Activity } from "lucide-react";
+import { Mail, Activity, Bot } from "lucide-react";
 
 type ApplicantStatus = "new" | "reviewing" | "phone_interview" | "in_person_interview" | "accepted" | "hired" | "rejected" | "withdrawn";
 
@@ -626,6 +627,7 @@ const DashboardPage = () => {
   if (tabAllowed("tab.trash")) visibleTabs.push({ value: "trash", label: <span className="flex items-center gap-1"><Trash2 className="w-3 h-3" />{lang === "ar" ? "سلة المحذوفات" : "Trash"}</span> });
   if (tabAllowed("tab.ai_doctor")) visibleTabs.push({ value: "ai_doctor", label: <span className="flex items-center gap-1"><Stethoscope className="w-3 h-3" />{lang === "ar" ? "طبيب النظام AI" : "AI Doctor"}</span> });
   if (tabAllowed("tab.ai_usage")) visibleTabs.push({ value: "ai_usage", label: <span className="flex items-center gap-1"><Activity className="w-3 h-3" />{lang === "ar" ? "استهلاك الذكاء" : "AI Usage"}</span> });
+  if (tabAllowed("tab.ai_settings")) visibleTabs.push({ value: "ai_settings", label: <span className="flex items-center gap-1"><Bot className="w-3 h-3" />{lang === "ar" ? "إعدادات الذكاء" : "AI Settings"}</span> });
 
   return (
     <div className="min-h-screen bg-background" dir={dir}>
@@ -1162,6 +1164,10 @@ const DashboardPage = () => {
 
           <TabsContent value="ai_usage">
             <AiUsageMonitor lang={lang} />
+          </TabsContent>
+
+          <TabsContent value="ai_settings">
+            <AiProviderSettings />
           </TabsContent>
         </Tabs>
       </main>
