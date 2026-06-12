@@ -1835,6 +1835,45 @@ export type Database = {
         }
         Relationships: []
       }
+      system_doctor_runs: {
+        Row: {
+          analyzed_count: number
+          client_error_count: number
+          created_at: string
+          health_score: number | null
+          id: string
+          issues: Json
+          recommendations: Json
+          summary: string | null
+          triggered_by: string
+          triggered_by_user: string | null
+        }
+        Insert: {
+          analyzed_count?: number
+          client_error_count?: number
+          created_at?: string
+          health_score?: number | null
+          id?: string
+          issues?: Json
+          recommendations?: Json
+          summary?: string | null
+          triggered_by?: string
+          triggered_by_user?: string | null
+        }
+        Update: {
+          analyzed_count?: number
+          client_error_count?: number
+          created_at?: string
+          health_score?: number | null
+          id?: string
+          issues?: Json
+          recommendations?: Json
+          summary?: string | null
+          triggered_by?: string
+          triggered_by_user?: string | null
+        }
+        Relationships: []
+      }
       user_permissions: {
         Row: {
           created_at: string
