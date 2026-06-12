@@ -1,8 +1,9 @@
-import { Moon, Sun, Globe, Palette, Check, Sparkles } from "lucide-react";
+import { Moon, Sun, Globe, Palette, Check, Sparkles, Wand2 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem,
   DropdownMenuTrigger, DropdownMenuLabel, DropdownMenuSeparator,
@@ -18,7 +19,7 @@ interface TopBarProps { variant?: "light" | "dark"; allowCustomization?: boolean
 
 const TopBar = ({ variant = "dark", allowCustomization = false }: TopBarProps) => {
   const { lang, setLang } = useLanguage();
-  const { theme, toggleTheme, palette, setPalette, iconStyle, setIconStyle, customTheme, setCustomTheme } = useTheme();
+  const { theme, toggleTheme, palette, setPalette, iconStyle, setIconStyle, customTheme, setCustomTheme, animatedBg, setAnimatedBg } = useTheme();
   const [customOpen, setCustomOpen] = useState(false);
   const [customDraft, setCustomDraft] = useState<CustomThemeColors>(customTheme);
 
@@ -42,24 +43,32 @@ const TopBar = ({ variant = "dark", allowCustomization = false }: TopBarProps) =
               <Palette className="w-5 h-5" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-60">
+          <DropdownMenuContent align="end" className="w-64">
             <DropdownMenuLabel>{lang === "ar" ? "اختر ثيم اللوحة" : "Choose theme"}</DropdownMenuLabel>
             <DropdownMenuSeparator />
             {palettes.map((p) => {
               const meta = PALETTE_LABELS[p];
               const active = palette === p;
+              const colors = p === "custom" ? [customTheme.primary, customTheme.accent] : meta.swatch;
               return (
                 <DropdownMenuItem key={p} onClick={() => p === "custom" ? (setCustomDraft(customTheme), setCustomOpen(true)) : setPalette(p)} className="flex items-center gap-2 cursor-pointer">
-                  <div className="flex gap-1">
-                    {(p === "custom" ? [customTheme.primary, customTheme.accent] : meta.swatch).map((c) => (
-                      <span key={c} className="w-3.5 h-3.5 rounded-full border border-border" style={{ background: c }} />
-                    ))}
-                  </div>
+                  <span
+                    className="w-8 h-5 rounded-md border border-border shrink-0"
+                    style={{ background: `linear-gradient(135deg, ${colors[0]}, ${colors[1]})` }}
+                  />
                   <span className="flex-1 text-sm">{lang === "ar" ? meta.ar : meta.en}</span>
                   {active && <Check className="w-4 h-4 text-accent" />}
                 </DropdownMenuItem>
               );
             })}
+            <DropdownMenuSeparator />
+            <div className="flex items-center gap-2 px-2 py-1.5">
+              <Wand2 className="w-4 h-4 text-muted-foreground" />
+              <Label htmlFor="animated-bg-toggle" className="flex-1 text-sm cursor-pointer">
+                {lang === "ar" ? "خلفية متدرجة متحركة" : "Animated gradient background"}
+              </Label>
+              <Switch id="animated-bg-toggle" checked={animatedBg} onCheckedChange={setAnimatedBg} />
+            </div>
           </DropdownMenuContent>
         </DropdownMenu>
       )}

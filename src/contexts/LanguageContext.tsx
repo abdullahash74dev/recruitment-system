@@ -63,6 +63,23 @@ const translations: Record<Lang, Record<string, string>> = {
     "success.title": "تم إرسال طلبك بنجاح!",
     "success.desc": "شكراً لتقديمك على الوظيفة في منصة التوظيف الذكية. سيتم مراجعة طلبك والتواصل معك في أقرب وقت.",
 
+    // Track application status
+    "track.title": "تتبع حالة طلبك",
+    "track.subtitle": "أدخل البريد الإلكتروني ورقم الهاتف المستخدمين عند التقديم لمعرفة حالة طلبك",
+    "track.email": "البريد الإلكتروني",
+    "track.phone": "رقم الهاتف",
+    "track.submit": "تحقق من الحالة",
+    "track.checking": "جارٍ البحث...",
+    "track.notFound": "لم يتم العثور على طلب مطابق لهذه البيانات",
+    "track.error": "حدث خطأ، حاول مرة أخرى",
+    "track.position": "الوظيفة المتقدم لها",
+    "track.appliedOn": "تاريخ التقديم",
+    "track.lastUpdate": "آخر تحديث",
+    "track.results": "نتائج البحث",
+    "track.backHome": "العودة للرئيسية",
+    "track.cta": "تتبع طلبك في أي وقت",
+    "track.ctaDesc": "احتفظ بالبريد الإلكتروني ورقم الهاتف المستخدمين، يمكنك متابعة حالة طلبك دون الحاجة لتسجيل الدخول",
+
     // Validation
     "validation.required": "يرجى تعبئة جميع الحقول المطلوبة",
     "validation.success": "تم إرسال طلبك بنجاح!",
@@ -346,6 +363,7 @@ const translations: Record<Lang, Record<string, string>> = {
 
     // Training page
     "nav.training": "التدريب التعاوني / تمهير",
+    "nav.track": "تتبع الطلب",
     "training.title": "فرص التدريب التعاوني وتمهير",
     "training.desc": "انضم لبرامج التدريب التعاوني وتمهير في منصة التوظيف الذكية",
     "training.noJobs": "لا توجد فرص تدريب متاحة حالياً",
@@ -445,6 +463,23 @@ const translations: Record<Lang, Record<string, string>> = {
     // Success
     "success.title": "Application Submitted Successfully!",
     "success.desc": "Thank you for applying at NexHire AI. Your application will be reviewed and we will contact you soon.",
+
+    // Track application status
+    "track.title": "Track Your Application",
+    "track.subtitle": "Enter the email and phone number you used when applying to check your application status",
+    "track.email": "Email",
+    "track.phone": "Phone Number",
+    "track.submit": "Check Status",
+    "track.checking": "Searching...",
+    "track.notFound": "No matching application was found for this information",
+    "track.error": "Something went wrong, please try again",
+    "track.position": "Position Applied For",
+    "track.appliedOn": "Applied On",
+    "track.lastUpdate": "Last Updated",
+    "track.results": "Search Results",
+    "track.backHome": "Back to Home",
+    "track.cta": "Track your application anytime",
+    "track.ctaDesc": "Keep the email and phone number you applied with — you can check your application status anytime without logging in",
 
     // Validation
     "validation.required": "Please fill in all required fields",
@@ -729,6 +764,7 @@ const translations: Record<Lang, Record<string, string>> = {
 
     // Training page
     "nav.training": "Co-op / Tamheer",
+    "nav.track": "Track Application",
     "training.title": "Co-op Training & Tamheer Opportunities",
     "training.desc": "Join our Co-op and Tamheer training programs at NexHire AI",
     "training.noJobs": "No training opportunities available right now",

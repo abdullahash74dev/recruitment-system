@@ -53,6 +53,7 @@ import { useUserPermissions } from "@/hooks/useUserPermissions";
 import AiSystemDoctor from "@/components/Dashboard/AiSystemDoctor";
 import { AiUsageMonitor } from "@/components/Dashboard/AiUsageMonitor";
 import AiProviderSettings from "@/components/Dashboard/AiProviderSettings";
+import AiInsightsPanel from "@/components/Dashboard/AiInsightsPanel";
 import NotificationsBell from "@/components/Dashboard/NotificationsBell";
 import ExecutiveKPIs from "@/components/Dashboard/ExecutiveKPIs";
 import ScheduledReports from "@/components/Dashboard/ScheduledReports";
@@ -1059,6 +1060,7 @@ const DashboardPage = () => {
 
           {/* ANALYTICS TAB */}
           <TabsContent value="analytics" className="space-y-6">
+            <AiInsightsPanel />
             <ExecutiveKPIs />
             <ReportBuilder />
             <SynonymsManager />

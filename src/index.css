@@ -112,6 +112,9 @@
 
   html.palette-noir { --background: 0 0% 96%; --card: 0 0% 100%; --muted: 0 0% 92%; --border: 0 0% 85%; --input: 0 0% 85%; --primary: 0 0% 8%; --primary-foreground: 42 55% 70%; --secondary: 42 30% 92%; --accent: 42 60% 50%; --accent-foreground: 0 0% 100%; --ring: 42 60% 50%; --sidebar-background: 0 0% 6%; --sidebar-foreground: 42 55% 80%; --sidebar-accent: 0 0% 14%; --gradient-primary: linear-gradient(135deg, hsl(0 0% 6%), hsl(0 0% 18%)); --gradient-accent: linear-gradient(135deg, hsl(42 55% 50%), hsl(42 70% 65%)); --gradient-hero: linear-gradient(160deg, hsl(0 0% 5%), hsl(0 0% 14%), hsl(42 40% 30%)); }
   html.palette-noir.dark { --background: 0 0% 5%; --card: 0 0% 9%; --muted: 0 0% 13%; --primary: 42 65% 62%; --accent: 42 70% 70%; --sidebar-background: 0 0% 4%; --sidebar-accent: 42 40% 18%; }
+
+  html.palette-aurora { --background: 235 30% 97%; --card: 235 30% 99%; --muted: 235 20% 93%; --border: 235 18% 87%; --input: 235 18% 87%; --primary: 243 70% 40%; --primary-foreground: 0 0% 100%; --secondary: 190 40% 93%; --accent: 190 85% 45%; --accent-foreground: 0 0% 100%; --ring: 190 85% 45%; --sidebar-background: 243 70% 16%; --sidebar-foreground: 0 0% 96%; --sidebar-accent: 262 70% 32%; --gradient-primary: linear-gradient(135deg, hsl(243 70% 30%), hsl(270 70% 50%)); --gradient-accent: linear-gradient(135deg, hsl(190 85% 45%), hsl(160 68% 50%)); --gradient-hero: linear-gradient(160deg, hsl(243 70% 12%), hsl(262 65% 26%), hsl(190 75% 40%)); }
+  html.palette-aurora.dark { --background: 245 45% 7%; --card: 245 40% 11%; --muted: 245 30% 16%; --primary: 190 85% 55%; --accent: 262 75% 68%; --sidebar-background: 245 50% 9%; --sidebar-accent: 245 40% 20%; }
 }
 
 /* ===================== DASHBOARD THEMES ===================== */
@@ -201,6 +204,14 @@ html.icons-sharp svg { stroke-linecap: square; stroke-linejoin: miter; stroke-wi
   .gradient-hero {
     background: var(--gradient-hero);
   }
+  html.animated-bg .gradient-hero {
+    background-size: 200% 200%;
+    animation: gradient-flow 18s ease infinite;
+  }
+  @keyframes gradient-flow {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+  }
   .shadow-card {
     box-shadow: var(--shadow-card);
   }
@@ -209,6 +220,48 @@ html.icons-sharp svg { stroke-linecap: square; stroke-linejoin: miter; stroke-wi
   }
   .shadow-glow {
     box-shadow: var(--shadow-glow);
+  }
+
+  /* ===== AI Network Background animations ===== */
+  .ai-node-pulse,
+  .ai-node-pulse-slow,
+  .ai-node-drift,
+  .ai-node-drift-slow {
+    transform-box: fill-box;
+    transform-origin: center;
+  }
+  .ai-node-pulse {
+    animation: ai-node-pulse 18s ease-in-out infinite;
+  }
+  .ai-node-pulse-slow {
+    animation: ai-node-pulse 26s ease-in-out infinite;
+    animation-delay: -6s;
+  }
+  .ai-node-drift {
+    animation: ai-node-drift 22s ease-in-out infinite;
+  }
+  .ai-node-drift-slow {
+    animation: ai-node-drift 30s ease-in-out infinite;
+    animation-delay: -10s;
+  }
+  .ai-edge-flow {
+    animation: ai-edge-flow 20s ease-in-out infinite;
+  }
+  .ai-edge-flow-slow {
+    animation: ai-edge-flow 28s ease-in-out infinite;
+    animation-delay: -8s;
+  }
+  @keyframes ai-node-pulse {
+    0%, 100% { opacity: 0.5; transform: scale(1); }
+    50% { opacity: 1; transform: scale(1.4); }
+  }
+  @keyframes ai-node-drift {
+    0%, 100% { transform: translate(0, 0); }
+    50% { transform: translate(0.6px, -0.8px); }
+  }
+  @keyframes ai-edge-flow {
+    0%, 100% { opacity: 0.4; }
+    50% { opacity: 1; }
   }
 }
 

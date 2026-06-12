@@ -2050,6 +2050,16 @@ export type Database = {
         Returns: number
       }
       restore_deleted_item: { Args: { _deleted_id: string }; Returns: Json }
+      track_application_status: {
+        Args: { _email: string; _phone: string }
+        Returns: {
+          created_at: string
+          desired_position: string
+          id: string
+          status: Database["public"]["Enums"]["applicant_status"]
+          updated_at: string
+        }[]
+      }
       update_existing_application: {
         Args: {
           _applicant_id: string

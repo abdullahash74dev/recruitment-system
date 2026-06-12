@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, ArrowLeft, Send, Loader2 } from "lucide-react";
+import { ArrowRight, ArrowLeft, Send, Loader2, ListChecks } from "lucide-react";
 import { toast } from "sonner";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { supabase } from "@/integrations/supabase/client";
@@ -553,17 +554,25 @@ const ApplicationForm = ({ preSelectedPosition }: Props) => {
           </div>
           <h2 className="text-3xl font-bold text-primary">{successTitle}</h2>
           <p className="text-muted-foreground text-lg max-w-md mx-auto">{successDesc}</p>
-          <Button
-            onClick={() => {
-              setIsSubmitted(false);
-              setFormData({});
-              setFiles({});
-              setCurrentStep(1);
-            }}
-            className="gradient-accent text-accent-foreground hover:opacity-90 px-8"
-          >
-            {t("btn.newApplication")}
-          </Button>
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            <Button
+              onClick={() => {
+                setIsSubmitted(false);
+                setFormData({});
+                setFiles({});
+                setCurrentStep(1);
+              }}
+              className="gradient-accent text-accent-foreground hover:opacity-90 px-8"
+            >
+              {t("btn.newApplication")}
+            </Button>
+            <Link to="/track">
+              <Button variant="outline" className="gap-2">
+                <ListChecks className="w-4 h-4" />
+                {t("nav.track")}
+              </Button>
+            </Link>
+          </div>
         </div>
       </div>
     );

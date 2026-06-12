@@ -2,7 +2,7 @@ import { createContext, useContext, useState, useEffect, ReactNode } from "react
 
 export type ThemeMode = "light" | "dark";
 export type ThemePalette =
-  | "default" | "midnight" | "emerald" | "rose" | "slate" | "sunset" | "ocean" | "noir" | "custom";
+  | "default" | "midnight" | "emerald" | "rose" | "slate" | "sunset" | "ocean" | "noir" | "aurora" | "custom";
 export type IconStyle = "regular" | "thin" | "bold" | "rounded" | "sharp";
 
 export interface CustomThemeColors {
@@ -21,11 +21,13 @@ interface ThemeContextType {
   setIconStyle: (s: IconStyle) => void;
   customTheme: CustomThemeColors;
   setCustomTheme: (colors: CustomThemeColors) => void;
+  animatedBg: boolean;
+  setAnimatedBg: (v: boolean) => void;
 }
 
 const ThemeContext = createContext<ThemeContextType | null>(null);
 
-const PALETTES: ThemePalette[] = ["default", "midnight", "emerald", "rose", "slate", "sunset", "ocean", "noir", "custom"];
+const PALETTES: ThemePalette[] = ["default", "midnight", "emerald", "rose", "slate", "sunset", "ocean", "noir", "aurora", "custom"];
 const ICON_STYLES: IconStyle[] = ["regular", "thin", "bold", "rounded", "sharp"];
 
 export const DEFAULT_CUSTOM_THEME: CustomThemeColors = {
@@ -44,6 +46,7 @@ export const PALETTE_LABELS: Record<ThemePalette, { ar: string; en: string; swat
   sunset:   { ar: "الغروب المتوهج",   en: "Sunset Blaze",     swatch: ["#ff6b35", "#e84393"] },
   ocean:    { ar: "أعماق المحيط",      en: "Ocean Deep",       swatch: ["#0c2340", "#2d8a9e"] },
   noir:     { ar: "الأسود الذهبي",     en: "Noir & Gold",      swatch: ["#0d0d0d", "#c9a84c"] },
+  aurora:   { ar: "أورورا الذكاء",     en: "AI Aurora",        swatch: ["#4338ca", "#22d3ee"] },
   custom:   { ar: "ثيمي الخاص",        en: "My Custom Theme",  swatch: ["#3b82f6", "#22d3ee"] },
 };
 
@@ -84,6 +87,7 @@ const PALETTE_TOKENS: Record<ThemePalette, { light: ThemeTokens; dark: ThemeToke
   sunset: { light: { "--background": "30 35% 97%", "--card": "30 40% 99%", "--muted": "30 25% 93%", "--border": "30 20% 87%", "--input": "30 20% 87%", "--primary": "16 85% 50%", "--secondary": "30 60% 93%", "--accent": "330 75% 58%", "--ring": "16 85% 50%", "--sidebar-background": "16 70% 35%", "--sidebar-accent": "16 70% 45%", "--gradient-primary": "linear-gradient(135deg, hsl(16 90% 50%), hsl(330 80% 60%))", "--gradient-accent": "linear-gradient(135deg, hsl(36 95% 55%), hsl(16 90% 60%))", "--gradient-hero": "linear-gradient(160deg, hsl(16 80% 35%), hsl(330 70% 50%), hsl(260 60% 50%))" }, dark: { "--background": "16 25% 9%", "--card": "16 25% 13%", "--muted": "16 20% 18%", "--border": "16 20% 24%", "--input": "16 20% 24%", "--primary": "16 85% 60%", "--accent": "330 75% 65%", "--sidebar-background": "16 40% 14%", "--sidebar-accent": "16 40% 24%" } },
   ocean: { light: { "--background": "200 30% 96%", "--card": "200 35% 99%", "--muted": "200 22% 92%", "--border": "200 18% 85%", "--input": "200 18% 85%", "--primary": "210 70% 20%", "--secondary": "188 40% 92%", "--accent": "188 60% 42%", "--ring": "188 60% 42%", "--sidebar-background": "210 70% 14%", "--sidebar-accent": "210 60% 24%", "--gradient-primary": "linear-gradient(135deg, hsl(210 70% 16%), hsl(210 55% 30%))", "--gradient-accent": "linear-gradient(135deg, hsl(188 56% 42%), hsl(180 50% 55%))", "--gradient-hero": "linear-gradient(160deg, hsl(210 70% 10%), hsl(210 55% 22%), hsl(188 50% 35%))" }, dark: { "--background": "210 40% 8%", "--card": "210 40% 12%", "--muted": "210 30% 16%", "--border": "210 28% 22%", "--input": "210 28% 22%", "--primary": "188 60% 52%", "--accent": "180 60% 60%", "--sidebar-background": "210 50% 10%", "--sidebar-accent": "210 45% 20%" } },
   noir: { light: { "--background": "0 0% 96%", "--card": "0 0% 100%", "--muted": "0 0% 92%", "--border": "0 0% 85%", "--input": "0 0% 85%", "--primary": "0 0% 8%", "--primary-foreground": "42 55% 70%", "--secondary": "42 30% 92%", "--accent": "42 60% 50%", "--ring": "42 60% 50%", "--sidebar-background": "0 0% 6%", "--sidebar-foreground": "42 55% 80%", "--sidebar-accent": "0 0% 14%", "--gradient-primary": "linear-gradient(135deg, hsl(0 0% 6%), hsl(0 0% 18%))", "--gradient-accent": "linear-gradient(135deg, hsl(42 55% 50%), hsl(42 70% 65%))", "--gradient-hero": "linear-gradient(160deg, hsl(0 0% 5%), hsl(0 0% 14%), hsl(42 40% 30%))" }, dark: { "--background": "0 0% 5%", "--card": "0 0% 9%", "--muted": "0 0% 13%", "--border": "0 0% 18%", "--input": "0 0% 18%", "--primary": "42 65% 62%", "--primary-foreground": "0 0% 8%", "--accent": "42 70% 70%", "--sidebar-background": "0 0% 4%", "--sidebar-accent": "42 40% 18%" } },
+  aurora: { light: { "--background": "235 30% 97%", "--card": "235 30% 99%", "--muted": "235 20% 93%", "--border": "235 18% 87%", "--input": "235 18% 87%", "--primary": "243 70% 40%", "--primary-foreground": "0 0% 100%", "--secondary": "190 40% 93%", "--accent": "190 85% 45%", "--accent-foreground": "0 0% 100%", "--ring": "190 85% 45%", "--sidebar-background": "243 70% 16%", "--sidebar-foreground": "0 0% 96%", "--sidebar-accent": "262 70% 32%", "--gradient-primary": "linear-gradient(135deg, hsl(243 70% 30%), hsl(270 70% 50%))", "--gradient-accent": "linear-gradient(135deg, hsl(190 85% 45%), hsl(160 68% 50%))", "--gradient-hero": "linear-gradient(160deg, hsl(243 70% 12%), hsl(262 65% 26%), hsl(190 75% 40%))" }, dark: { "--background": "245 45% 7%", "--card": "245 40% 11%", "--muted": "245 30% 16%", "--border": "245 28% 22%", "--input": "245 28% 22%", "--primary": "190 85% 55%", "--accent": "262 75% 68%", "--sidebar-background": "245 50% 9%", "--sidebar-accent": "245 40% 20%" } },
   custom: { light: {}, dark: {} },
 };
 
@@ -144,6 +148,10 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
     try { return { ...DEFAULT_CUSTOM_THEME, ...JSON.parse(localStorage.getItem("akg-custom-theme") || "{}") }; }
     catch { return DEFAULT_CUSTOM_THEME; }
   });
+  const [animatedBg, setAnimatedBgState] = useState<boolean>(() => {
+    try { return localStorage.getItem("akg-animated-bg") === "true"; }
+    catch { return false; }
+  });
 
   useEffect(() => {
     const root = document.documentElement;
@@ -167,6 +175,12 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
     localStorage.setItem("akg-icons", iconStyle);
   }, [iconStyle]);
 
+  useEffect(() => {
+    const root = document.documentElement;
+    root.classList.toggle("animated-bg", animatedBg);
+    localStorage.setItem("akg-animated-bg", String(animatedBg));
+  }, [animatedBg]);
+
   const setCustomTheme = (colors: CustomThemeColors) => {
     setCustomThemeState(colors);
     localStorage.setItem("akg-custom-theme", JSON.stringify(colors));
@@ -175,11 +189,12 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
 
   return (
     <ThemeContext.Provider value={{
-      theme, palette, iconStyle, customTheme,
+      theme, palette, iconStyle, customTheme, animatedBg,
       toggleTheme: () => setTheme((p) => (p === "light" ? "dark" : "light")),
       setPalette: setPaletteState,
       setIconStyle: setIconStyleState,
       setCustomTheme,
+      setAnimatedBg: setAnimatedBgState,
     }}>
       {children}
     </ThemeContext.Provider>

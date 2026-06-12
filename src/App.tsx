@@ -11,6 +11,7 @@ import ApplyPage from "./pages/ApplyPage.tsx";
 import JobsPage from "./pages/JobsPage.tsx";
 import JobDetailPage from "./pages/JobDetailPage.tsx";
 import TrainingPage from "./pages/TrainingPage.tsx";
+import TrackApplicationPage from "./pages/TrackApplicationPage.tsx";
 import AdminLoginPage from "./pages/AdminLoginPage.tsx";
 import AdminVerifyPage from "./pages/AdminVerifyPage.tsx";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage.tsx";
@@ -48,6 +49,7 @@ const App = () => (
               <Route path="/jobs" element={<JobsPage />} />
               <Route path="/jobs/:id" element={<JobDetailPage />} />
               <Route path="/training" element={<TrainingPage />} />
+              <Route path="/track" element={<TrackApplicationPage />} />
               <Route path="/executive/recruitment/:token" element={<ExecutiveRecruitmentPage />} />
 
               {/* HR / Admin routes */}
