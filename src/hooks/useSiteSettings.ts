@@ -8,6 +8,7 @@ export interface SiteSettings {
   accent_color: string;
   site_name_ar: string;
   site_name_en: string;
+  two_factor_enabled: boolean;
 }
 
 const DEFAULT_SETTINGS: SiteSettings = {
@@ -17,6 +18,9 @@ const DEFAULT_SETTINGS: SiteSettings = {
   accent_color: "#2f855a",
   site_name_ar: "مجموعة الخولي",
   site_name_en: "AlKholi Group",
+  // Fail open if settings can't be loaded, so a fetch error never locks
+  // admins out behind a 2FA prompt they can't complete.
+  two_factor_enabled: false,
 };
 
 let cachedSettings: SiteSettings | null = null;

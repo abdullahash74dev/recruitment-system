@@ -387,6 +387,11 @@ const translations: Record<Lang, Record<string, string>> = {
     "admin.emailNotRegistered": "هذا البريد الإلكتروني غير مسجل في النظام",
     "admin.noAccess": "ليس لديك صلاحية الوصول",
     "admin.noAccessDesc": "حسابك مسجل ولكن لا يملك صلاحية الدخول إلى لوحة التحكم. يرجى التواصل مع مسؤول النظام لمنحك صلاحية، أو تسجيل الخروج وتجربة حساب آخر.",
+    "admin.twoFactorTitle": "التحقق بخطوتين",
+    "admin.twoFactorDesc": "تم إرسال كود التحقق إلى بريدك الإلكتروني",
+    "admin.otpCodeSent": "تم إرسال كود التحقق إلى بريدك الإلكتروني",
+    "admin.otpCodeSendError": "فشل إرسال كود التحقق. حاول مرة أخرى.",
+    "admin.resendCode": "إعادة إرسال الكود",
   },
   en: {
     // Navbar & general
@@ -765,6 +770,11 @@ const translations: Record<Lang, Record<string, string>> = {
     "admin.emailNotRegistered": "This email is not registered in the system",
     "admin.noAccess": "Access Denied",
     "admin.noAccessDesc": "Your account is registered but does not have permission to access the dashboard. Please contact a system administrator, or sign out and try a different account.",
+    "admin.twoFactorTitle": "Two-Factor Verification",
+    "admin.twoFactorDesc": "A verification code has been sent to your email",
+    "admin.otpCodeSent": "Verification code sent to your email",
+    "admin.otpCodeSendError": "Failed to send verification code. Try again.",
+    "admin.resendCode": "Resend code",
   },
 };
 
