@@ -1,4 +1,4 @@
-import { Moon, Sun, Globe, Palette, Check, Sparkles, Wand2 } from "lucide-react";
+import { Moon, Sun, Globe, Palette, Check, Sparkles, Wand2, PanelLeft, Rows3 } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,15 +11,15 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useLanguage } from "@/contexts/LanguageContext";
 import {
-  useTheme, PALETTE_LABELS, ICON_STYLE_LABELS,
-  type ThemePalette, type IconStyle, type CustomThemeColors,
+  useTheme, PALETTE_LABELS, ICON_STYLE_LABELS, NAV_STYLE_LABELS,
+  type ThemePalette, type IconStyle, type CustomThemeColors, type NavStyle,
 } from "@/contexts/ThemeContext";
 
 interface TopBarProps { variant?: "light" | "dark"; allowCustomization?: boolean; }
 
 const TopBar = ({ variant = "dark", allowCustomization = false }: TopBarProps) => {
   const { lang, setLang } = useLanguage();
-  const { theme, toggleTheme, palette, setPalette, iconStyle, setIconStyle, customTheme, setCustomTheme, animatedBg, setAnimatedBg } = useTheme();
+  const { theme, toggleTheme, palette, setPalette, iconStyle, setIconStyle, customTheme, setCustomTheme, animatedBg, setAnimatedBg, navStyle, setNavStyle } = useTheme();
   const [customOpen, setCustomOpen] = useState(false);
   const [customDraft, setCustomDraft] = useState<CustomThemeColors>(customTheme);
 
@@ -29,6 +29,7 @@ const TopBar = ({ variant = "dark", allowCustomization = false }: TopBarProps) =
 
   const palettes = Object.keys(PALETTE_LABELS) as ThemePalette[];
   const iconStyles = Object.keys(ICON_STYLE_LABELS) as IconStyle[];
+  const navStyles = Object.keys(NAV_STYLE_LABELS) as NavStyle[];
 
   return (
     <div className="flex items-center gap-2">
@@ -90,6 +91,27 @@ const TopBar = ({ variant = "dark", allowCustomization = false }: TopBarProps) =
                 </span>
                 <span className="flex-1 text-sm">{lang === "ar" ? ICON_STYLE_LABELS[s].ar : ICON_STYLE_LABELS[s].en}</span>
                 {iconStyle === s && <Check className="w-4 h-4 text-accent" />}
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      )}
+
+      {allowCustomization && (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className={colorClass} title={lang === "ar" ? "نمط التنقل في اللوحة" : "Dashboard navigation style"}>
+              {navStyle === "modern" ? <PanelLeft className="w-5 h-5" /> : <Rows3 className="w-5 h-5" />}
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-60">
+            <DropdownMenuLabel>{lang === "ar" ? "نمط التنقل في اللوحة" : "Dashboard navigation style"}</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            {navStyles.map((s) => (
+              <DropdownMenuItem key={s} onClick={() => setNavStyle(s)} className="flex items-center gap-2 cursor-pointer">
+                {s === "modern" ? <PanelLeft className="w-4 h-4" /> : <Rows3 className="w-4 h-4" />}
+                <span className="flex-1 text-sm">{lang === "ar" ? NAV_STYLE_LABELS[s].ar : NAV_STYLE_LABELS[s].en}</span>
+                {navStyle === s && <Check className="w-4 h-4 text-accent" />}
               </DropdownMenuItem>
             ))}
           </DropdownMenuContent>

@@ -6,6 +6,7 @@ export type ThemeMode = "light" | "dark";
 export type ThemePalette =
   | "default" | "midnight" | "emerald" | "rose" | "slate" | "sunset" | "ocean" | "noir" | "aurora" | "custom";
 export type IconStyle = "regular" | "thin" | "bold" | "rounded" | "sharp";
+export type NavStyle = "modern" | "classic";
 
 export interface CustomThemeColors {
   primary: string;
@@ -25,6 +26,8 @@ interface ThemeContextType {
   setCustomTheme: (colors: CustomThemeColors) => void;
   animatedBg: boolean;
   setAnimatedBg: (v: boolean) => void;
+  navStyle: NavStyle;
+  setNavStyle: (v: NavStyle) => void;
 }
 
 const ThemeContext = createContext<ThemeContextType | null>(null);
@@ -58,6 +61,11 @@ export const ICON_STYLE_LABELS: Record<IconStyle, { ar: string; en: string }> = 
   bold:    { ar: "عريض",   en: "Bold" },
   rounded: { ar: "دائري",  en: "Rounded" },
   sharp:   { ar: "حاد",    en: "Sharp" },
+};
+
+export const NAV_STYLE_LABELS: Record<NavStyle, { ar: string; en: string }> = {
+  modern:  { ar: "عصري (شريط جانبي)",    en: "Modern (sidebar)" },
+  classic: { ar: "كلاسيكي (تبويبات علوية)", en: "Classic (top tabs)" },
 };
 
 type ThemeTokens = Record<string, string>;
@@ -183,6 +191,10 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
     try { return localStorage.getItem("akg-animated-bg") === "true"; }
     catch { return false; }
   });
+  const [navStyle, setNavStyleState] = useState<NavStyle>(() => {
+    try { return localStorage.getItem("akg-nav-style") === "classic" ? "classic" : "modern"; }
+    catch { return "modern"; }
+  });
 
   const location = useLocation();
   const isAdminRoute = location.pathname.startsWith("/admin") || location.pathname.startsWith("/dashboard");
@@ -197,6 +209,7 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => { localStorage.setItem("akg-palette", palette); }, [palette]);
   useEffect(() => { localStorage.setItem("akg-icons", iconStyle); }, [iconStyle]);
   useEffect(() => { localStorage.setItem("akg-animated-bg", String(animatedBg)); }, [animatedBg]);
+  useEffect(() => { localStorage.setItem("akg-nav-style", navStyle); }, [navStyle]);
 
   // Load the public site's theme from site_settings whenever a public page
   // is shown (cached by fetchSiteSettings, so this is cheap).
@@ -242,12 +255,13 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
 
   return (
     <ThemeContext.Provider value={{
-      theme, palette, iconStyle, customTheme, animatedBg,
+      theme, palette, iconStyle, customTheme, animatedBg, navStyle,
       toggleTheme: () => setTheme((p) => (p === "light" ? "dark" : "light")),
       setPalette: setPaletteState,
       setIconStyle: setIconStyleState,
       setCustomTheme,
       setAnimatedBg: setAnimatedBgState,
+      setNavStyle: setNavStyleState,
     }}>
       {children}
     </ThemeContext.Provider>

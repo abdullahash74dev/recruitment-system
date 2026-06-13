@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent } from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
@@ -67,6 +67,7 @@ import type { ApplicantEmailStatus } from "@/lib/applicantEmailTemplates";
 import { STATUSES_WITH_EMAIL } from "@/lib/applicantEmailTemplates";
 import { Mail, Activity, Bot, UserCog, Target, Globe, Menu } from "lucide-react";
 import DashboardSidebar, { type DashboardNavGroup } from "@/components/Dashboard/DashboardSidebar";
+import { useTheme } from "@/contexts/ThemeContext";
 
 type ApplicantStatus = "new" | "reviewing" | "phone_interview" | "in_person_interview" | "accepted" | "hired" | "rejected" | "withdrawn";
 
@@ -159,6 +160,7 @@ const CHART_COLORS = ["#3b82f6", "#eab308", "#a855f7", "#6366f1", "#22c55e", "#1
 
 const DashboardPage = () => {
   const { t, dir, lang } = useLanguage();
+  const { navStyle } = useTheme();
   const { permissions, hasPermission, role: currentUserRole, loading: permsLoading } = useUserPermissions();
   const { requestDelete } = useDeletePin();
   const [applicants, setApplicants] = useState<Applicant[]>([]);
@@ -658,22 +660,27 @@ const DashboardPage = () => {
   if (tabAllowed("tab.trash")) systemItems.push({ value: "trash", label: lang === "ar" ? "سلة المحذوفات" : "Trash", icon: Trash2 });
   if (systemItems.length) navGroups.push({ id: "system", title: lang === "ar" ? "النظام" : "System", items: systemItems });
 
+  const flatNavItems = navGroups.flatMap((g) => g.items);
+  const isModernNav = navStyle === "modern";
+
   return (
     <div className="min-h-screen bg-background relative flex" dir={dir}>
       <AuroraBackground />
-      <DashboardSidebar
-        groups={navGroups}
-        activeTab={activeTab}
-        onChange={setActiveTab}
-        collapsed={sidebarCollapsed}
-        onToggleCollapsed={() => setSidebarCollapsed((v) => !v)}
-        mobileOpen={mobileNavOpen}
-        onCloseMobile={() => setMobileNavOpen(false)}
-        dir={dir}
-        title={t("dash.title")}
-        collapseLabel={lang === "ar" ? "طي القائمة" : "Collapse"}
-        expandLabel={lang === "ar" ? "توسيع القائمة" : "Expand"}
-      />
+      {isModernNav && (
+        <DashboardSidebar
+          groups={navGroups}
+          activeTab={activeTab}
+          onChange={setActiveTab}
+          collapsed={sidebarCollapsed}
+          onToggleCollapsed={() => setSidebarCollapsed((v) => !v)}
+          mobileOpen={mobileNavOpen}
+          onCloseMobile={() => setMobileNavOpen(false)}
+          dir={dir}
+          title={t("dash.title")}
+          collapseLabel={lang === "ar" ? "طي القائمة" : "Collapse"}
+          expandLabel={lang === "ar" ? "توسيع القائمة" : "Expand"}
+        />
+      )}
       <div className="flex-1 min-w-0 flex flex-col">
       {/* Header */}
       <header className="gradient-hero py-4 px-6 sticky top-0 z-30 border-b border-white/10 shadow-elevated relative overflow-hidden">
@@ -684,15 +691,17 @@ const DashboardPage = () => {
         />
         <div className="max-w-7xl mx-auto flex items-center justify-between relative z-10">
           <div className="flex items-center gap-3 md:gap-4">
-            <button
-              type="button"
-              onClick={() => setMobileNavOpen(true)}
-              className="md:hidden p-2 rounded-lg text-primary-foreground hover:bg-white/10"
-              aria-label={lang === "ar" ? "فتح القائمة" : "Open menu"}
-            >
-              <Menu className="w-5 h-5" />
-            </button>
-            <Link to="/" className="hidden md:block"><SiteLogo heightOverride={40} /></Link>
+            {isModernNav && (
+              <button
+                type="button"
+                onClick={() => setMobileNavOpen(true)}
+                className="md:hidden p-2 rounded-lg text-primary-foreground hover:bg-white/10"
+                aria-label={lang === "ar" ? "فتح القائمة" : "Open menu"}
+              >
+                <Menu className="w-5 h-5" />
+              </button>
+            )}
+            <Link to="/" className={isModernNav ? "hidden md:block" : undefined}><SiteLogo heightOverride={40} /></Link>
             <div className="hidden md:flex items-center gap-2">
               <h1 className="text-primary-foreground font-bold text-lg">{t("dash.title")}</h1>
               <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-accent bg-white/10 border border-white/15 rounded-full px-2.5 py-1 backdrop-blur-sm shadow-glow animate-scale-in">
@@ -738,6 +747,21 @@ const DashboardPage = () => {
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
+          {!isModernNav && (
+            <TabsList className="flex flex-wrap w-full h-auto gap-1.5 p-1.5 bg-muted/60 backdrop-blur-sm border border-border/50 rounded-xl justify-start shadow-sm">
+              {flatNavItems.map((item) => (
+                <TabsTrigger
+                  key={item.value}
+                  value={item.value}
+                  className="h-9 px-4 text-sm font-medium rounded-lg flex items-center gap-1.5 transition-all duration-300 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-md hover:text-foreground"
+                >
+                  <item.icon className="w-3.5 h-3.5" />
+                  {item.label}
+                  {!!item.badge && <Badge variant="secondary" className="text-[10px] px-1 py-0 h-4 ms-1">{item.badge}</Badge>}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          )}
           {/* APPLICANTS TAB */}
           <TabsContent value="applicants">
             {isAdmin && <div className="mb-3 space-y-2"><ApplicantsImport onChanged={fetchApplicants} /><ApplicantsMappedImport onChanged={fetchApplicants} /></div>}
