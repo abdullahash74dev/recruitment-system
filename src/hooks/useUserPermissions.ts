@@ -115,6 +115,9 @@ export const useUserPermissions = () => {
   const [permissions, setPermissions] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
   const [role, setRole] = useState<string | null>(null);
+  // The "primary admin" is the longest-standing admin account. Only this
+  // account may change the public-facing site's color theme.
+  const [isPrimaryAdmin, setIsPrimaryAdmin] = useState(false);
 
   useEffect(() => { loadPermissions(); }, []);
 
@@ -137,6 +140,14 @@ export const useUserPermissions = () => {
     });
 
     setPermissions(result);
+
+    if (userRole === "admin") {
+      const { data: primary } = await supabase.rpc("am_i_primary_admin");
+      setIsPrimaryAdmin(!!primary);
+    } else {
+      setIsPrimaryAdmin(false);
+    }
+
     setLoading(false);
   };
 
@@ -145,5 +156,5 @@ export const useUserPermissions = () => {
     return permissions[key] ?? false;
   };
 
-  return { permissions, loading, role, hasPermission, reload: loadPermissions };
+  return { permissions, loading, role, isPrimaryAdmin, hasPermission, reload: loadPermissions };
 };

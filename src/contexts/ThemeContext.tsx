@@ -1,4 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { useLocation } from "react-router-dom";
+import { fetchSiteSettings } from "@/hooks/useSiteSettings";
 
 export type ThemeMode = "light" | "dark";
 export type ThemePalette =
@@ -127,6 +129,35 @@ const applyThemeTokens = (theme: ThemeMode, palette: ThemePalette, customTheme: 
   Object.entries(tokens).forEach(([key, value]) => root.style.setProperty(key, value));
 };
 
+// ===== Public (careers site) theme =====
+// Always light, and driven entirely by site_settings rather than the
+// admin's personal localStorage preferences, so the admin dashboard's
+// appearance never bleeds into the public-facing pages.
+const getPublicCustomTokens = (primaryHex: string, accentHex: string): ThemeTokens => {
+  const primary = hexToHsl(primaryHex, DEFAULT_LIGHT_TOKENS["--primary"]);
+  const accent = hexToHsl(accentHex, DEFAULT_LIGHT_TOKENS["--accent"]);
+  return {
+    "--primary": primary,
+    "--accent": accent,
+    "--ring": accent,
+    "--sidebar-background": primary,
+    "--sidebar-accent": accent,
+    "--gradient-primary": `linear-gradient(135deg, hsl(${primary}), hsl(${accent}))`,
+    "--gradient-accent": `linear-gradient(135deg, hsl(${accent}), hsl(${primary}))`,
+    "--gradient-hero": `linear-gradient(160deg, hsl(${primary}), hsl(${accent}))`,
+  };
+};
+
+export const computePublicThemeTokens = (palette: ThemePalette, primaryHex: string, accentHex: string): ThemeTokens => {
+  const overrides = palette === "custom" ? getPublicCustomTokens(primaryHex, accentHex) : (PALETTE_TOKENS[palette]?.light ?? {});
+  return { ...DEFAULT_LIGHT_TOKENS, ...overrides };
+};
+
+const applyPublicThemeTokens = (tokens: ThemeTokens) => {
+  const root = document.documentElement;
+  Object.entries(tokens).forEach(([key, value]) => root.style.setProperty(key, value));
+};
+
 export const ThemeProvider = ({ children }: { children: ReactNode }) => {
   const [theme, setTheme] = useState<ThemeMode>(() => {
     try { return (localStorage.getItem("akg-theme") as ThemeMode) || "light"; }
@@ -153,33 +184,55 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
     catch { return false; }
   });
 
-  useEffect(() => {
-    const root = document.documentElement;
-    if (theme === "dark") root.classList.add("dark"); else root.classList.remove("dark");
-    applyThemeTokens(theme, palette, customTheme);
-    localStorage.setItem("akg-theme", theme);
-  }, [theme, palette, customTheme]);
+  const location = useLocation();
+  const isAdminRoute = location.pathname.startsWith("/admin") || location.pathname.startsWith("/dashboard");
 
+  const [publicTokens, setPublicTokens] = useState<ThemeTokens>(() =>
+    computePublicThemeTokens("custom", DEFAULT_CUSTOM_THEME.primary, DEFAULT_CUSTOM_THEME.accent)
+  );
+
+  // Persist the admin's personal dashboard preferences regardless of which
+  // page is currently being viewed.
+  useEffect(() => { localStorage.setItem("akg-theme", theme); }, [theme]);
+  useEffect(() => { localStorage.setItem("akg-palette", palette); }, [palette]);
+  useEffect(() => { localStorage.setItem("akg-icons", iconStyle); }, [iconStyle]);
+  useEffect(() => { localStorage.setItem("akg-animated-bg", String(animatedBg)); }, [animatedBg]);
+
+  // Load the public site's theme from site_settings whenever a public page
+  // is shown (cached by fetchSiteSettings, so this is cheap).
+  useEffect(() => {
+    if (isAdminRoute) return;
+    let mounted = true;
+    fetchSiteSettings().then((settings) => {
+      if (!mounted) return;
+      const raw = settings.public_theme_palette as ThemePalette;
+      const publicPalette: ThemePalette = PALETTES.includes(raw) ? raw : "custom";
+      setPublicTokens(computePublicThemeTokens(publicPalette, settings.primary_color, settings.accent_color));
+    });
+    return () => { mounted = false; };
+  }, [isAdminRoute]);
+
+  // Apply the active theme to <html>. Admin dashboard and public site are
+  // fully independent: navigating between them swaps the whole set of CSS
+  // variables and visual classes rather than layering one on the other, so
+  // changing the dashboard's appearance never affects the public pages.
   useEffect(() => {
     const root = document.documentElement;
     PALETTES.forEach((p) => root.classList.remove(`palette-${p}`));
-    root.classList.add(`palette-${palette}`);
-    applyThemeTokens(theme, palette, customTheme);
-    localStorage.setItem("akg-palette", palette);
-  }, [theme, palette, customTheme]);
-
-  useEffect(() => {
-    const root = document.documentElement;
     ICON_STYLES.forEach((s) => root.classList.remove(`icons-${s}`));
-    root.classList.add(`icons-${iconStyle}`);
-    localStorage.setItem("akg-icons", iconStyle);
-  }, [iconStyle]);
 
-  useEffect(() => {
-    const root = document.documentElement;
-    root.classList.toggle("animated-bg", animatedBg);
-    localStorage.setItem("akg-animated-bg", String(animatedBg));
-  }, [animatedBg]);
+    if (isAdminRoute) {
+      if (theme === "dark") root.classList.add("dark"); else root.classList.remove("dark");
+      root.classList.add(`palette-${palette}`);
+      root.classList.add(`icons-${iconStyle}`);
+      root.classList.toggle("animated-bg", animatedBg);
+      applyThemeTokens(theme, palette, customTheme);
+    } else {
+      root.classList.remove("dark");
+      root.classList.remove("animated-bg");
+      applyPublicThemeTokens(publicTokens);
+    }
+  }, [isAdminRoute, theme, palette, customTheme, iconStyle, animatedBg, publicTokens]);
 
   const setCustomTheme = (colors: CustomThemeColors) => {
     setCustomThemeState(colors);
