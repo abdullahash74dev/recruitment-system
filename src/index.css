@@ -271,6 +271,26 @@ html.icons-sharp svg { stroke-linecap: square; stroke-linejoin: miter; stroke-wi
     -webkit-backdrop-filter: blur(20px);
     border: 1px solid hsl(var(--border) / 0.4);
   }
+
+  /* ===== Futuristic in-page tab controls ===== */
+  .tabs-list-futuristic {
+    background: hsl(var(--card) / 0.5);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid hsl(var(--border) / 0.4);
+  }
+  .tabs-trigger-futuristic {
+    color: hsl(var(--muted-foreground));
+  }
+  .tabs-trigger-futuristic:hover {
+    color: hsl(var(--foreground));
+    background: hsl(var(--foreground) / 0.06);
+  }
+  .tabs-trigger-futuristic[data-state="active"] {
+    background: var(--gradient-accent);
+    color: hsl(var(--accent-foreground));
+    box-shadow: var(--shadow-glow);
+  }
   .hover-lift {
     transition: transform 0.3s ease, box-shadow 0.3s ease;
   }
