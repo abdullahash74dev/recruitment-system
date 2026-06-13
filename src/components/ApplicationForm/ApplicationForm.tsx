@@ -162,6 +162,20 @@ const ApplicationForm = ({ preSelectedPosition }: Props) => {
         ? (error as { message?: string }).message
         : undefined;
 
+    const normalized = message?.toLowerCase() || "";
+
+    if (normalized.includes("too many submissions")) {
+      return lang === "ar"
+        ? "تم تجاوز عدد محاولات التقديم من هذا الاتصال. يرجى الانتظار قليلاً ثم المحاولة مرة أخرى."
+        : "Too many submissions from this network. Please wait a while before submitting again.";
+    }
+
+    if (normalized.includes("too many requests")) {
+      return lang === "ar"
+        ? "تم تجاوز عدد المحاولات المسموحة من هذا الاتصال. يرجى الانتظار قليلاً ثم المحاولة مرة أخرى."
+        : "Too many requests from this network. Please wait a while before trying again.";
+    }
+
     return message?.trim()
       ? message
       : lang === "ar"
