@@ -6,7 +6,7 @@ export type ThemeMode = "light" | "dark";
 export type ThemePalette =
   | "default" | "midnight" | "emerald" | "rose" | "slate" | "sunset" | "ocean" | "noir" | "aurora" | "custom";
 export type IconStyle = "regular" | "thin" | "bold" | "rounded" | "sharp";
-export type NavStyle = "modern" | "classic";
+export type NavStyle = "modern" | "classic" | "futuristic";
 
 export interface CustomThemeColors {
   primary: string;
@@ -64,8 +64,9 @@ export const ICON_STYLE_LABELS: Record<IconStyle, { ar: string; en: string }> = 
 };
 
 export const NAV_STYLE_LABELS: Record<NavStyle, { ar: string; en: string }> = {
-  modern:  { ar: "عصري (شريط جانبي)",    en: "Modern (sidebar)" },
-  classic: { ar: "كلاسيكي (تبويبات علوية)", en: "Classic (top tabs)" },
+  modern:     { ar: "عصري (شريط جانبي)",       en: "Modern (sidebar)" },
+  classic:    { ar: "كلاسيكي (تبويبات علوية)",  en: "Classic (top tabs)" },
+  futuristic: { ar: "مستقبلي (زجاجي AI)",      en: "Futuristic (AI glass)" },
 };
 
 type ThemeTokens = Record<string, string>;
@@ -192,8 +193,10 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
     catch { return false; }
   });
   const [navStyle, setNavStyleState] = useState<NavStyle>(() => {
-    try { return localStorage.getItem("akg-nav-style") === "classic" ? "classic" : "modern"; }
-    catch { return "modern"; }
+    try {
+      const v = localStorage.getItem("akg-nav-style");
+      return v === "classic" || v === "futuristic" ? v : "modern";
+    } catch { return "modern"; }
   });
 
   const location = useLocation();

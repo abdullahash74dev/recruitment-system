@@ -67,6 +67,7 @@ import type { ApplicantEmailStatus } from "@/lib/applicantEmailTemplates";
 import { STATUSES_WITH_EMAIL } from "@/lib/applicantEmailTemplates";
 import { Mail, Activity, Bot, UserCog, Target, Globe, Menu } from "lucide-react";
 import DashboardSidebar, { type DashboardNavGroup } from "@/components/Dashboard/DashboardSidebar";
+import DashboardSidebarFuturistic from "@/components/Dashboard/DashboardSidebarFuturistic";
 import { useTheme } from "@/contexts/ThemeContext";
 
 type ApplicantStatus = "new" | "reviewing" | "phone_interview" | "in_person_interview" | "accepted" | "hired" | "rejected" | "withdrawn";
@@ -661,26 +662,26 @@ const DashboardPage = () => {
   if (systemItems.length) navGroups.push({ id: "system", title: lang === "ar" ? "النظام" : "System", items: systemItems });
 
   const flatNavItems = navGroups.flatMap((g) => g.items);
-  const isModernNav = navStyle === "modern";
+  const showSidebar = navStyle !== "classic";
+  const sidebarProps = {
+    groups: navGroups,
+    activeTab,
+    onChange: setActiveTab,
+    collapsed: sidebarCollapsed,
+    onToggleCollapsed: () => setSidebarCollapsed((v) => !v),
+    mobileOpen: mobileNavOpen,
+    onCloseMobile: () => setMobileNavOpen(false),
+    dir,
+    title: t("dash.title"),
+    collapseLabel: lang === "ar" ? "طي القائمة" : "Collapse",
+    expandLabel: lang === "ar" ? "توسيع القائمة" : "Expand",
+  };
 
   return (
     <div className="min-h-screen bg-background relative flex" dir={dir}>
       <AuroraBackground />
-      {isModernNav && (
-        <DashboardSidebar
-          groups={navGroups}
-          activeTab={activeTab}
-          onChange={setActiveTab}
-          collapsed={sidebarCollapsed}
-          onToggleCollapsed={() => setSidebarCollapsed((v) => !v)}
-          mobileOpen={mobileNavOpen}
-          onCloseMobile={() => setMobileNavOpen(false)}
-          dir={dir}
-          title={t("dash.title")}
-          collapseLabel={lang === "ar" ? "طي القائمة" : "Collapse"}
-          expandLabel={lang === "ar" ? "توسيع القائمة" : "Expand"}
-        />
-      )}
+      {navStyle === "modern" && <DashboardSidebar {...sidebarProps} />}
+      {navStyle === "futuristic" && <DashboardSidebarFuturistic {...sidebarProps} />}
       <div className="flex-1 min-w-0 flex flex-col">
       {/* Header */}
       <header className="gradient-hero py-4 px-6 sticky top-0 z-30 border-b border-white/10 shadow-elevated relative overflow-hidden">
@@ -691,7 +692,7 @@ const DashboardPage = () => {
         />
         <div className="max-w-7xl mx-auto flex items-center justify-between relative z-10">
           <div className="flex items-center gap-3 md:gap-4">
-            {isModernNav && (
+            {showSidebar && (
               <button
                 type="button"
                 onClick={() => setMobileNavOpen(true)}
@@ -701,7 +702,7 @@ const DashboardPage = () => {
                 <Menu className="w-5 h-5" />
               </button>
             )}
-            <Link to="/" className={isModernNav ? "hidden md:block" : undefined}><SiteLogo heightOverride={40} /></Link>
+            <Link to="/" className={showSidebar ? "hidden md:block" : undefined}><SiteLogo heightOverride={40} /></Link>
             <div className="hidden md:flex items-center gap-2">
               <h1 className="text-primary-foreground font-bold text-lg">{t("dash.title")}</h1>
               <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-accent bg-white/10 border border-white/15 rounded-full px-2.5 py-1 backdrop-blur-sm shadow-glow animate-scale-in">
@@ -747,7 +748,7 @@ const DashboardPage = () => {
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          {!isModernNav && (
+          {navStyle === "classic" && (
             <TabsList className="flex flex-wrap w-full h-auto gap-1.5 p-1.5 bg-muted/60 backdrop-blur-sm border border-border/50 rounded-xl justify-start shadow-sm">
               {flatNavItems.map((item) => (
                 <TabsTrigger
