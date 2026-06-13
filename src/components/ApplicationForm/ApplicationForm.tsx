@@ -282,35 +282,64 @@ const ApplicationForm = ({ preSelectedPosition }: Props) => {
       : `Failed to upload the ${fileLabel.en}. Please try again.`;
   };
 
+  const isTransientNetworkError = (message: string | undefined) => {
+    const normalized = message?.toLowerCase() || "";
+    return (
+      normalized.includes("failed to fetch") ||
+      normalized.includes("failed to send a request") ||
+      normalized.includes("network request failed") ||
+      normalized.includes("failed to execute 'fetch'")
+    );
+  };
+
+  const UPLOAD_RETRY_ATTEMPTS = 3;
+  const UPLOAD_RETRY_DELAY_MS = 1200;
+
   const uploadFile = async (file: File, folder: string, applicantId: string, submissionToken: string, kind: string) => {
-    const requestBody = new FormData();
-    requestBody.append("file", file, file.name);
-    requestBody.append("folder", folder);
-    requestBody.append("applicantId", applicantId);
-    requestBody.append("submissionToken", submissionToken);
-    requestBody.append("kind", kind);
+    let lastError = new Error("Upload failed");
 
-    try {
-      const { data, error } = await supabase.functions.invoke("upload-file", {
-        body: requestBody,
-      });
+    for (let attempt = 1; attempt <= UPLOAD_RETRY_ATTEMPTS; attempt++) {
+      const requestBody = new FormData();
+      requestBody.append("file", file, file.name);
+      requestBody.append("folder", folder);
+      requestBody.append("applicantId", applicantId);
+      requestBody.append("submissionToken", submissionToken);
+      requestBody.append("kind", kind);
 
-      if (error) {
-        const errorMessage = await getEdgeFunctionErrorMessage(error);
-        throw new Error(errorMessage || error.message || "Upload failed");
+      try {
+        const { data, error } = await supabase.functions.invoke("upload-file", {
+          body: requestBody,
+        });
+
+        if (error) {
+          const errorMessage = await getEdgeFunctionErrorMessage(error);
+          throw new Error(errorMessage || error.message || "Upload failed");
+        }
+
+        const result = data as { path?: unknown } | null;
+
+        if (typeof result?.path !== "string") {
+          throw new Error("Upload failed");
+        }
+
+        return result.path;
+      } catch (err) {
+        lastError = err instanceof Error ? err : new Error("Upload failed");
+        console.error(`Upload attempt ${attempt} failed:`, lastError);
+
+        // Connection drops (common on mobile networks) are transient — retry
+        // with a short delay before giving up. Other errors (validation,
+        // token, file-type) won't be fixed by retrying.
+        if (attempt < UPLOAD_RETRY_ATTEMPTS && isTransientNetworkError(lastError.message)) {
+          await new Promise((resolve) => setTimeout(resolve, attempt * UPLOAD_RETRY_DELAY_MS));
+          continue;
+        }
+
+        throw lastError;
       }
-
-      const result = data as { path?: unknown } | null;
-
-      if (typeof result?.path !== "string") {
-        throw new Error("Upload failed");
-      }
-
-      return result.path;
-    } catch (err) {
-      console.error("Upload error:", err);
-      throw err instanceof Error ? err : new Error("Upload failed");
     }
+
+    throw lastError;
   };
 
   const uploadSelectedFile = async (
