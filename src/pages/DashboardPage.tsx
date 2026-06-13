@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
@@ -65,7 +65,8 @@ import AINetworkBackground from "@/components/AINetworkBackground";
 import AuroraBackground from "@/components/AuroraBackground";
 import type { ApplicantEmailStatus } from "@/lib/applicantEmailTemplates";
 import { STATUSES_WITH_EMAIL } from "@/lib/applicantEmailTemplates";
-import { Mail, Activity, Bot } from "lucide-react";
+import { Mail, Activity, Bot, UserCog, Target, Globe, Menu } from "lucide-react";
+import DashboardSidebar, { type DashboardNavGroup } from "@/components/Dashboard/DashboardSidebar";
 
 type ApplicantStatus = "new" | "reviewing" | "phone_interview" | "in_person_interview" | "accepted" | "hired" | "rejected" | "withdrawn";
 
@@ -170,6 +171,16 @@ const DashboardPage = () => {
   const [selectedApplicant, setSelectedApplicant] = useState<Applicant | null>(null);
   const [editNotes, setEditNotes] = useState("");
   const [activeTab, setActiveTab] = useState("applicants");
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try { return localStorage.getItem("akg-sidebar-collapsed") === "true"; }
+    catch { return false; }
+  });
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
+  useEffect(() => {
+    try { localStorage.setItem("akg-sidebar-collapsed", String(sidebarCollapsed)); }
+    catch { /* ignore */ }
+  }, [sidebarCollapsed]);
 
   // Job form state
   const [showJobForm, setShowJobForm] = useState(false);
@@ -609,32 +620,61 @@ const DashboardPage = () => {
 
   const isAdmin = currentUserRole === "admin";
 
-  // Build visible tabs based on permissions
-  const visibleTabs: { value: string; label: React.ReactNode }[] = [];
+  // Build the sidebar navigation, grouped and gated by permissions
   const tabAllowed = (key: string) => isAdmin || hasPermission(key as any);
+  const navGroups: DashboardNavGroup[] = [];
+
+  const applicantsItems: DashboardNavGroup["items"] = [];
   if (tabAllowed("tab.applicants")) {
-    visibleTabs.push({ value: "applicants", label: t("dash.tab.applicants") });
-    visibleTabs.push({ value: "archive", label: <span className="flex items-center gap-1"><Archive className="w-3 h-3" />{lang === "ar" ? "الأرشيف" : "Archive"}{archivedApplicants.length > 0 && <Badge variant="secondary" className="text-[10px] px-1 py-0 h-4 ms-1">{archivedApplicants.length}</Badge>}</span> });
+    applicantsItems.push({ value: "applicants", label: t("dash.tab.applicants"), icon: Users });
+    applicantsItems.push({ value: "archive", label: lang === "ar" ? "الأرشيف" : "Archive", icon: Archive, badge: archivedApplicants.length || undefined });
   }
-  if (tabAllowed("tab.jobs")) visibleTabs.push({ value: "jobs", label: t("dash.tab.jobs") });
-  if (tabAllowed("tab.users")) visibleTabs.push({ value: "users", label: t("dash.tab.users") });
-  if (tabAllowed("tab.projects")) visibleTabs.push({ value: "projects", label: t("dash.tab.projects") });
-  if (tabAllowed("tab.analytics")) visibleTabs.push({ value: "analytics", label: t("dash.tab.analytics") });
-  if (tabAllowed("tab.recruitment")) visibleTabs.push({ value: "recruitment", label: <span className="flex items-center gap-1"><Briefcase className="w-3 h-3" />{lang === "ar" ? "إدارة التوظيف" : "Recruitment"}</span> });
-  if (tabAllowed("tab.settings")) visibleTabs.push({ value: "settings", label: t("dash.tab.settings") });
-  if (tabAllowed("tab.jobpage")) visibleTabs.push({ value: "jobpage", label: <span className="flex items-center gap-1"><Briefcase className="w-3 h-3" />{lang === "ar" ? "صفحة الوظائف" : "Job Page"}</span> });
-  if (tabAllowed("tab.backup")) visibleTabs.push({ value: "backup", label: <span className="flex items-center gap-1"><Database className="w-3 h-3" />{lang === "ar" ? "نسخ احتياطي" : "Backup"}</span> });
-  if (tabAllowed("tab.auditlog")) visibleTabs.push({ value: "auditlog", label: <span className="flex items-center gap-1"><Shield className="w-3 h-3" />{lang === "ar" ? "سجل النظام" : "System Log"}</span> });
-  if (tabAllowed("tab.rejection_reasons")) visibleTabs.push({ value: "rejection_reasons", label: <span className="flex items-center gap-1"><Mail className="w-3 h-3" />{lang === "ar" ? "أسباب الرفض" : "Rejection Reasons"}</span> });
-  if (tabAllowed("tab.job_ads")) visibleTabs.push({ value: "job_ads", label: <span className="flex items-center gap-1"><Sparkles className="w-3 h-3" />{lang === "ar" ? "إعلانات الوظائف" : "Job Ads"}</span> });
-  if (tabAllowed("tab.trash")) visibleTabs.push({ value: "trash", label: <span className="flex items-center gap-1"><Trash2 className="w-3 h-3" />{lang === "ar" ? "سلة المحذوفات" : "Trash"}</span> });
-  if (tabAllowed("tab.ai_doctor")) visibleTabs.push({ value: "ai_doctor", label: <span className="flex items-center gap-1"><Stethoscope className="w-3 h-3" />{lang === "ar" ? "طبيب النظام AI" : "AI Doctor"}</span> });
-  if (tabAllowed("tab.ai_usage")) visibleTabs.push({ value: "ai_usage", label: <span className="flex items-center gap-1"><Activity className="w-3 h-3" />{lang === "ar" ? "استهلاك الذكاء" : "AI Usage"}</span> });
-  if (tabAllowed("tab.ai_settings")) visibleTabs.push({ value: "ai_settings", label: <span className="flex items-center gap-1"><Bot className="w-3 h-3" />{lang === "ar" ? "إعدادات الذكاء" : "AI Settings"}</span> });
+  if (applicantsItems.length) navGroups.push({ id: "applicants", title: lang === "ar" ? "المتقدمون" : "Applicants", items: applicantsItems });
+
+  const recruitmentItems: DashboardNavGroup["items"] = [];
+  if (tabAllowed("tab.jobs")) recruitmentItems.push({ value: "jobs", label: t("dash.tab.jobs"), icon: Briefcase });
+  if (tabAllowed("tab.job_ads")) recruitmentItems.push({ value: "job_ads", label: lang === "ar" ? "إعلانات الوظائف" : "Job Ads", icon: Sparkles });
+  if (tabAllowed("tab.recruitment")) recruitmentItems.push({ value: "recruitment", label: lang === "ar" ? "إدارة التوظيف" : "Recruitment", icon: Target });
+  if (tabAllowed("tab.rejection_reasons")) recruitmentItems.push({ value: "rejection_reasons", label: lang === "ar" ? "أسباب الرفض" : "Rejection Reasons", icon: Mail });
+  if (tabAllowed("tab.jobpage")) recruitmentItems.push({ value: "jobpage", label: lang === "ar" ? "صفحة الوظائف" : "Job Page", icon: Globe });
+  if (recruitmentItems.length) navGroups.push({ id: "recruitment", title: lang === "ar" ? "التوظيف" : "Recruitment", items: recruitmentItems });
+
+  const managementItems: DashboardNavGroup["items"] = [];
+  if (tabAllowed("tab.projects")) managementItems.push({ value: "projects", label: t("dash.tab.projects"), icon: FolderOpen });
+  if (tabAllowed("tab.users")) managementItems.push({ value: "users", label: t("dash.tab.users"), icon: UserCog });
+  if (tabAllowed("tab.analytics")) managementItems.push({ value: "analytics", label: t("dash.tab.analytics"), icon: BarChart3 });
+  if (managementItems.length) navGroups.push({ id: "management", title: lang === "ar" ? "الإدارة" : "Management", items: managementItems });
+
+  const aiItems: DashboardNavGroup["items"] = [];
+  if (tabAllowed("tab.ai_doctor")) aiItems.push({ value: "ai_doctor", label: lang === "ar" ? "طبيب النظام" : "AI Doctor", icon: Stethoscope });
+  if (tabAllowed("tab.ai_usage")) aiItems.push({ value: "ai_usage", label: lang === "ar" ? "استهلاك الذكاء" : "AI Usage", icon: Activity });
+  if (tabAllowed("tab.ai_settings")) aiItems.push({ value: "ai_settings", label: lang === "ar" ? "إعدادات الذكاء" : "AI Settings", icon: Bot });
+  if (aiItems.length) navGroups.push({ id: "ai", title: lang === "ar" ? "الذكاء الاصطناعي" : "AI Tools", items: aiItems });
+
+  const systemItems: DashboardNavGroup["items"] = [];
+  if (tabAllowed("tab.settings")) systemItems.push({ value: "settings", label: t("dash.tab.settings"), icon: Settings });
+  if (tabAllowed("tab.backup")) systemItems.push({ value: "backup", label: lang === "ar" ? "نسخ احتياطي" : "Backup", icon: Database });
+  if (tabAllowed("tab.auditlog")) systemItems.push({ value: "auditlog", label: lang === "ar" ? "سجل النظام" : "System Log", icon: Shield });
+  if (tabAllowed("tab.trash")) systemItems.push({ value: "trash", label: lang === "ar" ? "سلة المحذوفات" : "Trash", icon: Trash2 });
+  if (systemItems.length) navGroups.push({ id: "system", title: lang === "ar" ? "النظام" : "System", items: systemItems });
 
   return (
-    <div className="min-h-screen bg-background relative" dir={dir}>
+    <div className="min-h-screen bg-background relative flex" dir={dir}>
       <AuroraBackground />
+      <DashboardSidebar
+        groups={navGroups}
+        activeTab={activeTab}
+        onChange={setActiveTab}
+        collapsed={sidebarCollapsed}
+        onToggleCollapsed={() => setSidebarCollapsed((v) => !v)}
+        mobileOpen={mobileNavOpen}
+        onCloseMobile={() => setMobileNavOpen(false)}
+        dir={dir}
+        title={t("dash.title")}
+        collapseLabel={lang === "ar" ? "طي القائمة" : "Collapse"}
+        expandLabel={lang === "ar" ? "توسيع القائمة" : "Expand"}
+      />
+      <div className="flex-1 min-w-0 flex flex-col">
       {/* Header */}
       <header className="gradient-hero py-4 px-6 sticky top-0 z-30 border-b border-white/10 shadow-elevated relative overflow-hidden">
         <AINetworkBackground className="opacity-40" />
@@ -643,8 +683,16 @@ const DashboardPage = () => {
           style={{ background: "radial-gradient(circle at 15% 30%, hsl(var(--accent) / 0.25), transparent 55%)" }}
         />
         <div className="max-w-7xl mx-auto flex items-center justify-between relative z-10">
-          <div className="flex items-center gap-4">
-            <Link to="/"><SiteLogo heightOverride={40} /></Link>
+          <div className="flex items-center gap-3 md:gap-4">
+            <button
+              type="button"
+              onClick={() => setMobileNavOpen(true)}
+              className="md:hidden p-2 rounded-lg text-primary-foreground hover:bg-white/10"
+              aria-label={lang === "ar" ? "فتح القائمة" : "Open menu"}
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+            <Link to="/" className="hidden md:block"><SiteLogo heightOverride={40} /></Link>
             <div className="hidden md:flex items-center gap-2">
               <h1 className="text-primary-foreground font-bold text-lg">{t("dash.title")}</h1>
               <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-accent bg-white/10 border border-white/15 rounded-full px-2.5 py-1 backdrop-blur-sm shadow-glow animate-scale-in">
@@ -668,7 +716,7 @@ const DashboardPage = () => {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto p-4 md:p-6 space-y-6">
+      <main className="max-w-7xl mx-auto w-full p-4 md:p-6 space-y-6">
         {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {stats.map((stat, i) => (
@@ -690,19 +738,6 @@ const DashboardPage = () => {
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          {/* Unified tab bar — auto-flows to grid so future tabs match style. */}
-          <TabsList className="flex flex-wrap w-full h-auto gap-1.5 p-1.5 bg-muted/60 backdrop-blur-sm border border-border/50 rounded-xl justify-start shadow-sm">
-            {visibleTabs.map(tab => (
-              <TabsTrigger
-                key={tab.value}
-                value={tab.value}
-                className="h-9 px-4 text-sm font-medium rounded-lg flex items-center gap-1.5 transition-all duration-300 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-md hover:text-foreground"
-              >
-                {tab.label}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-
           {/* APPLICANTS TAB */}
           <TabsContent value="applicants">
             {isAdmin && <div className="mb-3 space-y-2"><ApplicantsImport onChanged={fetchApplicants} /><ApplicantsMappedImport onChanged={fetchApplicants} /></div>}
@@ -1162,11 +1197,9 @@ const DashboardPage = () => {
             <RejectionReasonsSettings />
           </TabsContent>
 
-          {isAdmin && (
-            <TabsContent value="job_ads">
-              <JobAdvertisements />
-            </TabsContent>
-          )}
+          <TabsContent value="job_ads">
+            <JobAdvertisements />
+          </TabsContent>
 
           <TabsContent value="trash">
             <TrashBin />
@@ -1189,6 +1222,7 @@ const DashboardPage = () => {
           </TabsContent>
         </Tabs>
       </main>
+      </div>
 
       {/* Applicant Detail Dialog */}
       <Dialog open={!!selectedApplicant} onOpenChange={() => setSelectedApplicant(null)}>
