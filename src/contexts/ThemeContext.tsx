@@ -194,9 +194,9 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
   });
   const [navStyle, setNavStyleState] = useState<NavStyle>(() => {
     try {
-      const v = localStorage.getItem("akg-nav-style");
-      return v === "classic" || v === "futuristic" ? v : "modern";
-    } catch { return "modern"; }
+      const v = localStorage.getItem("akg-nav-style-v2");
+      return v === "modern" || v === "classic" || v === "futuristic" ? v : "futuristic";
+    } catch { return "futuristic"; }
   });
 
   const location = useLocation();
@@ -212,7 +212,7 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => { localStorage.setItem("akg-palette", palette); }, [palette]);
   useEffect(() => { localStorage.setItem("akg-icons", iconStyle); }, [iconStyle]);
   useEffect(() => { localStorage.setItem("akg-animated-bg", String(animatedBg)); }, [animatedBg]);
-  useEffect(() => { localStorage.setItem("akg-nav-style", navStyle); }, [navStyle]);
+  useEffect(() => { localStorage.setItem("akg-nav-style-v2", navStyle); }, [navStyle]);
 
   // Load the public site's theme from site_settings whenever a public page
   // is shown (cached by fetchSiteSettings, so this is cheap).
