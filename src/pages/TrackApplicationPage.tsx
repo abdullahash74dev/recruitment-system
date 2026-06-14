@@ -125,7 +125,7 @@ const TrackApplicationPage = () => {
         </div>
       </header>
 
-      <main className="max-w-3xl mx-auto px-6 py-10 space-y-6">
+      <main className="max-w-3xl mx-auto px-6 py-10 space-y-6 content-fade-in">
         <div className="text-center space-y-2">
           <h1 className="text-3xl md:text-4xl font-black text-primary">{t("track.title")}</h1>
           <p className="text-muted-foreground max-w-xl mx-auto">{t("track.subtitle")}</p>

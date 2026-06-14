@@ -213,6 +213,11 @@ html.icons-sharp svg { stroke-linecap: square; stroke-linejoin: miter; stroke-wi
   .gradient-hero {
     background: var(--gradient-hero);
   }
+  /* Soft tinted wash beneath gradient-hero headers, fading into the page
+     background so the header doesn't end in a hard, empty white seam. */
+  .content-fade-in {
+    background: linear-gradient(to bottom, hsl(var(--primary) / 0.06), hsl(var(--accent) / 0.03) 140px, transparent 320px);
+  }
   html.animated-bg .gradient-hero {
     background-size: 200% 200%;
     animation: gradient-flow 18s ease infinite;

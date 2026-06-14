@@ -749,7 +749,7 @@ const DashboardPage = () => {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto w-full p-4 md:p-6 space-y-6">
+      <main className="max-w-7xl mx-auto w-full p-4 md:p-6 space-y-6 content-fade-in">
         {/* Stats — only on the Applicants tab; Recruitment & Analytics have their own dedicated KPI sections */}
         {activeTab === "applicants" && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

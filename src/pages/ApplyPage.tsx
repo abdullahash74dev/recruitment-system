@@ -39,7 +39,7 @@ const ApplyPage = () => {
       </header>
 
       {/* Form Section */}
-      <main className="py-10 px-4">
+      <main className="py-10 px-4 content-fade-in">
         <div className="max-w-3xl mx-auto mb-8 text-center">
           <h1 className="text-3xl md:text-4xl font-bold text-primary mb-3">{applyTitle}</h1>
           <p className="text-muted-foreground text-lg">{applyDesc}</p>
