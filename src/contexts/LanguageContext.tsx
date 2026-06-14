@@ -1,4 +1,12 @@
-import { createContext, useContext, useState, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { fetchSiteSettings } from "@/hooks/useSiteSettings";
+
+// The default company name used throughout the static translation strings
+// below. Whenever the admin changes the site name in Branding settings,
+// t() swaps these placeholders for the configured name so every page stays
+// in sync without editing each string individually.
+const DEFAULT_COMPANY_AR = "منصة التوظيف الذكية";
+const DEFAULT_COMPANY_EN = "NexHire AI";
 
 export type Lang = "ar" | "en";
 
@@ -838,7 +846,23 @@ export const LanguageProvider = ({ children }: { children: ReactNode }) => {
     localStorage.setItem("akg-lang", l);
   };
 
-  const t = (key: string) => translations[lang][key] || key;
+  const [companyName, setCompanyName] = useState({ ar: DEFAULT_COMPANY_AR, en: DEFAULT_COMPANY_EN });
+
+  useEffect(() => {
+    fetchSiteSettings().then((settings) => {
+      setCompanyName({
+        ar: settings.site_name_ar || DEFAULT_COMPANY_AR,
+        en: settings.site_name_en || DEFAULT_COMPANY_EN,
+      });
+    });
+  }, []);
+
+  const t = (key: string) => {
+    const raw = translations[lang][key] || key;
+    return raw
+      .split(DEFAULT_COMPANY_AR).join(companyName.ar)
+      .split(DEFAULT_COMPANY_EN).join(companyName.en);
+  };
   const dir = lang === "ar" ? "rtl" : "ltr";
 
   return (
