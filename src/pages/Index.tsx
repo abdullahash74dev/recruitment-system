@@ -94,7 +94,7 @@ const Index = () => {
       {/* Hero */}
       <section className="relative min-h-[85vh] flex items-center overflow-hidden" style={content.hero_bg_color ? { background: content.hero_bg_color } : undefined}>
         <div className="absolute inset-0">
-          <img src={heroBg} alt="" className="w-full h-full object-cover" width={1920} height={1080} />
+          <img src={content.hero_image_url || heroBg} alt="" className="w-full h-full object-cover" width={1920} height={1080} />
           {!content.hero_bg_color && <div className="absolute inset-0 gradient-hero opacity-85" />}
           {!content.hero_bg_color && <div className="absolute inset-0 bg-grid-dots opacity-40" />}
           {!content.hero_bg_color && <AINetworkBackground />}
