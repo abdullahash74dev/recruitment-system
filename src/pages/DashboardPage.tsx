@@ -663,6 +663,8 @@ const DashboardPage = () => {
 
   const flatNavItems = navGroups.flatMap((g) => g.items);
   const showSidebar = navStyle !== "classic";
+  const activeNavItem = flatNavItems.find((i) => i.value === activeTab);
+  const ActiveIcon = activeNavItem?.icon;
   const sidebarProps = {
     groups: navGroups,
     activeTab,
@@ -702,13 +704,22 @@ const DashboardPage = () => {
                 <Menu className="w-5 h-5" />
               </button>
             )}
-            <Link to="/" className={showSidebar ? "hidden md:block" : undefined}><SiteLogo heightOverride={40} /></Link>
-            <div className="hidden md:flex items-center gap-2">
-              <h1 className="text-primary-foreground font-bold text-lg">{t("dash.title")}</h1>
-              <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-accent bg-white/10 border border-white/15 rounded-full px-2.5 py-1 backdrop-blur-sm shadow-glow animate-scale-in">
-                <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
-                AI
-              </span>
+            <Link to="/" className={showSidebar ? "md:hidden" : undefined}><SiteLogo heightOverride={40} /></Link>
+            <div className="hidden md:flex items-center gap-2 min-w-0">
+              {showSidebar && activeNavItem ? (
+                <>
+                  {ActiveIcon && <ActiveIcon className="w-5 h-5 text-accent shrink-0" />}
+                  <h1 className="text-primary-foreground font-bold text-lg truncate">{activeNavItem.label}</h1>
+                </>
+              ) : (
+                <>
+                  <h1 className="text-primary-foreground font-bold text-lg">{t("dash.title")}</h1>
+                  <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-accent bg-white/10 border border-white/15 rounded-full px-2.5 py-1 backdrop-blur-sm shadow-glow animate-scale-in">
+                    <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
+                    AI
+                  </span>
+                </>
+              )}
             </div>
           </div>
           <div className="flex items-center gap-3">

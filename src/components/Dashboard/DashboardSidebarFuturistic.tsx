@@ -34,8 +34,8 @@ const NavButton = ({
       style={{ animationDelay: `${delay}ms` }}
       className={cn(
         "animate-fade-in-up group relative flex w-full items-center gap-3 rounded-2xl px-2.5 py-2.5 text-sm font-medium transition-all duration-300 ease-out",
-        "text-sidebar-foreground/65 hover:text-sidebar-foreground hover:bg-white/5",
-        active && "text-sidebar-foreground bg-gradient-to-r from-sidebar-accent/90 via-sidebar-accent/40 to-transparent shadow-glow",
+        "text-slate-400 hover:text-white hover:bg-white/5",
+        active && "text-white bg-accent/10 ring-1 ring-accent/40 shadow-glow",
         collapsed && "justify-center px-0",
       )}
     >
@@ -44,12 +44,12 @@ const NavButton = ({
           "relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-all duration-300",
           active
             ? "gradient-accent text-accent-foreground shadow-glow scale-105"
-            : "bg-sidebar-accent/30 text-sidebar-foreground/70 group-hover:scale-105 group-hover:bg-sidebar-accent/50 group-hover:text-sidebar-foreground",
+            : "bg-white/5 text-slate-400 group-hover:scale-105 group-hover:bg-white/10 group-hover:text-white",
         )}
       >
         <Icon className="h-[18px] w-[18px]" />
         {active && (
-          <span className="absolute -end-1 -top-1 h-2 w-2 rounded-full bg-accent ring-2 ring-sidebar-background animate-pulse" />
+          <span className="absolute -end-1 -top-1 h-2 w-2 rounded-full bg-accent ring-2 ring-slate-950 animate-pulse" />
         )}
       </span>
       {!collapsed && <span className="flex-1 truncate text-start">{item.label}</span>}
@@ -78,6 +78,7 @@ const DashboardSidebarFuturistic = ({
   groups, activeTab, onChange, collapsed, onToggleCollapsed, mobileOpen, onCloseMobile, dir, title, collapseLabel, expandLabel,
 }: DashboardSidebarFuturisticProps) => {
   const tooltipSide: "left" | "right" = dir === "rtl" ? "left" : "right";
+  const statusLabel = dir === "rtl" ? "النظام متصل" : "System Online";
 
   const renderNav = (forceExpanded: boolean, onSelect: (value: string) => void) => {
     let itemIndex = 0;
@@ -86,7 +87,7 @@ const DashboardSidebarFuturistic = ({
         {groups.map((group, idx) => (
           <div key={group.id}>
             {idx > 0 && collapsed && !forceExpanded && (
-              <div className="mx-3 mb-2 h-px bg-gradient-to-r from-transparent via-sidebar-border to-transparent" />
+              <div className="mx-3 mb-2 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
             )}
             {(!collapsed || forceExpanded) && (
               <p className="mb-2 flex items-center gap-2 px-2 text-[10px] font-bold uppercase tracking-[0.2em]">
@@ -126,9 +127,10 @@ const DashboardSidebarFuturistic = ({
           collapsed ? "w-[88px]" : "w-72",
         )}
       >
-        <div className="relative flex h-full w-full flex-col overflow-hidden rounded-3xl border border-white/10 bg-sidebar/75 shadow-elevated backdrop-blur-2xl">
-          <AINetworkBackground className="opacity-25" />
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-sidebar-primary/15 via-transparent to-accent/10" />
+        <div className="relative flex h-full w-full flex-col overflow-hidden rounded-3xl border border-accent/20 bg-gradient-to-b from-slate-950/95 via-slate-900/90 to-slate-950/95 shadow-glow backdrop-blur-2xl">
+          <div className="pointer-events-none absolute -top-24 start-1/2 h-48 w-48 -translate-x-1/2 rounded-full bg-accent/20 blur-3xl" />
+          <AINetworkBackground className="opacity-30" />
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-accent/10 via-transparent to-primary/10" />
           <div className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-accent/70 to-transparent" />
 
           {/* Logo header */}
@@ -138,7 +140,7 @@ const DashboardSidebarFuturistic = ({
             </Link>
             {!collapsed && (
               <div className="flex flex-1 items-center justify-between gap-2 overflow-hidden">
-                <span className="truncate text-sm font-bold text-sidebar-foreground">{title}</span>
+                <span className="truncate text-sm font-bold text-white">{title}</span>
                 <span className="inline-flex items-center gap-1 rounded-full border border-accent/30 bg-accent/10 px-2 py-0.5 text-[10px] font-semibold text-accent shadow-glow">
                   <Sparkles className="h-3 w-3 animate-pulse" />
                   AI
@@ -149,11 +151,19 @@ const DashboardSidebarFuturistic = ({
 
           {renderNav(false, onChange)}
 
+          {/* AI status indicator */}
+          {!collapsed && (
+            <div className="relative z-10 mx-3 mb-1 flex items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-3 py-2 text-[11px] font-medium text-emerald-400">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              {statusLabel}
+            </div>
+          )}
+
           {/* Collapse toggle */}
           <button
             type="button"
             onClick={onToggleCollapsed}
-            className="relative z-10 m-3 flex shrink-0 items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 py-2.5 text-xs font-semibold text-sidebar-foreground/70 transition-all duration-300 hover:border-accent/40 hover:bg-accent/10 hover:text-sidebar-foreground hover:shadow-glow"
+            className="relative z-10 m-3 flex shrink-0 items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 py-2.5 text-xs font-semibold text-slate-400 transition-all duration-300 hover:border-accent/40 hover:bg-accent/10 hover:text-white hover:shadow-glow"
           >
             {dir === "rtl"
               ? (collapsed ? <ChevronsLeft className="h-4 w-4" /> : <ChevronsRight className="h-4 w-4" />)
@@ -170,27 +180,32 @@ const DashboardSidebarFuturistic = ({
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-in fade-in-0" onClick={onCloseMobile} />
           <div
             className={cn(
-              "relative z-10 m-3 flex h-[calc(100%-1.5rem)] w-80 flex-col overflow-hidden rounded-3xl border border-white/10 bg-sidebar/90 shadow-elevated backdrop-blur-2xl animate-in duration-200",
+              "relative z-10 m-3 flex h-[calc(100%-1.5rem)] w-80 flex-col overflow-hidden rounded-3xl border border-accent/20 bg-gradient-to-b from-slate-950/95 via-slate-900/90 to-slate-950/95 shadow-glow backdrop-blur-2xl animate-in duration-200",
               dir === "rtl" ? "slide-in-from-right" : "slide-in-from-left",
             )}
           >
-            <AINetworkBackground className="opacity-25" />
-            <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-sidebar-primary/15 via-transparent to-accent/10" />
+            <div className="pointer-events-none absolute -top-24 start-1/2 h-48 w-48 -translate-x-1/2 rounded-full bg-accent/20 blur-3xl" />
+            <AINetworkBackground className="opacity-30" />
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-accent/10 via-transparent to-primary/10" />
 
             <div className="relative z-10 flex h-16 shrink-0 items-center justify-between gap-2 border-b border-white/10 px-4">
               <div className="flex items-center gap-2 overflow-hidden">
                 <SiteLogo heightOverride={32} />
-                <span className="truncate text-sm font-bold text-sidebar-foreground">{title}</span>
+                <span className="truncate text-sm font-bold text-white">{title}</span>
               </div>
               <button
                 type="button"
                 onClick={onCloseMobile}
-                className="rounded-xl p-1.5 text-sidebar-foreground/60 hover:bg-white/10 hover:text-sidebar-foreground"
+                className="rounded-xl p-1.5 text-slate-400 hover:bg-white/10 hover:text-white"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
             {renderNav(true, (value) => { onChange(value); onCloseMobile(); })}
+            <div className="relative z-10 mx-3 mb-3 flex items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/5 px-3 py-2 text-[11px] font-medium text-emerald-400">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              {statusLabel}
+            </div>
           </div>
         </div>
       )}
