@@ -168,6 +168,9 @@ const DashboardPage = () => {
   const [jobs, setJobs] = useState<JobPosting[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [jobsSearch, setJobsSearch] = useState("");
+  const [usersSearch, setUsersSearch] = useState("");
+  const [projectsSearch, setProjectsSearch] = useState("");
   const [advFilters, setAdvFilters] = useState<AdvancedFilter[]>([]);
   const [aiSelectedIds, setAiSelectedIds] = useState<Set<string> | null>(null);
   const [aiSummary, setAiSummary] = useState("");
@@ -621,6 +624,26 @@ const DashboardPage = () => {
     { label: t("dash.hired"), value: activeApplicants.filter(a => a.status === "hired").length, icon: CheckCircle2, color: "text-green-500", bg: "bg-green-500/10" },
   ];
 
+  // Search filters for Jobs / Users / Projects tabs
+  const filteredJobs = jobs.filter(job => {
+    const q = jobsSearch.trim().toLowerCase();
+    if (!q) return true;
+    return [job.title_ar, (job as any).title_en, job.location, (job as any).location_en]
+      .some(v => (v || "").toLowerCase().includes(q));
+  });
+
+  const filteredUsers = users.filter((user: any) => {
+    const q = usersSearch.trim().toLowerCase();
+    if (!q) return true;
+    return [user.display_name, user.email].some((v: string) => (v || "").toLowerCase().includes(q));
+  });
+
+  const filteredProjects = projects.filter((p: any) => {
+    const q = projectsSearch.trim().toLowerCase();
+    if (!q) return true;
+    return [p.name_ar, p.name_en].some((v: string) => (v || "").toLowerCase().includes(q));
+  });
+
   const isAdmin = currentUserRole === "admin";
 
   // Build the sidebar navigation, grouped and gated by permissions
@@ -922,47 +945,57 @@ const DashboardPage = () => {
           <TabsContent value="jobs">
             <Card>
               <CardHeader>
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                   <CardTitle className="flex items-center gap-2"><Briefcase className="w-5 h-5" />{t("dash.manageJobs")}</CardTitle>
-                  <Button onClick={() => openJobForm()} className="gradient-accent text-accent-foreground gap-2"><Plus className="w-4 h-4" />{t("dash.addJob")}</Button>
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <div className="relative">
+                      <Search className="absolute top-2.5 w-4 h-4 text-muted-foreground" style={{ [dir === "rtl" ? "right" : "left"]: "0.75rem" }} />
+                      <Input value={jobsSearch} onChange={e => setJobsSearch(e.target.value)} placeholder={t("dash.search")} className="w-full sm:w-64" style={{ [dir === "rtl" ? "paddingRight" : "paddingLeft"]: "2.5rem" }} />
+                    </div>
+                    <Button onClick={() => openJobForm()} className="gradient-accent text-accent-foreground gap-2"><Plus className="w-4 h-4" />{t("dash.addJob")}</Button>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
                 <JobsExcelTools jobs={jobs} onChanged={fetchJobs} />
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>{t("dash.jobTitle")}</TableHead>
-                        <TableHead>{t("dash.jobLocation")}</TableHead>
-                        <TableHead>{t("dash.jobType")}</TableHead>
-                        <TableHead>{t("dash.status")}</TableHead>
-                        <TableHead>{t("dash.actions")}</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {jobs.map(job => (
-                        <TableRow key={job.id}>
-                          <TableCell className="font-medium">{lang === "ar" ? job.title_ar : (job.title_en || job.title_ar)}</TableCell>
-                          <TableCell>{lang === "ar" ? job.location : ((job as any).location_en || job.location)}</TableCell>
-                          <TableCell>{lang === "ar" ? job.job_type : ((job as any).job_type_en || job.job_type)}</TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              <Switch checked={job.is_active} onCheckedChange={(v) => toggleJobActive(job.id, v)} />
-                              <span className="text-xs">{job.is_active ? t("dash.jobActive") : t("dash.jobInactive")}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-1">
-                              <Button size="sm" variant="ghost" onClick={() => openJobForm(job)}><Pencil className="w-4 h-4" /></Button>
-                              <Button size="sm" variant="ghost" className="text-destructive" onClick={() => deleteJob(job.id)}><Trash2 className="w-4 h-4" /></Button>
-                            </div>
-                          </TableCell>
+                {filteredJobs.length === 0 ? (
+                  <p className="text-muted-foreground text-sm text-center py-8">{lang === "ar" ? "لا توجد وظائف مطابقة" : "No matching jobs"}</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>{t("dash.jobTitle")}</TableHead>
+                          <TableHead>{t("dash.jobLocation")}</TableHead>
+                          <TableHead>{t("dash.jobType")}</TableHead>
+                          <TableHead>{t("dash.status")}</TableHead>
+                          <TableHead>{t("dash.actions")}</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredJobs.map(job => (
+                          <TableRow key={job.id}>
+                            <TableCell className="font-medium">{lang === "ar" ? job.title_ar : (job.title_en || job.title_ar)}</TableCell>
+                            <TableCell>{lang === "ar" ? job.location : ((job as any).location_en || job.location)}</TableCell>
+                            <TableCell>{lang === "ar" ? job.job_type : ((job as any).job_type_en || job.job_type)}</TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <Switch checked={job.is_active} onCheckedChange={(v) => toggleJobActive(job.id, v)} />
+                                <span className="text-xs">{job.is_active ? t("dash.jobActive") : t("dash.jobInactive")}</span>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-1">
+                                <Button size="sm" variant="ghost" onClick={() => openJobForm(job)}><Pencil className="w-4 h-4" /></Button>
+                                <Button size="sm" variant="ghost" className="text-destructive" onClick={() => deleteJob(job.id)}><Trash2 className="w-4 h-4" /></Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -970,14 +1003,20 @@ const DashboardPage = () => {
           <TabsContent value="users">
             <Card>
               <CardHeader>
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                   <CardTitle className="flex items-center gap-2"><Users className="w-5 h-5" />{t("dash.manageUsers")}</CardTitle>
-                  <Button onClick={() => setShowUserForm(true)} className="gradient-accent text-accent-foreground gap-2"><Plus className="w-4 h-4" />{t("dash.addUser")}</Button>
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <div className="relative">
+                      <Search className="absolute top-2.5 w-4 h-4 text-muted-foreground" style={{ [dir === "rtl" ? "right" : "left"]: "0.75rem" }} />
+                      <Input value={usersSearch} onChange={e => setUsersSearch(e.target.value)} placeholder={t("dash.search")} className="w-full sm:w-64" style={{ [dir === "rtl" ? "paddingRight" : "paddingLeft"]: "2.5rem" }} />
+                    </div>
+                    <Button onClick={() => setShowUserForm(true)} className="gradient-accent text-accent-foreground gap-2"><Plus className="w-4 h-4" />{t("dash.addUser")}</Button>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent>
-                {users.length === 0 ? (
-                  <p className="text-muted-foreground text-sm text-center py-8">{t("dash.noUsers")}</p>
+                {filteredUsers.length === 0 ? (
+                  <p className="text-muted-foreground text-sm text-center py-8">{users.length === 0 ? t("dash.noUsers") : (lang === "ar" ? "لا يوجد مستخدمون مطابقون" : "No matching users")}</p>
                 ) : (
                   <div className="overflow-x-auto">
                     <Table>
@@ -991,7 +1030,7 @@ const DashboardPage = () => {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {users.map((user: any) => {
+                        {filteredUsers.map((user: any) => {
                           const userRole = userRoles.find((r: any) => r.user_id === user.user_id);
                           const isCurrentUser = false; // handled by AdminGuard
                           return (
@@ -1051,17 +1090,23 @@ const DashboardPage = () => {
           <TabsContent value="projects">
             <Card>
               <CardHeader>
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                   <CardTitle className="flex items-center gap-2"><FolderOpen className="w-5 h-5" />{t("dash.projects")}</CardTitle>
-                  <Button onClick={() => { setEditingProjectId(null); setProjectForm(emptyProjectForm); setShowProjectForm(true); }} className="gradient-accent text-accent-foreground gap-2"><Plus className="w-4 h-4" />{t("dash.addProject")}</Button>
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <div className="relative">
+                      <Search className="absolute top-2.5 w-4 h-4 text-muted-foreground" style={{ [dir === "rtl" ? "right" : "left"]: "0.75rem" }} />
+                      <Input value={projectsSearch} onChange={e => setProjectsSearch(e.target.value)} placeholder={t("dash.search")} className="w-full sm:w-64" style={{ [dir === "rtl" ? "paddingRight" : "paddingLeft"]: "2.5rem" }} />
+                    </div>
+                    <Button onClick={() => { setEditingProjectId(null); setProjectForm(emptyProjectForm); setShowProjectForm(true); }} className="gradient-accent text-accent-foreground gap-2"><Plus className="w-4 h-4" />{t("dash.addProject")}</Button>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent>
-                {projects.length === 0 ? (
-                  <p className="text-muted-foreground text-sm text-center py-8">{lang === "ar" ? "لا توجد مشاريع بعد" : "No projects yet"}</p>
+                {filteredProjects.length === 0 ? (
+                  <p className="text-muted-foreground text-sm text-center py-8">{projects.length === 0 ? (lang === "ar" ? "لا توجد مشاريع بعد" : "No projects yet") : (lang === "ar" ? "لا توجد مشاريع مطابقة" : "No matching projects")}</p>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                     {projects.map((p: any) => (
+                     {filteredProjects.map((p: any) => (
                       <Card key={p.id}>
                         <CardContent className="p-4">
                           <div className="flex items-center gap-3 mb-2">
