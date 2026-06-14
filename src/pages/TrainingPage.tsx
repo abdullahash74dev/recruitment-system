@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { useSiteContent } from "@/hooks/useSiteContent";
 import TopBar from "@/components/TopBar";
+import AuroraBackground from "@/components/AuroraBackground";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -75,7 +76,8 @@ const TrainingPage = () => {
     : ((settings as any).training_page_desc_en || "Join our Co-op and Tamheer training programs at NexHire AI");
 
   return (
-    <div className="min-h-screen bg-background" dir={dir}>
+    <div className="min-h-screen bg-background relative" dir={dir}>
+      <AuroraBackground />
       <nav className="sticky top-0 z-30 bg-card border-b border-border shadow-sm">
         <div className="max-w-6xl mx-auto flex items-center justify-between py-3 px-6">
           <div className="flex items-center gap-6">

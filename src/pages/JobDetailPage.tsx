@@ -10,6 +10,7 @@ import {
   GraduationCap, CalendarDays, FileText, ChevronRight, ChevronLeft,
 } from "lucide-react";
 import ProjectLogo from "@/components/ProjectLogo";
+import AuroraBackground from "@/components/AuroraBackground";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { useSiteContent } from "@/hooks/useSiteContent";
 
@@ -108,7 +109,8 @@ const JobDetailPage = () => {
   ].filter(item => item.value);
 
   return (
-    <div className="min-h-screen bg-background" dir={dir}>
+    <div className="min-h-screen bg-background relative" dir={dir}>
+      <AuroraBackground />
       {/* Navbar */}
       <nav className="sticky top-0 z-30 bg-card border-b border-border shadow-sm">
         <div className="max-w-6xl mx-auto flex items-center justify-between py-3 px-6">

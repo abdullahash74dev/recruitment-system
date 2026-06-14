@@ -9,6 +9,7 @@ export interface SiteSettings {
   site_name_ar: string;
   site_name_en: string;
   two_factor_enabled: boolean;
+  public_theme_palette: string;
 }
 
 const DEFAULT_SETTINGS: SiteSettings = {
@@ -21,6 +22,7 @@ const DEFAULT_SETTINGS: SiteSettings = {
   // Fail open if settings can't be loaded, so a fetch error never locks
   // admins out behind a 2FA prompt they can't complete.
   two_factor_enabled: false,
+  public_theme_palette: "custom",
 };
 
 let cachedSettings: SiteSettings | null = null;

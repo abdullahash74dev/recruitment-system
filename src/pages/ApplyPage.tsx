@@ -6,6 +6,7 @@ import { useSiteContent } from "@/hooks/useSiteContent";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import SiteLogo from "@/components/SiteLogo";
+import AuroraBackground from "@/components/AuroraBackground";
 
 const ApplyPage = () => {
   const { t, dir, lang } = useLanguage();
@@ -19,7 +20,8 @@ const ApplyPage = () => {
   const applyDesc = lang === "ar" ? content.apply_desc_ar : content.apply_desc_en;
 
   return (
-    <div className="min-h-screen bg-background" dir={dir}>
+    <div className="min-h-screen bg-background relative" dir={dir}>
+      <AuroraBackground />
       {/* Header */}
       <header className="gradient-hero py-4 px-6">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
@@ -37,7 +39,7 @@ const ApplyPage = () => {
       </header>
 
       {/* Form Section */}
-      <main className="py-10 px-4">
+      <main className="py-10 px-4 content-fade-in">
         <div className="max-w-3xl mx-auto mb-8 text-center">
           <h1 className="text-3xl md:text-4xl font-bold text-primary mb-3">{applyTitle}</h1>
           <p className="text-muted-foreground text-lg">{applyDesc}</p>

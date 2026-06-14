@@ -1,10 +1,24 @@
 import * as React from "react";
 
 import { cn } from "@/lib/utils";
+import { useTheme } from "@/contexts/ThemeContext";
 
-const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(({ className, ...props }, ref) => (
-  <div ref={ref} className={cn("rounded-lg border bg-card text-card-foreground shadow-sm", className)} {...props} />
-));
+const Card = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(({ className, ...props }, ref) => {
+  const { navStyle } = useTheme();
+  return (
+    <div
+      ref={ref}
+      className={cn(
+        "text-card-foreground transition-all duration-300",
+        navStyle === "futuristic"
+          ? "glass-panel rounded-2xl shadow-elevated hover:shadow-glow hover:border-accent/40 hover:-translate-y-0.5"
+          : "rounded-lg border bg-card shadow-sm hover:shadow-md",
+        className,
+      )}
+      {...props}
+    />
+  );
+});
 Card.displayName = "Card";
 
 const CardHeader = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(

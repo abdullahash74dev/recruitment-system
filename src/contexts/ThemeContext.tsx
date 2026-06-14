@@ -1,9 +1,12 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { useLocation } from "react-router-dom";
+import { fetchSiteSettings } from "@/hooks/useSiteSettings";
 
 export type ThemeMode = "light" | "dark";
 export type ThemePalette =
-  | "default" | "midnight" | "emerald" | "rose" | "slate" | "sunset" | "ocean" | "noir" | "aurora" | "custom";
+  | "default" | "midnight" | "emerald" | "rose" | "slate" | "sunset" | "ocean" | "noir" | "aurora" | "navy" | "khawlani" | "royal" | "custom";
 export type IconStyle = "regular" | "thin" | "bold" | "rounded" | "sharp";
+export type NavStyle = "modern" | "classic" | "futuristic";
 
 export interface CustomThemeColors {
   primary: string;
@@ -23,11 +26,13 @@ interface ThemeContextType {
   setCustomTheme: (colors: CustomThemeColors) => void;
   animatedBg: boolean;
   setAnimatedBg: (v: boolean) => void;
+  navStyle: NavStyle;
+  setNavStyle: (v: NavStyle) => void;
 }
 
 const ThemeContext = createContext<ThemeContextType | null>(null);
 
-const PALETTES: ThemePalette[] = ["default", "midnight", "emerald", "rose", "slate", "sunset", "ocean", "noir", "aurora", "custom"];
+const PALETTES: ThemePalette[] = ["default", "midnight", "emerald", "rose", "slate", "sunset", "ocean", "noir", "aurora", "navy", "khawlani", "royal", "custom"];
 const ICON_STYLES: IconStyle[] = ["regular", "thin", "bold", "rounded", "sharp"];
 
 export const DEFAULT_CUSTOM_THEME: CustomThemeColors = {
@@ -38,7 +43,7 @@ export const DEFAULT_CUSTOM_THEME: CustomThemeColors = {
 };
 
 export const PALETTE_LABELS: Record<ThemePalette, { ar: string; en: string; swatch: string[] }> = {
-  default:  { ar: "كوانتم الأزرق",     en: "Quantum Blue",     swatch: ["#3b82f6", "#22d3ee"] },
+  default:  { ar: "الكحلي الأنيق",     en: "Elegant Navy",     swatch: ["#16325A", "#4B799B"] },
   midnight: { ar: "منتصف الليل",       en: "Midnight Indigo", swatch: ["#1e1b4b", "#4f46e5"] },
   emerald:  { ar: "الزمرد الفاخر",     en: "Emerald Prestige", swatch: ["#064e3b", "#c9a84c"] },
   rose:     { ar: "الورد والخزامى",   en: "Blush & Lavender", swatch: ["#9b72cf", "#e8c5d0"] },
@@ -47,6 +52,9 @@ export const PALETTE_LABELS: Record<ThemePalette, { ar: string; en: string; swat
   ocean:    { ar: "أعماق المحيط",      en: "Ocean Deep",       swatch: ["#0c2340", "#2d8a9e"] },
   noir:     { ar: "الأسود الذهبي",     en: "Noir & Gold",      swatch: ["#0d0d0d", "#c9a84c"] },
   aurora:   { ar: "أورورا الذكاء",     en: "AI Aurora",        swatch: ["#4338ca", "#22d3ee"] },
+  navy:     { ar: "الأزرق الكحلي الرسمي", en: "Formal Navy",   swatch: ["#16325A", "#4B799B"] },
+  khawlani: { ar: "الأخضر الخولي",      en: "Khawlani Green",  swatch: ["#445D32", "#AC8B53"] },
+  royal:    { ar: "الأسود الملكي",      en: "Royal Black",     swatch: ["#1A1A1A", "#962C3D"] },
   custom:   { ar: "ثيمي الخاص",        en: "My Custom Theme",  swatch: ["#3b82f6", "#22d3ee"] },
 };
 
@@ -56,6 +64,12 @@ export const ICON_STYLE_LABELS: Record<IconStyle, { ar: string; en: string }> = 
   bold:    { ar: "عريض",   en: "Bold" },
   rounded: { ar: "دائري",  en: "Rounded" },
   sharp:   { ar: "حاد",    en: "Sharp" },
+};
+
+export const NAV_STYLE_LABELS: Record<NavStyle, { ar: string; en: string }> = {
+  modern:     { ar: "عصري (شريط جانبي)",       en: "Modern (sidebar)" },
+  classic:    { ar: "كلاسيكي (تبويبات علوية)",  en: "Classic (top tabs)" },
+  futuristic: { ar: "مستقبلي (زجاجي AI)",      en: "Futuristic (AI glass)" },
 };
 
 type ThemeTokens = Record<string, string>;
@@ -79,7 +93,9 @@ const DEFAULT_DARK_TOKENS: ThemeTokens = {
 };
 
 const PALETTE_TOKENS: Record<ThemePalette, { light: ThemeTokens; dark: ThemeTokens }> = {
-  default: { light: {}, dark: {} },
+  // Calm, cohesive navy/steel-blue look so the header, sidebar and page
+  // background all share one hue family instead of clashing blue/cyan/purple/white.
+  default: { light: { "--background": "215 25% 97%", "--card": "215 25% 99%", "--muted": "215 18% 93%", "--border": "215 15% 86%", "--input": "215 15% 86%", "--primary": "215 60% 22%", "--primary-foreground": "0 0% 100%", "--secondary": "215 25% 92%", "--accent": "205 35% 45%", "--accent-foreground": "0 0% 100%", "--ring": "205 35% 45%", "--sidebar-background": "215 60% 12%", "--sidebar-foreground": "210 30% 90%", "--sidebar-accent": "215 45% 22%", "--gradient-primary": "linear-gradient(135deg, hsl(215 60% 14%), hsl(215 50% 28%))", "--gradient-accent": "linear-gradient(135deg, hsl(205 40% 40%), hsl(205 45% 55%))", "--gradient-hero": "linear-gradient(160deg, hsl(215 60% 8%), hsl(215 50% 18%), hsl(205 40% 32%))", "--shadow-glow": "0 0 28px hsl(215 60% 35% / 0.35), 0 0 56px hsl(205 45% 50% / 0.2)" }, dark: { "--background": "215 35% 7%", "--card": "215 35% 11%", "--muted": "215 25% 16%", "--border": "215 22% 22%", "--input": "215 22% 22%", "--primary": "205 45% 55%", "--accent": "205 50% 60%", "--sidebar-background": "215 50% 9%", "--sidebar-accent": "215 40% 18%", "--shadow-glow": "0 0 28px hsl(205 50% 55% / 0.35), 0 0 56px hsl(205 45% 65% / 0.2)" } },
   midnight: { light: { "--background": "240 30% 96%", "--card": "240 30% 99%", "--muted": "240 25% 92%", "--border": "240 20% 86%", "--input": "240 20% 86%", "--primary": "240 60% 22%", "--secondary": "244 60% 94%", "--accent": "244 84% 60%", "--ring": "244 84% 60%", "--sidebar-background": "240 60% 14%", "--sidebar-accent": "244 60% 24%", "--gradient-primary": "linear-gradient(135deg, hsl(240 60% 16%), hsl(244 70% 32%))", "--gradient-accent": "linear-gradient(135deg, hsl(244 84% 55%), hsl(260 84% 65%))", "--gradient-hero": "linear-gradient(160deg, hsl(240 60% 8%), hsl(244 60% 20%), hsl(260 50% 30%))" }, dark: { "--background": "240 40% 7%", "--card": "240 40% 11%", "--muted": "240 30% 16%", "--border": "240 28% 22%", "--input": "240 28% 22%", "--primary": "244 84% 65%", "--accent": "260 84% 70%", "--sidebar-background": "240 50% 10%", "--sidebar-accent": "244 50% 20%" } },
   emerald: { light: { "--background": "150 25% 96%", "--card": "150 30% 99%", "--muted": "150 20% 92%", "--border": "150 18% 85%", "--input": "150 18% 85%", "--primary": "160 80% 18%", "--secondary": "160 30% 92%", "--accent": "42 65% 48%", "--ring": "42 65% 48%", "--sidebar-background": "160 80% 14%", "--sidebar-foreground": "42 60% 88%", "--sidebar-accent": "160 70% 24%", "--gradient-primary": "linear-gradient(135deg, hsl(160 80% 16%), hsl(160 70% 30%))", "--gradient-accent": "linear-gradient(135deg, hsl(42 70% 50%), hsl(42 80% 65%))", "--gradient-hero": "linear-gradient(160deg, hsl(160 80% 10%), hsl(160 60% 22%), hsl(42 50% 35%))" }, dark: { "--background": "160 40% 7%", "--card": "160 40% 11%", "--muted": "160 30% 16%", "--border": "160 25% 22%", "--input": "160 25% 22%", "--primary": "42 65% 56%", "--accent": "160 60% 50%", "--sidebar-background": "160 60% 10%", "--sidebar-accent": "160 50% 20%" } },
   rose: { light: { "--background": "320 30% 97%", "--card": "320 30% 99%", "--muted": "320 20% 93%", "--border": "320 18% 87%", "--input": "320 18% 87%", "--primary": "280 35% 50%", "--secondary": "340 50% 94%", "--accent": "340 75% 62%", "--ring": "340 75% 62%", "--sidebar-background": "280 35% 35%", "--sidebar-accent": "320 50% 45%", "--gradient-primary": "linear-gradient(135deg, hsl(280 35% 42%), hsl(320 50% 60%))", "--gradient-accent": "linear-gradient(135deg, hsl(340 70% 70%), hsl(280 50% 70%))", "--gradient-hero": "linear-gradient(160deg, hsl(280 35% 30%), hsl(320 40% 50%), hsl(340 50% 65%))" }, dark: { "--background": "300 30% 9%", "--card": "300 30% 13%", "--muted": "300 20% 18%", "--border": "300 20% 24%", "--input": "300 20% 24%", "--primary": "340 75% 70%", "--accent": "280 60% 72%", "--sidebar-background": "300 35% 14%", "--sidebar-accent": "320 40% 24%" } },
@@ -88,6 +104,9 @@ const PALETTE_TOKENS: Record<ThemePalette, { light: ThemeTokens; dark: ThemeToke
   ocean: { light: { "--background": "200 30% 96%", "--card": "200 35% 99%", "--muted": "200 22% 92%", "--border": "200 18% 85%", "--input": "200 18% 85%", "--primary": "210 70% 20%", "--secondary": "188 40% 92%", "--accent": "188 60% 42%", "--ring": "188 60% 42%", "--sidebar-background": "210 70% 14%", "--sidebar-accent": "210 60% 24%", "--gradient-primary": "linear-gradient(135deg, hsl(210 70% 16%), hsl(210 55% 30%))", "--gradient-accent": "linear-gradient(135deg, hsl(188 56% 42%), hsl(180 50% 55%))", "--gradient-hero": "linear-gradient(160deg, hsl(210 70% 10%), hsl(210 55% 22%), hsl(188 50% 35%))" }, dark: { "--background": "210 40% 8%", "--card": "210 40% 12%", "--muted": "210 30% 16%", "--border": "210 28% 22%", "--input": "210 28% 22%", "--primary": "188 60% 52%", "--accent": "180 60% 60%", "--sidebar-background": "210 50% 10%", "--sidebar-accent": "210 45% 20%" } },
   noir: { light: { "--background": "0 0% 96%", "--card": "0 0% 100%", "--muted": "0 0% 92%", "--border": "0 0% 85%", "--input": "0 0% 85%", "--primary": "0 0% 8%", "--primary-foreground": "42 55% 70%", "--secondary": "42 30% 92%", "--accent": "42 60% 50%", "--ring": "42 60% 50%", "--sidebar-background": "0 0% 6%", "--sidebar-foreground": "42 55% 80%", "--sidebar-accent": "0 0% 14%", "--gradient-primary": "linear-gradient(135deg, hsl(0 0% 6%), hsl(0 0% 18%))", "--gradient-accent": "linear-gradient(135deg, hsl(42 55% 50%), hsl(42 70% 65%))", "--gradient-hero": "linear-gradient(160deg, hsl(0 0% 5%), hsl(0 0% 14%), hsl(42 40% 30%))" }, dark: { "--background": "0 0% 5%", "--card": "0 0% 9%", "--muted": "0 0% 13%", "--border": "0 0% 18%", "--input": "0 0% 18%", "--primary": "42 65% 62%", "--primary-foreground": "0 0% 8%", "--accent": "42 70% 70%", "--sidebar-background": "0 0% 4%", "--sidebar-accent": "42 40% 18%" } },
   aurora: { light: { "--background": "235 30% 97%", "--card": "235 30% 99%", "--muted": "235 20% 93%", "--border": "235 18% 87%", "--input": "235 18% 87%", "--primary": "243 70% 40%", "--primary-foreground": "0 0% 100%", "--secondary": "190 40% 93%", "--accent": "190 85% 45%", "--accent-foreground": "0 0% 100%", "--ring": "190 85% 45%", "--sidebar-background": "243 70% 16%", "--sidebar-foreground": "0 0% 96%", "--sidebar-accent": "262 70% 32%", "--gradient-primary": "linear-gradient(135deg, hsl(243 70% 30%), hsl(270 70% 50%))", "--gradient-accent": "linear-gradient(135deg, hsl(190 85% 45%), hsl(160 68% 50%))", "--gradient-hero": "linear-gradient(160deg, hsl(243 70% 12%), hsl(262 65% 26%), hsl(190 75% 40%))" }, dark: { "--background": "245 45% 7%", "--card": "245 40% 11%", "--muted": "245 30% 16%", "--border": "245 28% 22%", "--input": "245 28% 22%", "--primary": "190 85% 55%", "--accent": "262 75% 68%", "--sidebar-background": "245 50% 9%", "--sidebar-accent": "245 40% 20%" } },
+  navy: { light: { "--background": "215 25% 97%", "--card": "215 25% 99%", "--muted": "215 18% 93%", "--border": "215 15% 86%", "--input": "215 15% 86%", "--primary": "215 60% 22%", "--primary-foreground": "0 0% 100%", "--secondary": "215 25% 92%", "--accent": "205 35% 45%", "--accent-foreground": "0 0% 100%", "--ring": "205 35% 45%", "--sidebar-background": "215 60% 12%", "--sidebar-foreground": "210 30% 90%", "--sidebar-accent": "215 45% 22%", "--gradient-primary": "linear-gradient(135deg, hsl(215 60% 14%), hsl(215 50% 28%))", "--gradient-accent": "linear-gradient(135deg, hsl(205 40% 40%), hsl(205 45% 55%))", "--gradient-hero": "linear-gradient(160deg, hsl(215 60% 8%), hsl(215 50% 18%), hsl(205 40% 32%))" }, dark: { "--background": "215 35% 7%", "--card": "215 35% 11%", "--muted": "215 25% 16%", "--border": "215 22% 22%", "--input": "215 22% 22%", "--primary": "205 45% 55%", "--accent": "205 50% 60%", "--sidebar-background": "215 50% 9%", "--sidebar-accent": "215 40% 18%" } },
+  khawlani: { light: { "--background": "90 15% 96%", "--card": "90 18% 99%", "--muted": "90 14% 91%", "--border": "90 12% 84%", "--input": "90 12% 84%", "--primary": "95 30% 28%", "--primary-foreground": "0 0% 100%", "--secondary": "85 20% 92%", "--accent": "38 35% 50%", "--ring": "38 35% 50%", "--sidebar-background": "95 30% 18%", "--sidebar-foreground": "85 25% 90%", "--sidebar-accent": "95 25% 28%", "--gradient-primary": "linear-gradient(135deg, hsl(95 30% 20%), hsl(95 28% 34%))", "--gradient-accent": "linear-gradient(135deg, hsl(38 40% 48%), hsl(45 45% 60%))", "--gradient-hero": "linear-gradient(160deg, hsl(95 30% 12%), hsl(95 28% 24%), hsl(60 25% 38%))" }, dark: { "--background": "95 25% 7%", "--card": "95 25% 11%", "--muted": "95 18% 16%", "--border": "95 16% 22%", "--input": "95 16% 22%", "--primary": "85 35% 50%", "--accent": "38 45% 58%", "--sidebar-background": "95 30% 9%", "--sidebar-accent": "95 22% 18%" } },
+  royal: { light: { "--background": "0 0% 96%", "--card": "0 0% 100%", "--muted": "0 0% 92%", "--border": "0 0% 85%", "--input": "0 0% 85%", "--primary": "0 0% 10%", "--primary-foreground": "350 35% 92%", "--secondary": "350 25% 92%", "--accent": "350 55% 38%", "--accent-foreground": "0 0% 100%", "--ring": "350 55% 38%", "--sidebar-background": "0 0% 7%", "--sidebar-foreground": "350 40% 85%", "--sidebar-accent": "350 45% 22%", "--gradient-primary": "linear-gradient(135deg, hsl(0 0% 6%), hsl(0 0% 16%))", "--gradient-accent": "linear-gradient(135deg, hsl(350 55% 35%), hsl(350 60% 50%))", "--gradient-hero": "linear-gradient(160deg, hsl(0 0% 5%), hsl(0 0% 14%), hsl(350 45% 28%))" }, dark: { "--background": "0 0% 5%", "--card": "0 0% 9%", "--muted": "0 0% 13%", "--border": "0 0% 18%", "--input": "0 0% 18%", "--primary": "350 55% 55%", "--primary-foreground": "0 0% 8%", "--accent": "350 60% 60%", "--sidebar-background": "0 0% 4%", "--sidebar-accent": "350 35% 18%" } },
   custom: { light: {}, dark: {} },
 };
 
@@ -114,16 +133,45 @@ const getCustomTokens = (theme: ThemeMode, colors: CustomThemeColors): ThemeToke
   const accent = hexToHsl(colors.accent, DEFAULT_LIGHT_TOKENS["--accent"]);
   const background = hexToHsl(colors.background, DEFAULT_LIGHT_TOKENS["--background"]);
   const card = hexToHsl(colors.card, DEFAULT_LIGHT_TOKENS["--card"]);
+  const hue = primary.split(" ")[0];
   if (theme === "dark") {
-    const hue = primary.split(" ")[0];
     return { "--background": `${hue} 32% 7%`, "--card": `${hue} 28% 11%`, "--muted": `${hue} 20% 16%`, "--border": `${hue} 18% 22%`, "--input": `${hue} 18% 22%`, "--primary": accent, "--accent": primary, "--ring": accent, "--sidebar-background": `${hue} 38% 9%`, "--sidebar-accent": `${hue} 28% 18%`, "--gradient-primary": `linear-gradient(135deg, hsl(${primary}), hsl(${accent}))`, "--gradient-accent": `linear-gradient(135deg, hsl(${accent}), hsl(${primary}))`, "--gradient-hero": `linear-gradient(160deg, hsl(${hue} 42% 7%), hsl(${primary}), hsl(${accent}))` };
   }
-  return { "--background": background, "--card": card, "--muted": background, "--border": "214 32% 88%", "--input": "214 32% 88%", "--primary": primary, "--accent": accent, "--ring": accent, "--sidebar-background": primary, "--sidebar-accent": accent, "--gradient-primary": `linear-gradient(135deg, hsl(${primary}), hsl(${accent}))`, "--gradient-accent": `linear-gradient(135deg, hsl(${accent}), hsl(${primary}))`, "--gradient-hero": `linear-gradient(160deg, hsl(${primary}), hsl(${accent}))` };
+  return { "--background": background, "--card": card, "--muted": background, "--border": "214 32% 88%", "--input": "214 32% 88%", "--primary": primary, "--accent": accent, "--ring": accent, "--sidebar-background": `${hue} 35% 11%`, "--sidebar-accent": `${hue} 28% 18%`, "--gradient-primary": `linear-gradient(135deg, hsl(${primary}), hsl(${accent}))`, "--gradient-accent": `linear-gradient(135deg, hsl(${accent}), hsl(${primary}))`, "--gradient-hero": `linear-gradient(160deg, hsl(${hue} 35% 11%), hsl(${primary}), hsl(${accent}))` };
 };
 
 const applyThemeTokens = (theme: ThemeMode, palette: ThemePalette, customTheme: CustomThemeColors) => {
   const root = document.documentElement;
   const tokens = { ...DEFAULT_LIGHT_TOKENS, ...(theme === "dark" ? DEFAULT_DARK_TOKENS : {}), ...PALETTE_TOKENS[palette].light, ...(theme === "dark" ? PALETTE_TOKENS[palette].dark : {}), ...(palette === "custom" ? getCustomTokens(theme, customTheme) : {}) };
+  Object.entries(tokens).forEach(([key, value]) => root.style.setProperty(key, value));
+};
+
+// ===== Public (careers site) theme =====
+// Always light, and driven entirely by site_settings rather than the
+// admin's personal localStorage preferences, so the admin dashboard's
+// appearance never bleeds into the public-facing pages.
+const getPublicCustomTokens = (primaryHex: string, accentHex: string): ThemeTokens => {
+  const primary = hexToHsl(primaryHex, DEFAULT_LIGHT_TOKENS["--primary"]);
+  const accent = hexToHsl(accentHex, DEFAULT_LIGHT_TOKENS["--accent"]);
+  return {
+    "--primary": primary,
+    "--accent": accent,
+    "--ring": accent,
+    "--sidebar-background": primary,
+    "--sidebar-accent": accent,
+    "--gradient-primary": `linear-gradient(135deg, hsl(${primary}), hsl(${accent}))`,
+    "--gradient-accent": `linear-gradient(135deg, hsl(${accent}), hsl(${primary}))`,
+    "--gradient-hero": `linear-gradient(160deg, hsl(${primary}), hsl(${accent}))`,
+  };
+};
+
+export const computePublicThemeTokens = (palette: ThemePalette, primaryHex: string, accentHex: string): ThemeTokens => {
+  const overrides = palette === "custom" ? getPublicCustomTokens(primaryHex, accentHex) : (PALETTE_TOKENS[palette]?.light ?? {});
+  return { ...DEFAULT_LIGHT_TOKENS, ...overrides };
+};
+
+const applyPublicThemeTokens = (tokens: ThemeTokens) => {
+  const root = document.documentElement;
   Object.entries(tokens).forEach(([key, value]) => root.style.setProperty(key, value));
 };
 
@@ -152,34 +200,63 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
     try { return localStorage.getItem("akg-animated-bg") === "true"; }
     catch { return false; }
   });
+  const [navStyle, setNavStyleState] = useState<NavStyle>(() => {
+    try {
+      const v = localStorage.getItem("akg-nav-style-v2");
+      return v === "modern" || v === "classic" || v === "futuristic" ? v : "futuristic";
+    } catch { return "futuristic"; }
+  });
 
+  const location = useLocation();
+  const isAdminRoute = location.pathname.startsWith("/admin") || location.pathname.startsWith("/dashboard");
+
+  const [publicTokens, setPublicTokens] = useState<ThemeTokens>(() =>
+    computePublicThemeTokens("custom", DEFAULT_CUSTOM_THEME.primary, DEFAULT_CUSTOM_THEME.accent)
+  );
+
+  // Persist the admin's personal dashboard preferences regardless of which
+  // page is currently being viewed.
+  useEffect(() => { localStorage.setItem("akg-theme", theme); }, [theme]);
+  useEffect(() => { localStorage.setItem("akg-palette", palette); }, [palette]);
+  useEffect(() => { localStorage.setItem("akg-icons", iconStyle); }, [iconStyle]);
+  useEffect(() => { localStorage.setItem("akg-animated-bg", String(animatedBg)); }, [animatedBg]);
+  useEffect(() => { localStorage.setItem("akg-nav-style-v2", navStyle); }, [navStyle]);
+
+  // Load the public site's theme from site_settings whenever a public page
+  // is shown (cached by fetchSiteSettings, so this is cheap).
   useEffect(() => {
-    const root = document.documentElement;
-    if (theme === "dark") root.classList.add("dark"); else root.classList.remove("dark");
-    applyThemeTokens(theme, palette, customTheme);
-    localStorage.setItem("akg-theme", theme);
-  }, [theme, palette, customTheme]);
+    if (isAdminRoute) return;
+    let mounted = true;
+    fetchSiteSettings().then((settings) => {
+      if (!mounted) return;
+      const raw = settings.public_theme_palette as ThemePalette;
+      const publicPalette: ThemePalette = PALETTES.includes(raw) ? raw : "custom";
+      setPublicTokens(computePublicThemeTokens(publicPalette, settings.primary_color, settings.accent_color));
+    });
+    return () => { mounted = false; };
+  }, [isAdminRoute]);
 
+  // Apply the active theme to <html>. Admin dashboard and public site are
+  // fully independent: navigating between them swaps the whole set of CSS
+  // variables and visual classes rather than layering one on the other, so
+  // changing the dashboard's appearance never affects the public pages.
   useEffect(() => {
     const root = document.documentElement;
     PALETTES.forEach((p) => root.classList.remove(`palette-${p}`));
-    root.classList.add(`palette-${palette}`);
-    applyThemeTokens(theme, palette, customTheme);
-    localStorage.setItem("akg-palette", palette);
-  }, [theme, palette, customTheme]);
-
-  useEffect(() => {
-    const root = document.documentElement;
     ICON_STYLES.forEach((s) => root.classList.remove(`icons-${s}`));
-    root.classList.add(`icons-${iconStyle}`);
-    localStorage.setItem("akg-icons", iconStyle);
-  }, [iconStyle]);
 
-  useEffect(() => {
-    const root = document.documentElement;
-    root.classList.toggle("animated-bg", animatedBg);
-    localStorage.setItem("akg-animated-bg", String(animatedBg));
-  }, [animatedBg]);
+    if (isAdminRoute) {
+      if (theme === "dark") root.classList.add("dark"); else root.classList.remove("dark");
+      root.classList.add(`palette-${palette}`);
+      root.classList.add(`icons-${iconStyle}`);
+      root.classList.toggle("animated-bg", animatedBg);
+      applyThemeTokens(theme, palette, customTheme);
+    } else {
+      root.classList.remove("dark");
+      root.classList.remove("animated-bg");
+      applyPublicThemeTokens(publicTokens);
+    }
+  }, [isAdminRoute, theme, palette, customTheme, iconStyle, animatedBg, publicTokens]);
 
   const setCustomTheme = (colors: CustomThemeColors) => {
     setCustomThemeState(colors);
@@ -189,12 +266,13 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
 
   return (
     <ThemeContext.Provider value={{
-      theme, palette, iconStyle, customTheme, animatedBg,
+      theme, palette, iconStyle, customTheme, animatedBg, navStyle,
       toggleTheme: () => setTheme((p) => (p === "light" ? "dark" : "light")),
       setPalette: setPaletteState,
       setIconStyle: setIconStyleState,
       setCustomTheme,
       setAnimatedBg: setAnimatedBgState,
+      setNavStyle: setNavStyleState,
     }}>
       {children}
     </ThemeContext.Provider>

@@ -34,13 +34,13 @@ const UIStylesLoader = () => {
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <ThemeProvider>
-      <LanguageProvider>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <UIStylesLoader />
-          <BrowserRouter>
+    <BrowserRouter>
+      <ThemeProvider>
+        <LanguageProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <UIStylesLoader />
             <DeletePinProvider>
             <Routes>
               {/* Public applicant-facing routes */}
@@ -65,10 +65,10 @@ const App = () => (
               <Route path="*" element={<NotFound />} />
             </Routes>
             </DeletePinProvider>
-          </BrowserRouter>
-        </TooltipProvider>
-      </LanguageProvider>
-    </ThemeProvider>
+          </TooltipProvider>
+        </LanguageProvider>
+      </ThemeProvider>
+    </BrowserRouter>
   </QueryClientProvider>
 );
 

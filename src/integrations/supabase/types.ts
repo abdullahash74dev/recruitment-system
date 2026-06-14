@@ -1601,6 +1601,7 @@ export type Database = {
           logo_width: number | null
           logo_width_mobile: number | null
           primary_color: string | null
+          public_theme_palette: string
           projects_count: string | null
           show_nationality_on_jobs: boolean
           show_projects_section: boolean | null
@@ -1717,6 +1718,7 @@ export type Database = {
           logo_width?: number | null
           logo_width_mobile?: number | null
           primary_color?: string | null
+          public_theme_palette?: string
           projects_count?: string | null
           show_nationality_on_jobs?: boolean
           show_projects_section?: boolean | null
@@ -1833,6 +1835,7 @@ export type Database = {
           logo_width?: number | null
           logo_width_mobile?: number | null
           primary_color?: string | null
+          public_theme_palette?: string
           projects_count?: string | null
           show_nationality_on_jobs?: boolean
           show_projects_section?: boolean | null
@@ -2012,6 +2015,7 @@ export type Database = {
       }
     }
     Functions: {
+      am_i_primary_admin: { Args: never; Returns: boolean }
       cleanup_expired_trash: { Args: never; Returns: number }
       current_user_email: { Args: never; Returns: string }
       find_duplicate_applicant: {

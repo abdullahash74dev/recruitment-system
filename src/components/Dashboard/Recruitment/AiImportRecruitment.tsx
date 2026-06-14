@@ -110,7 +110,7 @@ export default function AiImportRecruitment({ ar, onImported }: Props) {
 
   return (
     <>
-      <Button onClick={() => fileRef.current?.click()} disabled={analyzing} variant="default" className="gap-1 bg-gradient-to-r from-purple-600 to-blue-600 hover:opacity-90">
+      <Button onClick={() => fileRef.current?.click()} disabled={analyzing} variant="default" className="gap-1 gradient-accent text-accent-foreground hover:opacity-90">
         {analyzing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
         {analyzing ? (ar ? "جاري التحليل..." : "Analyzing...") : (ar ? "استيراد ذكي بالذكاء الاصطناعي" : "AI Smart Import")}
       </Button>

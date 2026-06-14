@@ -14,7 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Users, UserPlus, Phone, CheckCircle2, Download, LogOut, Search, Eye, BarChart3, Briefcase, FileText, ExternalLink, Plus, Pencil, Trash2, FolderOpen, Settings, Database, Archive, RotateCcw, Shield, Sparkles, Stethoscope } from "lucide-react";
+import { Users, UserPlus, Phone, CheckCircle2, Download, LogOut, Search, Eye, BarChart3, Briefcase, FileText, ExternalLink, Plus, Pencil, Trash2, FolderOpen, Settings, Database, Archive, RotateCcw, Shield, Sparkles, Stethoscope, KeyRound } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from "recharts";
 import * as XLSX from "xlsx";
 import SiteLogo from "@/components/SiteLogo";
@@ -41,6 +41,7 @@ import JobsExcelTools from "@/components/Dashboard/JobsExcelTools";
 import SystemLog from "@/components/Dashboard/SystemLog";
 import TrashBin from "@/components/Dashboard/TrashBin";
 import UserPermissionsDialog from "@/components/Dashboard/UserPermissionsDialog";
+import ResetPasswordDialog from "@/components/Dashboard/ResetPasswordDialog";
 import RejectionReasonsSettings from "@/components/Dashboard/RejectionReasonsSettings";
 import JobAdvertisements from "@/components/Dashboard/JobAdvertisements";
 import RecruitmentDashboard from "@/components/Dashboard/Recruitment/RecruitmentDashboard";
@@ -61,9 +62,14 @@ import ReportBuilder from "@/components/Dashboard/ReportBuilder";
 import SynonymsManager from "@/components/Dashboard/SynonymsManager";
 import JobCategoriesManager from "@/components/Dashboard/JobCategoriesManager";
 import { useDeletePin } from "@/components/DeletePinDialog";
+import AINetworkBackground from "@/components/AINetworkBackground";
+import AuroraBackground from "@/components/AuroraBackground";
 import type { ApplicantEmailStatus } from "@/lib/applicantEmailTemplates";
 import { STATUSES_WITH_EMAIL } from "@/lib/applicantEmailTemplates";
-import { Mail, Activity, Bot } from "lucide-react";
+import { Mail, Activity, Bot, UserCog, Target, Globe, Menu, Palette, ListChecks } from "lucide-react";
+import DashboardSidebar, { type DashboardNavGroup } from "@/components/Dashboard/DashboardSidebar";
+import DashboardSidebarFuturistic from "@/components/Dashboard/DashboardSidebarFuturistic";
+import { useTheme } from "@/contexts/ThemeContext";
 
 type ApplicantStatus = "new" | "reviewing" | "phone_interview" | "in_person_interview" | "accepted" | "hired" | "rejected" | "withdrawn";
 
@@ -156,18 +162,32 @@ const CHART_COLORS = ["#3b82f6", "#eab308", "#a855f7", "#6366f1", "#22c55e", "#1
 
 const DashboardPage = () => {
   const { t, dir, lang } = useLanguage();
+  const { navStyle } = useTheme();
   const { permissions, hasPermission, role: currentUserRole, loading: permsLoading } = useUserPermissions();
   const { requestDelete } = useDeletePin();
   const [applicants, setApplicants] = useState<Applicant[]>([]);
   const [jobs, setJobs] = useState<JobPosting[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [jobsSearch, setJobsSearch] = useState("");
+  const [usersSearch, setUsersSearch] = useState("");
+  const [projectsSearch, setProjectsSearch] = useState("");
   const [advFilters, setAdvFilters] = useState<AdvancedFilter[]>([]);
   const [aiSelectedIds, setAiSelectedIds] = useState<Set<string> | null>(null);
   const [aiSummary, setAiSummary] = useState("");
   const [selectedApplicant, setSelectedApplicant] = useState<Applicant | null>(null);
   const [editNotes, setEditNotes] = useState("");
   const [activeTab, setActiveTab] = useState("applicants");
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try { return localStorage.getItem("akg-sidebar-collapsed") === "true"; }
+    catch { return false; }
+  });
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
+  useEffect(() => {
+    try { localStorage.setItem("akg-sidebar-collapsed", String(sidebarCollapsed)); }
+    catch { /* ignore */ }
+  }, [sidebarCollapsed]);
 
   // Job form state
   const [showJobForm, setShowJobForm] = useState(false);
@@ -194,6 +214,7 @@ const DashboardPage = () => {
 
   // Permissions dialog state
   const [permDialogUser, setPermDialogUser] = useState<{ id: string; name: string; role: string } | null>(null);
+  const [resetPasswordUser, setResetPasswordUser] = useState<{ id: string; name: string } | null>(null);
 
   // Project form state
   const [showProjectForm, setShowProjectForm] = useState(false);
@@ -497,6 +518,13 @@ const DashboardPage = () => {
     fetchUsers();
   };
 
+  const resetUserPassword = async (userId: string, newPassword: string) => {
+    const result = await callManageUser({ action: "reset_password", user_id: userId, new_password: newPassword });
+    if (result.error) return { error: result.error };
+    toast.success(t("dash.passwordReset"));
+    return {};
+  };
+
   const deleteUser = (userId: string) => {
     requestDelete({
       message: lang === "ar" ? "سيتم حذف هذا المستخدم نهائياً." : "This user will be permanently deleted.",
@@ -599,45 +627,121 @@ const DashboardPage = () => {
 
 
   const stats = [
-    { label: t("dash.totalApplicants"), value: activeApplicants.length, icon: Users, color: "text-blue-500" },
-    { label: t("dash.newApplicants"), value: activeApplicants.filter(a => a.status === "new").length, icon: UserPlus, color: "text-yellow-500" },
-    { label: t("dash.inInterview"), value: activeApplicants.filter(a => ["phone_interview", "in_person_interview"].includes(a.status)).length, icon: Phone, color: "text-purple-500" },
-    { label: t("dash.hired"), value: activeApplicants.filter(a => a.status === "hired").length, icon: CheckCircle2, color: "text-green-500" },
+    { label: t("dash.totalApplicants"), value: activeApplicants.length, icon: Users, color: "text-blue-500", bg: "bg-blue-500/10" },
+    { label: t("dash.newApplicants"), value: activeApplicants.filter(a => a.status === "new").length, icon: UserPlus, color: "text-yellow-500", bg: "bg-yellow-500/10" },
+    { label: t("dash.inInterview"), value: activeApplicants.filter(a => ["phone_interview", "in_person_interview"].includes(a.status)).length, icon: Phone, color: "text-purple-500", bg: "bg-purple-500/10" },
+    { label: t("dash.hired"), value: activeApplicants.filter(a => a.status === "hired").length, icon: CheckCircle2, color: "text-green-500", bg: "bg-green-500/10" },
   ];
+
+  // Search filters for Jobs / Users / Projects tabs
+  const filteredJobs = jobs.filter(job => {
+    const q = jobsSearch.trim().toLowerCase();
+    if (!q) return true;
+    return [job.title_ar, (job as any).title_en, job.location, (job as any).location_en]
+      .some(v => (v || "").toLowerCase().includes(q));
+  });
+
+  const filteredUsers = users.filter((user: any) => {
+    const q = usersSearch.trim().toLowerCase();
+    if (!q) return true;
+    return [user.display_name, user.email].some((v: string) => (v || "").toLowerCase().includes(q));
+  });
+
+  const filteredProjects = projects.filter((p: any) => {
+    const q = projectsSearch.trim().toLowerCase();
+    if (!q) return true;
+    return [p.name_ar, p.name_en].some((v: string) => (v || "").toLowerCase().includes(q));
+  });
 
   const isAdmin = currentUserRole === "admin";
 
-  // Build visible tabs based on permissions
-  const visibleTabs: { value: string; label: React.ReactNode }[] = [];
+  // Build the sidebar navigation, grouped and gated by permissions
   const tabAllowed = (key: string) => isAdmin || hasPermission(key as any);
+  const navGroups: DashboardNavGroup[] = [];
+
+  const applicantsItems: DashboardNavGroup["items"] = [];
   if (tabAllowed("tab.applicants")) {
-    visibleTabs.push({ value: "applicants", label: t("dash.tab.applicants") });
-    visibleTabs.push({ value: "archive", label: <span className="flex items-center gap-1"><Archive className="w-3 h-3" />{lang === "ar" ? "الأرشيف" : "Archive"}{archivedApplicants.length > 0 && <Badge variant="secondary" className="text-[10px] px-1 py-0 h-4 ms-1">{archivedApplicants.length}</Badge>}</span> });
+    applicantsItems.push({ value: "applicants", label: t("dash.tab.applicants"), icon: Users });
+    applicantsItems.push({ value: "archive", label: lang === "ar" ? "الأرشيف" : "Archive", icon: Archive, badge: archivedApplicants.length || undefined });
   }
-  if (tabAllowed("tab.jobs")) visibleTabs.push({ value: "jobs", label: t("dash.tab.jobs") });
-  if (tabAllowed("tab.users")) visibleTabs.push({ value: "users", label: t("dash.tab.users") });
-  if (tabAllowed("tab.projects")) visibleTabs.push({ value: "projects", label: t("dash.tab.projects") });
-  if (tabAllowed("tab.analytics")) visibleTabs.push({ value: "analytics", label: t("dash.tab.analytics") });
-  if (tabAllowed("tab.recruitment")) visibleTabs.push({ value: "recruitment", label: <span className="flex items-center gap-1"><Briefcase className="w-3 h-3" />{lang === "ar" ? "إدارة التوظيف" : "Recruitment"}</span> });
-  if (tabAllowed("tab.settings")) visibleTabs.push({ value: "settings", label: t("dash.tab.settings") });
-  if (tabAllowed("tab.jobpage")) visibleTabs.push({ value: "jobpage", label: <span className="flex items-center gap-1"><Briefcase className="w-3 h-3" />{lang === "ar" ? "صفحة الوظائف" : "Job Page"}</span> });
-  if (tabAllowed("tab.backup")) visibleTabs.push({ value: "backup", label: <span className="flex items-center gap-1"><Database className="w-3 h-3" />{lang === "ar" ? "نسخ احتياطي" : "Backup"}</span> });
-  if (tabAllowed("tab.auditlog")) visibleTabs.push({ value: "auditlog", label: <span className="flex items-center gap-1"><Shield className="w-3 h-3" />{lang === "ar" ? "سجل النظام" : "System Log"}</span> });
-  if (tabAllowed("tab.rejection_reasons")) visibleTabs.push({ value: "rejection_reasons", label: <span className="flex items-center gap-1"><Mail className="w-3 h-3" />{lang === "ar" ? "أسباب الرفض" : "Rejection Reasons"}</span> });
-  if (tabAllowed("tab.job_ads")) visibleTabs.push({ value: "job_ads", label: <span className="flex items-center gap-1"><Sparkles className="w-3 h-3" />{lang === "ar" ? "إعلانات الوظائف" : "Job Ads"}</span> });
-  if (tabAllowed("tab.trash")) visibleTabs.push({ value: "trash", label: <span className="flex items-center gap-1"><Trash2 className="w-3 h-3" />{lang === "ar" ? "سلة المحذوفات" : "Trash"}</span> });
-  if (tabAllowed("tab.ai_doctor")) visibleTabs.push({ value: "ai_doctor", label: <span className="flex items-center gap-1"><Stethoscope className="w-3 h-3" />{lang === "ar" ? "طبيب النظام AI" : "AI Doctor"}</span> });
-  if (tabAllowed("tab.ai_usage")) visibleTabs.push({ value: "ai_usage", label: <span className="flex items-center gap-1"><Activity className="w-3 h-3" />{lang === "ar" ? "استهلاك الذكاء" : "AI Usage"}</span> });
-  if (tabAllowed("tab.ai_settings")) visibleTabs.push({ value: "ai_settings", label: <span className="flex items-center gap-1"><Bot className="w-3 h-3" />{lang === "ar" ? "إعدادات الذكاء" : "AI Settings"}</span> });
+  if (applicantsItems.length) navGroups.push({ id: "applicants", title: lang === "ar" ? "المتقدمون" : "Applicants", items: applicantsItems });
+
+  const recruitmentItems: DashboardNavGroup["items"] = [];
+  if (tabAllowed("tab.jobs")) recruitmentItems.push({ value: "jobs", label: t("dash.tab.jobs"), icon: Briefcase });
+  if (tabAllowed("tab.job_ads")) recruitmentItems.push({ value: "job_ads", label: lang === "ar" ? "إعلانات الوظائف" : "Job Ads", icon: Sparkles });
+  if (tabAllowed("tab.recruitment")) recruitmentItems.push({ value: "recruitment", label: lang === "ar" ? "إدارة التوظيف" : "Recruitment", icon: Target });
+  if (tabAllowed("tab.rejection_reasons")) recruitmentItems.push({ value: "rejection_reasons", label: lang === "ar" ? "أسباب الرفض" : "Rejection Reasons", icon: Mail });
+  if (tabAllowed("tab.jobpage")) recruitmentItems.push({ value: "jobpage", label: lang === "ar" ? "صفحة الوظائف" : "Job Page", icon: Globe });
+  if (recruitmentItems.length) navGroups.push({ id: "recruitment", title: lang === "ar" ? "التوظيف" : "Recruitment", items: recruitmentItems });
+
+  const managementItems: DashboardNavGroup["items"] = [];
+  if (tabAllowed("tab.projects")) managementItems.push({ value: "projects", label: t("dash.tab.projects"), icon: FolderOpen });
+  if (tabAllowed("tab.users")) managementItems.push({ value: "users", label: t("dash.tab.users"), icon: UserCog });
+  if (tabAllowed("tab.analytics")) managementItems.push({ value: "analytics", label: t("dash.tab.analytics"), icon: BarChart3 });
+  if (managementItems.length) navGroups.push({ id: "management", title: lang === "ar" ? "الإدارة" : "Management", items: managementItems });
+
+  const aiItems: DashboardNavGroup["items"] = [];
+  if (tabAllowed("tab.ai_doctor")) aiItems.push({ value: "ai_doctor", label: lang === "ar" ? "طبيب النظام" : "AI Doctor", icon: Stethoscope });
+  if (tabAllowed("tab.ai_usage")) aiItems.push({ value: "ai_usage", label: lang === "ar" ? "استهلاك الذكاء" : "AI Usage", icon: Activity });
+  if (tabAllowed("tab.ai_settings")) aiItems.push({ value: "ai_settings", label: lang === "ar" ? "إعدادات الذكاء" : "AI Settings", icon: Bot });
+  if (aiItems.length) navGroups.push({ id: "ai", title: lang === "ar" ? "الذكاء الاصطناعي" : "AI Tools", items: aiItems });
+
+  const systemItems: DashboardNavGroup["items"] = [];
+  if (tabAllowed("tab.settings")) systemItems.push({ value: "settings", label: t("dash.tab.settings"), icon: Settings });
+  if (tabAllowed("tab.backup")) systemItems.push({ value: "backup", label: lang === "ar" ? "نسخ احتياطي" : "Backup", icon: Database });
+  if (tabAllowed("tab.auditlog")) systemItems.push({ value: "auditlog", label: lang === "ar" ? "سجل النظام" : "System Log", icon: Shield });
+  if (tabAllowed("tab.trash")) systemItems.push({ value: "trash", label: lang === "ar" ? "سلة المحذوفات" : "Trash", icon: Trash2 });
+  if (systemItems.length) navGroups.push({ id: "system", title: lang === "ar" ? "النظام" : "System", items: systemItems });
+
+  const flatNavItems = navGroups.flatMap((g) => g.items);
+  const showSidebar = navStyle !== "classic";
+  const sidebarProps = {
+    groups: navGroups,
+    activeTab,
+    onChange: setActiveTab,
+    collapsed: sidebarCollapsed,
+    onToggleCollapsed: () => setSidebarCollapsed((v) => !v),
+    mobileOpen: mobileNavOpen,
+    onCloseMobile: () => setMobileNavOpen(false),
+    dir,
+    title: t("dash.title"),
+    collapseLabel: lang === "ar" ? "طي القائمة" : "Collapse",
+    expandLabel: lang === "ar" ? "توسيع القائمة" : "Expand",
+  };
 
   return (
-    <div className="min-h-screen bg-background" dir={dir}>
+    <div className="min-h-screen bg-background relative flex" dir={dir}>
+      <AuroraBackground />
+      {navStyle === "modern" && <DashboardSidebar {...sidebarProps} />}
+      {navStyle === "futuristic" && <DashboardSidebarFuturistic {...sidebarProps} />}
+      <div className="flex-1 min-w-0 flex flex-col">
       {/* Header */}
-      <header className="gradient-hero py-4 px-6 sticky top-0 z-30">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-4">
+      <header className="gradient-hero py-4 px-6 sticky top-0 z-30 border-b border-white/10 shadow-elevated relative overflow-hidden">
+        <AINetworkBackground className="opacity-40" />
+        <div
+          className="absolute inset-0 pointer-events-none opacity-60"
+          style={{ background: "radial-gradient(circle at 15% 30%, hsl(var(--accent) / 0.25), transparent 55%)" }}
+        />
+        <div className="max-w-7xl mx-auto flex items-center justify-between relative z-10">
+          <div className="flex items-center gap-3 md:gap-4">
+            {showSidebar && (
+              <button
+                type="button"
+                onClick={() => setMobileNavOpen(true)}
+                className="md:hidden p-2 rounded-lg text-primary-foreground hover:bg-white/10"
+                aria-label={lang === "ar" ? "فتح القائمة" : "Open menu"}
+              >
+                <Menu className="w-5 h-5" />
+              </button>
+            )}
             <Link to="/"><SiteLogo heightOverride={40} /></Link>
-            <h1 className="text-primary-foreground font-bold text-lg hidden md:block">{t("dash.title")}</h1>
+            <div className="hidden md:flex items-center gap-2">
+              <h1 className="text-primary-foreground font-bold text-lg">{t("dash.title")}</h1>
+              <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-accent bg-white/10 border border-white/15 rounded-full px-2.5 py-1 backdrop-blur-sm shadow-glow animate-scale-in">
+                <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
+                AI
+              </span>
+            </div>
           </div>
           <div className="flex items-center gap-3">
             <TopBar variant="light" allowCustomization />
@@ -654,39 +758,45 @@ const DashboardPage = () => {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto p-4 md:p-6 space-y-6">
-        {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {stats.map((stat, i) => (
-            <Card key={i} className="hover:shadow-elevated transition-shadow">
-              <CardContent className="p-4 md:p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-muted-foreground text-xs md:text-sm">{stat.label}</p>
-                    <p className="text-2xl md:text-3xl font-bold mt-1">{stat.value}</p>
+      <main className="max-w-7xl mx-auto w-full p-4 md:p-6 space-y-6 content-fade-in">
+        {/* Stats — only on the Applicants tab; Recruitment & Analytics have their own dedicated KPI sections */}
+        {activeTab === "applicants" && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {stats.map((stat, i) => (
+              <Card key={i} className="group overflow-hidden hover:shadow-elevated hover:-translate-y-0.5">
+                <CardContent className="p-4 md:p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-muted-foreground text-xs md:text-sm font-medium">{stat.label}</p>
+                      <p className="text-2xl md:text-3xl font-bold mt-1 tracking-tight">{stat.value}</p>
+                    </div>
+                    <div className={`w-12 h-12 md:w-14 md:h-14 rounded-2xl ${stat.bg} flex items-center justify-center transition-transform duration-300 group-hover:scale-110`}>
+                      <stat.icon className={`w-6 h-6 md:w-7 md:h-7 ${stat.color}`} />
+                    </div>
                   </div>
-                  <stat.icon className={`w-8 h-8 md:w-10 md:h-10 ${stat.color} opacity-80`} />
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          {/* Unified tab bar — auto-flows to grid so future tabs match style. */}
-          <TabsList className="flex flex-wrap w-full h-auto gap-2 p-2 bg-muted rounded-lg justify-start">
-            {visibleTabs.map(tab => (
-              <TabsTrigger
-                key={tab.value}
-                value={tab.value}
-                className="h-9 px-4 text-sm font-medium rounded-md flex items-center gap-1.5 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-sm"
-              >
-                {tab.label}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-
+          {navStyle === "classic" && (
+            <TabsList className="flex flex-wrap w-full h-auto gap-1.5 p-1.5 bg-muted/60 backdrop-blur-sm border border-border/50 rounded-xl justify-start shadow-sm">
+              {flatNavItems.map((item) => (
+                <TabsTrigger
+                  key={item.value}
+                  value={item.value}
+                  className="h-9 px-4 text-sm font-medium rounded-lg flex items-center gap-1.5 transition-all duration-300 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-md hover:text-foreground"
+                >
+                  <item.icon className="w-3.5 h-3.5" />
+                  {item.label}
+                  {!!item.badge && <Badge variant="secondary" className="text-[10px] px-1 py-0 h-4 ms-1">{item.badge}</Badge>}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          )}
           {/* APPLICANTS TAB */}
           <TabsContent value="applicants">
             {isAdmin && <div className="mb-3 space-y-2"><ApplicantsImport onChanged={fetchApplicants} /><ApplicantsMappedImport onChanged={fetchApplicants} /></div>}
@@ -844,47 +954,57 @@ const DashboardPage = () => {
           <TabsContent value="jobs">
             <Card>
               <CardHeader>
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                   <CardTitle className="flex items-center gap-2"><Briefcase className="w-5 h-5" />{t("dash.manageJobs")}</CardTitle>
-                  <Button onClick={() => openJobForm()} className="gradient-accent text-accent-foreground gap-2"><Plus className="w-4 h-4" />{t("dash.addJob")}</Button>
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <div className="relative">
+                      <Search className="absolute top-2.5 w-4 h-4 text-muted-foreground" style={{ [dir === "rtl" ? "right" : "left"]: "0.75rem" }} />
+                      <Input value={jobsSearch} onChange={e => setJobsSearch(e.target.value)} placeholder={t("dash.search")} className="w-full sm:w-64" style={{ [dir === "rtl" ? "paddingRight" : "paddingLeft"]: "2.5rem" }} />
+                    </div>
+                    <Button onClick={() => openJobForm()} className="gradient-accent text-accent-foreground gap-2"><Plus className="w-4 h-4" />{t("dash.addJob")}</Button>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
                 <JobsExcelTools jobs={jobs} onChanged={fetchJobs} />
-                <div className="overflow-x-auto">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>{t("dash.jobTitle")}</TableHead>
-                        <TableHead>{t("dash.jobLocation")}</TableHead>
-                        <TableHead>{t("dash.jobType")}</TableHead>
-                        <TableHead>{t("dash.status")}</TableHead>
-                        <TableHead>{t("dash.actions")}</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {jobs.map(job => (
-                        <TableRow key={job.id}>
-                          <TableCell className="font-medium">{lang === "ar" ? job.title_ar : (job.title_en || job.title_ar)}</TableCell>
-                          <TableCell>{lang === "ar" ? job.location : ((job as any).location_en || job.location)}</TableCell>
-                          <TableCell>{lang === "ar" ? job.job_type : ((job as any).job_type_en || job.job_type)}</TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-2">
-                              <Switch checked={job.is_active} onCheckedChange={(v) => toggleJobActive(job.id, v)} />
-                              <span className="text-xs">{job.is_active ? t("dash.jobActive") : t("dash.jobInactive")}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-1">
-                              <Button size="sm" variant="ghost" onClick={() => openJobForm(job)}><Pencil className="w-4 h-4" /></Button>
-                              <Button size="sm" variant="ghost" className="text-destructive" onClick={() => deleteJob(job.id)}><Trash2 className="w-4 h-4" /></Button>
-                            </div>
-                          </TableCell>
+                {filteredJobs.length === 0 ? (
+                  <p className="text-muted-foreground text-sm text-center py-8">{lang === "ar" ? "لا توجد وظائف مطابقة" : "No matching jobs"}</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>{t("dash.jobTitle")}</TableHead>
+                          <TableHead>{t("dash.jobLocation")}</TableHead>
+                          <TableHead>{t("dash.jobType")}</TableHead>
+                          <TableHead>{t("dash.status")}</TableHead>
+                          <TableHead>{t("dash.actions")}</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredJobs.map(job => (
+                          <TableRow key={job.id}>
+                            <TableCell className="font-medium">{lang === "ar" ? job.title_ar : (job.title_en || job.title_ar)}</TableCell>
+                            <TableCell>{lang === "ar" ? job.location : ((job as any).location_en || job.location)}</TableCell>
+                            <TableCell>{lang === "ar" ? job.job_type : ((job as any).job_type_en || job.job_type)}</TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <Switch checked={job.is_active} onCheckedChange={(v) => toggleJobActive(job.id, v)} />
+                                <span className="text-xs">{job.is_active ? t("dash.jobActive") : t("dash.jobInactive")}</span>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-1">
+                                <Button size="sm" variant="ghost" onClick={() => openJobForm(job)}><Pencil className="w-4 h-4" /></Button>
+                                <Button size="sm" variant="ghost" className="text-destructive" onClick={() => deleteJob(job.id)}><Trash2 className="w-4 h-4" /></Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -892,14 +1012,20 @@ const DashboardPage = () => {
           <TabsContent value="users">
             <Card>
               <CardHeader>
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                   <CardTitle className="flex items-center gap-2"><Users className="w-5 h-5" />{t("dash.manageUsers")}</CardTitle>
-                  <Button onClick={() => setShowUserForm(true)} className="gradient-accent text-accent-foreground gap-2"><Plus className="w-4 h-4" />{t("dash.addUser")}</Button>
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <div className="relative">
+                      <Search className="absolute top-2.5 w-4 h-4 text-muted-foreground" style={{ [dir === "rtl" ? "right" : "left"]: "0.75rem" }} />
+                      <Input value={usersSearch} onChange={e => setUsersSearch(e.target.value)} placeholder={t("dash.search")} className="w-full sm:w-64" style={{ [dir === "rtl" ? "paddingRight" : "paddingLeft"]: "2.5rem" }} />
+                    </div>
+                    <Button onClick={() => setShowUserForm(true)} className="gradient-accent text-accent-foreground gap-2"><Plus className="w-4 h-4" />{t("dash.addUser")}</Button>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent>
-                {users.length === 0 ? (
-                  <p className="text-muted-foreground text-sm text-center py-8">{t("dash.noUsers")}</p>
+                {filteredUsers.length === 0 ? (
+                  <p className="text-muted-foreground text-sm text-center py-8">{users.length === 0 ? t("dash.noUsers") : (lang === "ar" ? "لا يوجد مستخدمون مطابقون" : "No matching users")}</p>
                 ) : (
                   <div className="overflow-x-auto">
                     <Table>
@@ -913,7 +1039,7 @@ const DashboardPage = () => {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {users.map((user: any) => {
+                        {filteredUsers.map((user: any) => {
                           const userRole = userRoles.find((r: any) => r.user_id === user.user_id);
                           const isCurrentUser = false; // handled by AdminGuard
                           return (
@@ -951,6 +1077,9 @@ const DashboardPage = () => {
                                       <Button size="sm" variant="ghost" onClick={() => setPermDialogUser({ id: user.user_id, name: user.display_name || user.email, role: userRole?.role || "" })}>
                                         <Shield className="w-4 h-4" />
                                       </Button>
+                                      <Button size="sm" variant="ghost" title={t("dash.resetPassword")} onClick={() => setResetPasswordUser({ id: user.user_id, name: user.display_name || user.email })}>
+                                        <KeyRound className="w-4 h-4" />
+                                      </Button>
                                       <Button size="sm" variant="ghost" className="text-destructive" onClick={() => deleteUser(user.user_id)}>
                                         <Trash2 className="w-4 h-4" />
                                       </Button>
@@ -973,17 +1102,23 @@ const DashboardPage = () => {
           <TabsContent value="projects">
             <Card>
               <CardHeader>
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                   <CardTitle className="flex items-center gap-2"><FolderOpen className="w-5 h-5" />{t("dash.projects")}</CardTitle>
-                  <Button onClick={() => { setEditingProjectId(null); setProjectForm(emptyProjectForm); setShowProjectForm(true); }} className="gradient-accent text-accent-foreground gap-2"><Plus className="w-4 h-4" />{t("dash.addProject")}</Button>
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <div className="relative">
+                      <Search className="absolute top-2.5 w-4 h-4 text-muted-foreground" style={{ [dir === "rtl" ? "right" : "left"]: "0.75rem" }} />
+                      <Input value={projectsSearch} onChange={e => setProjectsSearch(e.target.value)} placeholder={t("dash.search")} className="w-full sm:w-64" style={{ [dir === "rtl" ? "paddingRight" : "paddingLeft"]: "2.5rem" }} />
+                    </div>
+                    <Button onClick={() => { setEditingProjectId(null); setProjectForm(emptyProjectForm); setShowProjectForm(true); }} className="gradient-accent text-accent-foreground gap-2"><Plus className="w-4 h-4" />{t("dash.addProject")}</Button>
+                  </div>
                 </div>
               </CardHeader>
               <CardContent>
-                {projects.length === 0 ? (
-                  <p className="text-muted-foreground text-sm text-center py-8">{lang === "ar" ? "لا توجد مشاريع بعد" : "No projects yet"}</p>
+                {filteredProjects.length === 0 ? (
+                  <p className="text-muted-foreground text-sm text-center py-8">{projects.length === 0 ? (lang === "ar" ? "لا توجد مشاريع بعد" : "No projects yet") : (lang === "ar" ? "لا توجد مشاريع مطابقة" : "No matching projects")}</p>
                 ) : (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                     {projects.map((p: any) => (
+                     {filteredProjects.map((p: any) => (
                       <Card key={p.id}>
                         <CardContent className="p-4">
                           <div className="flex items-center gap-3 mb-2">
@@ -1070,53 +1205,79 @@ const DashboardPage = () => {
 
           {/* SETTINGS TAB */}
           <TabsContent value="settings">
-            <div className="space-y-6">
-              <Card className="border-destructive/40">
-                <CardContent className="p-6">
-                  <DeletePinSettings />
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-6">
-                  <TwoFactorSettings />
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-6">
-                  <SiteContentSettings />
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-6">
-                  <FormFieldsSettings />
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-6">
-                  <BrandingSettings />
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-6">
-                  <DropdownOptionsSettings />
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-6">
-                  <CustomQuestionsSettings />
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-6">
-                  <UIStylingSettings />
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-6">
-                  <JobCategoriesManager />
-                </CardContent>
-              </Card>
-            </div>
+            <Tabs defaultValue="appearance">
+              <TabsList className="flex flex-wrap h-auto gap-1.5">
+                <TabsTrigger value="appearance" className="gap-1.5">
+                  <Palette className="w-3.5 h-3.5" />{lang === "ar" ? "المظهر والعلامة التجارية" : "Appearance & Branding"}
+                </TabsTrigger>
+                <TabsTrigger value="content" className="gap-1.5">
+                  <Globe className="w-3.5 h-3.5" />{lang === "ar" ? "محتوى الموقع" : "Site Content"}
+                </TabsTrigger>
+                <TabsTrigger value="forms" className="gap-1.5">
+                  <ListChecks className="w-3.5 h-3.5" />{lang === "ar" ? "النماذج والحقول" : "Forms & Fields"}
+                </TabsTrigger>
+                <TabsTrigger value="security" className="gap-1.5">
+                  <Shield className="w-3.5 h-3.5" />{lang === "ar" ? "الأمان" : "Security"}
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="appearance" className="space-y-6 mt-4">
+                <Card>
+                  <CardContent className="p-6">
+                    <BrandingSettings />
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-6">
+                    <UIStylingSettings />
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="content" className="space-y-6 mt-4">
+                <Card>
+                  <CardContent className="p-6">
+                    <SiteContentSettings />
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="forms" className="space-y-6 mt-4">
+                <Card>
+                  <CardContent className="p-6">
+                    <FormFieldsSettings />
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-6">
+                    <CustomQuestionsSettings />
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-6">
+                    <DropdownOptionsSettings />
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-6">
+                    <JobCategoriesManager />
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="security" className="space-y-6 mt-4">
+                <Card className="border-destructive/40">
+                  <CardContent className="p-6">
+                    <DeletePinSettings />
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-6">
+                    <TwoFactorSettings />
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
           </TabsContent>
 
           {/* JOB PAGE SETTINGS TAB */}
@@ -1146,11 +1307,9 @@ const DashboardPage = () => {
             <RejectionReasonsSettings />
           </TabsContent>
 
-          {isAdmin && (
-            <TabsContent value="job_ads">
-              <JobAdvertisements />
-            </TabsContent>
-          )}
+          <TabsContent value="job_ads">
+            <JobAdvertisements />
+          </TabsContent>
 
           <TabsContent value="trash">
             <TrashBin />
@@ -1173,6 +1332,7 @@ const DashboardPage = () => {
           </TabsContent>
         </Tabs>
       </main>
+      </div>
 
       {/* Applicant Detail Dialog */}
       <Dialog open={!!selectedApplicant} onOpenChange={() => setSelectedApplicant(null)}>
@@ -1675,6 +1835,16 @@ const DashboardPage = () => {
           userId={permDialogUser.id}
           userName={permDialogUser.name}
           userRole={permDialogUser.role}
+        />
+      )}
+
+      {/* Reset Password Dialog */}
+      {resetPasswordUser && (
+        <ResetPasswordDialog
+          open={!!resetPasswordUser}
+          onOpenChange={(open) => !open && setResetPasswordUser(null)}
+          userName={resetPasswordUser.name}
+          onSubmit={(newPassword) => resetUserPassword(resetPasswordUser.id, newPassword)}
         />
       )}
     </div>

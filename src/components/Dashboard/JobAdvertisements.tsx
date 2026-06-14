@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { toPng, toJpeg } from "html-to-image";
 import BrandMark from "@/components/BrandMark";
+import { useSiteContent } from "@/hooks/useSiteContent";
 
 interface JobPosting {
   id: string;
@@ -119,6 +120,9 @@ const JobAdvertisements = () => {
   const { lang, dir } = useLanguage();
   const ar = lang === "ar";
   const printRef = useRef<HTMLDivElement>(null);
+  const { content: siteContent } = useSiteContent();
+  const companyAr = siteContent.site_name_ar;
+  const companyEn = siteContent.site_name_en;
 
   const [jobs, setJobs] = useState<JobPosting[]>([]);
   const [ads, setAds] = useState<Advertisement[]>([]);
@@ -128,8 +132,8 @@ const JobAdvertisements = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [titleAr, setTitleAr] = useState("فرص وظيفية مميزة");
   const [titleEn, setTitleEn] = useState("Exciting Job Opportunities");
-  const [subtitleAr, setSubtitleAr] = useState("انضم إلى فريق منصة التوظيف الذكية");
-  const [subtitleEn, setSubtitleEn] = useState("Join the NexHire AI Team");
+  const [subtitleAr, setSubtitleAr] = useState(`انضم إلى فريق ${companyAr}`);
+  const [subtitleEn, setSubtitleEn] = useState(`Join the ${companyEn} Team`);
   const [selectedJobs, setSelectedJobs] = useState<string[]>([]);
   const [manualJobs, setManualJobs] = useState<ManualJob[]>([]);
   const [designStyle, setDesignStyle] = useState("modern");
@@ -242,8 +246,8 @@ const JobAdvertisements = () => {
     setEditingId(null);
     setTitleAr("فرص وظيفية مميزة");
     setTitleEn("Exciting Job Opportunities");
-    setSubtitleAr("انضم إلى فريق منصة التوظيف الذكية");
-    setSubtitleEn("Join the NexHire AI Team");
+    setSubtitleAr(`انضم إلى فريق ${companyAr}`);
+    setSubtitleEn(`Join the ${companyEn} Team`);
     setSelectedJobs([]);
     setManualJobs([]);
     setDesignStyle("modern");
@@ -1067,7 +1071,7 @@ const JobAdvertisements = () => {
                   style={{ fontFamily: getFontStack(fontFamily) }}
                 >
                   <div className="text-lg font-bold">{ar ? "نموذج: فرص وظيفية مميزة" : "Sample: Job Opportunities"}</div>
-                  <div className="text-sm text-muted-foreground mt-1">NexHire AI · منصة التوظيف الذكية</div>
+                  <div className="text-sm text-muted-foreground mt-1">{companyEn} · {companyAr}</div>
                 </div>
               </div>
 
@@ -1412,6 +1416,8 @@ const JobAdvertisements = () => {
                 titleAlignEn={titleAlignEn}
                 titleOffsetX={titleOffsetX}
                 titleOffsetY={titleOffsetY}
+                companyAr={companyAr}
+                companyEn={companyEn}
               />
             </div>
           </CardContent>
@@ -1554,6 +1560,8 @@ interface AdRendererProps {
   titleAlignEn?: "start" | "center" | "end";
   titleOffsetX?: number;
   titleOffsetY?: number;
+  companyAr?: string;
+  companyEn?: string;
   ak?: {
     headerHeight: number;
     headerChevronPos: number;
@@ -1597,6 +1605,7 @@ const AdRenderer = (props: AdRendererProps) => {
     logoOffsetX = 0, logoOffsetY = 0, logoAlign = "start", logoBgColor = "#ffffff", logoUseCustomBg = false,
     fontFamily: fontKey = "system",
     titleAlignAr = "end", titleAlignEn = "start", titleOffsetX = 0, titleOffsetY = 0,
+    companyAr = "منصة التوظيف الذكية", companyEn = "NexHire AI",
   } = props;
 
   const headerTitle = pickHeader(titleAr, titleEn, bilingualMode);
@@ -2036,7 +2045,7 @@ const AdRenderer = (props: AdRendererProps) => {
     header = (
       <div style={{ padding: "28px 36px 24px", background: "white", borderBottom: `2px solid #0f172a` }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", borderBottom: "1px solid #e2e8f0", paddingBottom: 12, marginBottom: 16 }}>
-          {logoUrl ? <img src={logoUrl} alt="logo" style={{ height: 36, maxWidth: 110, objectFit: "contain" }} /> : <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: 4 }}>{ar ? "منصة التوظيف الذكية" : "NEXHIRE AI"}</div>}
+          {logoUrl ? <img src={logoUrl} alt="logo" style={{ height: 36, maxWidth: 110, objectFit: "contain" }} /> : <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: 4 }}>{ar ? companyAr : companyEn.toUpperCase()}</div>}
           <div style={{ fontSize: 9, color: "#64748b", letterSpacing: 2 }}>{ar ? tag.ar : tag.en} · {new Date().getFullYear()}</div>
         </div>
         <h1 style={{ fontSize: 44, fontWeight: 900, margin: 0, color: "#0f172a", lineHeight: 0.95, letterSpacing: -1.5, fontFamily: "Georgia, serif" }} dir={bilingualMode === "en" ? "ltr" : "rtl"}>{headerTitle.primary}</h1>
@@ -2111,7 +2120,7 @@ const AdRenderer = (props: AdRendererProps) => {
               {logoUrl ? (
                 <img
                   src={logoUrl}
-                  alt="NexHire AI"
+                  alt={companyEn}
                   crossOrigin="anonymous"
                   style={{
                     height: logoSize,
@@ -2122,12 +2131,12 @@ const AdRenderer = (props: AdRendererProps) => {
                   }}
                 />
               ) : (
-                <BrandMark size={logoSize} aria-label="NexHire AI" />
+                <BrandMark size={logoSize} aria-label={companyEn} />
               )}
             </div>
           </div>
           <div style={{ textAlign: "right", color: "#64748b", fontSize: 14, fontWeight: 500 }} dir="ltr">
-            {qrUrl ? qrUrl.replace(/^https?:\/\//, "") : (ar ? "منصة التوظيف الذكية" : "NexHire AI")}
+            {qrUrl ? qrUrl.replace(/^https?:\/\//, "") : (ar ? companyAr : companyEn)}
           </div>
         </div>
         {/* Dual title (alignment + offsets) */}
@@ -2243,7 +2252,7 @@ const AdRenderer = (props: AdRendererProps) => {
           )}
         </>
       ) : (
-        <Footer accent={accent} secondary={secondary} ar={ar} showQr={showQr} qrUrl={qrUrl} totalVacancies={showTotalVacancies ? totalAuto : null} />
+        <Footer accent={accent} secondary={secondary} ar={ar} showQr={showQr} qrUrl={qrUrl} totalVacancies={showTotalVacancies ? totalAuto : null} companyAr={companyAr} companyEn={companyEn} />
       )}
     </div>
   );
@@ -2262,10 +2271,10 @@ const CompactMeta = ({ job, ar, accent, fs = 10 }: { job: RenderJob; ar: boolean
   );
 };
 
-const Footer = ({ accent, secondary, ar, showQr, qrUrl, totalVacancies }: { accent: string; secondary: string; ar: boolean; showQr: boolean; qrUrl: string; totalVacancies: number | null }) => (
+const Footer = ({ accent, secondary, ar, showQr, qrUrl, totalVacancies, companyAr = "منصة التوظيف الذكية", companyEn = "NexHire AI" }: { accent: string; secondary: string; ar: boolean; showQr: boolean; qrUrl: string; totalVacancies: number | null; companyAr?: string; companyEn?: string }) => (
   <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "14px 36px", borderTop: `3px solid ${accent}`, background: "#f8fafc", fontSize: 11, color: "#475569", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
     <div>
-      <div style={{ fontWeight: 800, color: accent, fontSize: 14 }}>{ar ? "منصة التوظيف الذكية" : "NexHire AI"}</div>
+      <div style={{ fontWeight: 800, color: accent, fontSize: 14 }}>{ar ? companyAr : companyEn}</div>
       <div style={{ fontSize: 10, marginTop: 2 }}>{ar ? "للتقديم امسح الباركود أو زر موقعنا" : "Scan QR or visit our website"}</div>
       <div style={{ fontSize: 9, marginTop: 2, color: secondary, fontWeight: 600 }}>
         {ar ? `تاريخ النشر: ${new Date().toLocaleDateString("ar-EG")}` : `Posted: ${new Date().toLocaleDateString("en-US")}`}

@@ -1,4 +1,12 @@
-import { createContext, useContext, useState, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { fetchSiteSettings } from "@/hooks/useSiteSettings";
+
+// The default company name used throughout the static translation strings
+// below. Whenever the admin changes the site name in Branding settings,
+// t() swaps these placeholders for the configured name so every page stays
+// in sync without editing each string individually.
+const DEFAULT_COMPANY_AR = "منصة التوظيف الذكية";
+const DEFAULT_COMPANY_EN = "NexHire AI";
 
 export type Lang = "ar" | "en";
 
@@ -117,9 +125,9 @@ const translations: Record<Lang, Record<string, string>> = {
     "field.currentlyEmployed": "هل أنت على رأس العمل؟",
     "field.currentTitle": "المسمى الوظيفي الحالي",
     "field.currentTasks": "نبذة عن المهام الحالية",
-    "field.selfSummary": "الملخص المهني (ملخص + المهام الحالية + خبرات أخرى)",
+    "field.selfSummary": "الملخص المهني (نبذة عنك + خبرات أخرى)",
     "field.otherExperience": "ماهي الخبرات المصاحبة في مجال غير التخصص؟",
-    "ph.selfSummaryMerged": "اكتب ملخصاً مهنياً شاملاً يجمع: نبذة عنك، أهم مهامك السابقة أو الحالية، وأي خبرات إضافية في مجالات أخرى. إن لم تكن تعمل حالياً يمكنك ذكر مؤهلاتك ومهاراتك.",
+    "ph.selfSummaryMerged": "اكتب ملخصاً مهنياً شاملاً يتضمن نبذة عنك وأي خبرات إضافية في مجالات أخرى. إن لم تكن تعمل حالياً يمكنك ذكر مؤهلاتك ومهاراتك.",
     "field.arabicLevel": "مستوى اللغة العربية",
     "field.englishLevel": "مستوى اللغة الإنجليزية",
     "field.otherLanguage": "لغة أخرى",
@@ -343,6 +351,10 @@ const translations: Record<Lang, Record<string, string>> = {
     "dash.userDeleted": "تم حذف المستخدم",
     "dash.roleUpdated": "تم تحديث الصلاحية",
     "dash.statusUpdated": "تم تحديث حالة المستخدم",
+    "dash.resetPassword": "إعادة تعيين كلمة المرور",
+    "dash.resetPasswordFor": "إعادة تعيين كلمة المرور لـ",
+    "dash.resetPasswordDesc": "أدخل كلمة مرور جديدة لهذا المستخدم. سيتم تسجيل خروجه من جميع الأجهزة.",
+    "dash.passwordReset": "تم تغيير كلمة المرور بنجاح",
     "dash.displayName": "اسم العرض",
 
     // Roles
@@ -405,6 +417,10 @@ const translations: Record<Lang, Record<string, string>> = {
     "admin.emailNotRegistered": "هذا البريد الإلكتروني غير مسجل في النظام",
     "admin.noAccess": "ليس لديك صلاحية الوصول",
     "admin.noAccessDesc": "حسابك مسجل ولكن لا يملك صلاحية الدخول إلى لوحة التحكم. يرجى التواصل مع مسؤول النظام لمنحك صلاحية، أو تسجيل الخروج وتجربة حساب آخر.",
+    "admin.idleWarningTitle": "ستنتهي الجلسة بسبب عدم النشاط",
+    "admin.idleWarningDesc": "لم يتم رصد أي نشاط لفترة طويلة. سيتم تسجيل خروجك تلقائياً بعد {seconds} ثانية لحماية حسابك.",
+    "admin.idleStaySignedIn": "متابعة الجلسة",
+    "admin.idleLoggedOutToast": "تم تسجيل خروجك تلقائياً بسبب عدم النشاط لحماية حسابك.",
     "admin.twoFactorTitle": "التحقق بخطوتين",
     "admin.twoFactorDesc": "تم إرسال كود التحقق إلى بريدك الإلكتروني",
     "admin.otpCodeSent": "تم إرسال كود التحقق إلى بريدك الإلكتروني",
@@ -518,9 +534,9 @@ const translations: Record<Lang, Record<string, string>> = {
     "field.currentlyEmployed": "Currently Employed?",
     "field.currentTitle": "Current Job Title",
     "field.currentTasks": "Current Tasks Summary",
-    "field.selfSummary": "Professional Summary (about you + current tasks + other experience)",
+    "field.selfSummary": "Professional Summary (about you + other experience)",
     "field.otherExperience": "Other Experience Outside Specialization",
-    "ph.selfSummaryMerged": "Write a comprehensive summary covering: about you, your key past or current tasks, and any extra experience. If you're not currently employed, mention your qualifications and skills.",
+    "ph.selfSummaryMerged": "Write a comprehensive summary covering: about you and any extra experience in other fields. If you're not currently employed, mention your qualifications and skills.",
     "field.arabicLevel": "Arabic Language Level",
     "field.englishLevel": "English Language Level",
     "field.otherLanguage": "Other Language",
@@ -744,6 +760,10 @@ const translations: Record<Lang, Record<string, string>> = {
     "dash.userDeleted": "User deleted",
     "dash.roleUpdated": "Role updated",
     "dash.statusUpdated": "User status updated",
+    "dash.resetPassword": "Reset Password",
+    "dash.resetPasswordFor": "Reset password for",
+    "dash.resetPasswordDesc": "Enter a new password for this user. They will be signed out of all devices.",
+    "dash.passwordReset": "Password changed successfully",
     "dash.displayName": "Display Name",
 
     // Roles
@@ -806,6 +826,10 @@ const translations: Record<Lang, Record<string, string>> = {
     "admin.emailNotRegistered": "This email is not registered in the system",
     "admin.noAccess": "Access Denied",
     "admin.noAccessDesc": "Your account is registered but does not have permission to access the dashboard. Please contact a system administrator, or sign out and try a different account.",
+    "admin.idleWarningTitle": "Your session is about to expire",
+    "admin.idleWarningDesc": "No activity has been detected for a while. You'll be signed out automatically in {seconds} seconds to protect your account.",
+    "admin.idleStaySignedIn": "Stay signed in",
+    "admin.idleLoggedOutToast": "You were signed out automatically due to inactivity, to protect your account.",
     "admin.twoFactorTitle": "Two-Factor Verification",
     "admin.twoFactorDesc": "A verification code has been sent to your email",
     "admin.otpCodeSent": "Verification code sent to your email",
@@ -830,7 +854,23 @@ export const LanguageProvider = ({ children }: { children: ReactNode }) => {
     localStorage.setItem("akg-lang", l);
   };
 
-  const t = (key: string) => translations[lang][key] || key;
+  const [companyName, setCompanyName] = useState({ ar: DEFAULT_COMPANY_AR, en: DEFAULT_COMPANY_EN });
+
+  useEffect(() => {
+    fetchSiteSettings().then((settings) => {
+      setCompanyName({
+        ar: settings.site_name_ar || DEFAULT_COMPANY_AR,
+        en: settings.site_name_en || DEFAULT_COMPANY_EN,
+      });
+    });
+  }, []);
+
+  const t = (key: string) => {
+    const raw = translations[lang][key] || key;
+    return raw
+      .split(DEFAULT_COMPANY_AR).join(companyName.ar)
+      .split(DEFAULT_COMPANY_EN).join(companyName.en);
+  };
   const dir = lang === "ar" ? "rtl" : "ltr";
 
   return (

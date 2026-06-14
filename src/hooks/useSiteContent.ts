@@ -65,6 +65,7 @@ export interface SiteContent {
   cta_bg_color: string | null;
   hero_title_size_desktop: string | null;
   hero_title_size_mobile: string | null;
+  hero_image_url: string | null;
 }
 
 const DEFAULTS: SiteContent = {
@@ -129,6 +130,7 @@ const DEFAULTS: SiteContent = {
   cta_bg_color: null,
   hero_title_size_desktop: "4rem",
   hero_title_size_mobile: "2rem",
+  hero_image_url: null,
 };
 
 export const useSiteContent = () => {

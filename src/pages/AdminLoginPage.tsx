@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import SiteLogo from "@/components/SiteLogo";
+import AuroraBackground from "@/components/AuroraBackground";
 
 export default function AdminLoginPage() {
   const { t } = useLanguage();
@@ -35,7 +36,8 @@ export default function AdminLoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4">
+    <div className="min-h-screen flex items-center justify-center bg-background p-4 relative">
+      <AuroraBackground />
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="flex justify-center mb-4"><SiteLogo /></div>

@@ -42,8 +42,13 @@ const ExperienceStep = ({ data, onChange }: Props) => {
         {show("yearsExperience") && <FormField label={lbl("yearsExperience", t("field.yearsExperience"))} name="yearsExperience" type="select" required={req("yearsExperience")} value={data.yearsExperience || ""} onChange={onChange} options={dd.getYearsOfExperience()} />}
         {show("currentlyEmployed") && <FormField label={lbl("currentlyEmployed", t("field.currentlyEmployed"))} name="currentlyEmployed" type="select" required={req("currentlyEmployed")} value={data.currentlyEmployed || ""} onChange={onChange} options={yesNoOptions} />}
         {isEmployed && show("currentTitle") && <FormField label={lbl("currentTitle", t("field.currentTitle"))} name="currentTitle" type="text" required={req("currentTitle")} value={data.currentTitle || ""} onChange={onChange} placeholder={t("ph.currentTitle")} />}
+        {isEmployed && show("currentTasks") && (
+          <div className="md:col-span-2">
+            <FormField label={lbl("currentTasks", t("field.currentTasks"))} name="currentTasks" type="textarea" required={req("currentTasks")} value={data.currentTasks || ""} onChange={onChange} placeholder={t("ph.currentTasks")} />
+          </div>
+        )}
 
-        {/* Merged Self Summary (replaces currentTasks + selfSummary + otherExperience) */}
+        {/* Merged Self Summary (replaces selfSummary + otherExperience) */}
         {show("selfSummary") && (
           <div className="md:col-span-2">
             <FormField

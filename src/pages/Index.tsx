@@ -10,6 +10,7 @@ import StorageImage from "@/components/StorageImage";
 import ProjectLogo from "@/components/ProjectLogo";
 import SiteLogo from "@/components/SiteLogo";
 import AINetworkBackground from "@/components/AINetworkBackground";
+import AuroraBackground from "@/components/AuroraBackground";
 import heroBg from "@/assets/hero-bg.jpg";
 
 interface Project {
@@ -59,10 +60,11 @@ const Index = () => {
   const bi = (ar: string, en: string) => lang === "ar" ? ar : en;
 
   return (
-    <div className="min-h-screen bg-background" dir={dir}>
+    <div className="min-h-screen bg-background relative" dir={dir}>
+      <AuroraBackground />
       {/* Navbar */}
-      <nav className="absolute top-0 left-0 right-0 z-20 py-5 px-6">
-        <div className="max-w-6xl mx-auto flex items-center justify-between relative">
+      <nav className="absolute top-4 md:top-6 left-4 md:left-6 right-4 md:right-6 z-20">
+        <div className="max-w-6xl mx-auto flex items-center justify-between relative rounded-2xl border border-white/10 bg-white/5 backdrop-blur-xl shadow-lg px-4 md:px-6 py-2.5">
           <div className={content.logo_alignment === "center" ? "absolute left-1/2 -translate-x-1/2" : ""}>
             <SiteLogo />
           </div>
@@ -92,23 +94,31 @@ const Index = () => {
       {/* Hero */}
       <section className="relative min-h-[85vh] flex items-center overflow-hidden" style={content.hero_bg_color ? { background: content.hero_bg_color } : undefined}>
         <div className="absolute inset-0">
-          <img src={heroBg} alt="" className="w-full h-full object-cover" width={1920} height={1080} />
+          <img src={content.hero_image_url || heroBg} alt="" className="w-full h-full object-cover" width={1920} height={1080} />
           {!content.hero_bg_color && <div className="absolute inset-0 gradient-hero opacity-85" />}
+          {!content.hero_bg_color && <div className="absolute inset-0 bg-grid-dots opacity-40" />}
           {!content.hero_bg_color && <AINetworkBackground />}
         </div>
         <div className="relative z-10 max-w-6xl mx-auto px-6 py-20">
           <div className="max-w-2xl space-y-6 animate-fade-in">
+            <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full border border-white/15 bg-white/5 backdrop-blur-sm text-sm font-semibold text-primary-foreground animate-scale-in">
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full rounded-full bg-accent opacity-75 animate-ping" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-accent" />
+              </span>
+              <span className="text-gradient">{bi("مدعوم بالذكاء الاصطناعي", "AI-Powered Recruitment")}</span>
+            </div>
             <h1 className="text-4xl md:text-6xl font-black text-primary-foreground leading-tight">
               {bi(content.hero_title1_ar, content.hero_title1_en)}
               <br />
-              <span className="text-accent">{bi(content.hero_title2_ar, content.hero_title2_en)}</span>
+              <span className="text-gradient">{bi(content.hero_title2_ar, content.hero_title2_en)}</span>
             </h1>
             <p className="text-lg md:text-xl text-primary-foreground/80 leading-relaxed max-w-lg">
               {bi(content.hero_desc_ar, content.hero_desc_en)}
             </p>
             <div className="flex flex-wrap gap-4 pt-4">
               <Link to="/apply">
-                <Button size="lg" className="gradient-accent text-accent-foreground hover:opacity-90 gap-2 text-lg px-8 py-6 font-bold shadow-glow">
+                <Button size="lg" className="gradient-accent text-accent-foreground hover:opacity-90 gap-2 text-lg px-8 py-6 font-bold shadow-glow animate-glow-pulse">
                   {t("hero.cta")}
                   <Arrow className="w-5 h-5" />
                 </Button>
@@ -141,8 +151,8 @@ const Index = () => {
                 { icon: FolderOpen, value: `+${content.projects_count}`, label: bi("مشروع", "Projects") },
                 { icon: Briefcase, value: `${jobCount}`, label: bi("وظيفة شاغرة", "Open Positions") },
               ].map((stat, i) => (
-                <div key={i} className="text-center space-y-2 rounded-xl p-4 bg-card/60 backdrop-blur-md border border-border/50 hover:shadow-glow transition-shadow duration-300">
-                  <div className="w-14 h-14 rounded-xl gradient-accent flex items-center justify-center mx-auto shadow-glow">
+                <div key={i} className="text-center space-y-2 rounded-xl p-4 glass-panel hover-lift hover:shadow-glow animate-fade-in-up" style={{ animationDelay: `${i * 0.1}s` }}>
+                  <div className="w-14 h-14 rounded-xl gradient-accent flex items-center justify-center mx-auto shadow-glow animate-float" style={{ animationDelay: `${i * 0.3}s` }}>
                     <stat.icon className="w-7 h-7 text-accent-foreground" />
                   </div>
                   <p className="text-3xl md:text-4xl font-black text-primary">{stat.value}</p>
@@ -165,9 +175,9 @@ const Index = () => {
               {bi("نعمل على مشاريع رائدة في مختلف القطاعات", "We work on leading projects across various sectors")}
             </p>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-              {projects.map(project => (
-                <div key={project.id} className="group">
-                  <div className="bg-card rounded-xl border border-border p-6 hover:shadow-elevated transition-all duration-300 text-center h-full flex flex-col items-center justify-center gap-4">
+              {projects.map((project, i) => (
+                <div key={project.id} className="group animate-fade-in-up" style={{ animationDelay: `${i * 0.06}s` }}>
+                  <div className="bg-card rounded-xl border border-border p-6 hover-lift hover:shadow-elevated text-center h-full flex flex-col items-center justify-center gap-4">
                     <ProjectLogo
                       path={project.logo_url}
                       alt={bi(project.name_ar, project.name_en || project.name_ar)}
@@ -214,7 +224,7 @@ const Index = () => {
               { icon: Users, title: bi(content.feature2_title_ar, content.feature2_title_en), desc: bi(content.feature2_desc_ar, content.feature2_desc_en) },
               { icon: TrendingUp, title: bi(content.feature3_title_ar, content.feature3_title_en), desc: bi(content.feature3_desc_ar, content.feature3_desc_en) },
             ].map((feature, i) => (
-              <div key={i} className="bg-card/60 backdrop-blur-md rounded-xl p-8 shadow-card border border-border/50 hover:shadow-glow transition-shadow duration-300 text-center">
+              <div key={i} className="glass-panel rounded-xl p-8 shadow-card hover-lift hover:shadow-glow text-center animate-fade-in-up" style={{ animationDelay: `${i * 0.1}s` }}>
                 <div className="w-14 h-14 rounded-xl gradient-accent flex items-center justify-center mx-auto mb-5 shadow-glow">
                   <feature.icon className="w-7 h-7 text-accent-foreground" />
                 </div>
@@ -236,7 +246,7 @@ const Index = () => {
             {bi(content.cta_desc_ar, content.cta_desc_en)}
           </p>
           <Link to="/apply">
-            <Button size="lg" className="gradient-accent text-accent-foreground hover:opacity-90 gap-2 text-lg px-10 py-6 font-bold shadow-glow mt-4">
+            <Button size="lg" className="gradient-accent text-accent-foreground hover:opacity-90 gap-2 text-lg px-10 py-6 font-bold shadow-glow animate-glow-pulse mt-4">
               {t("cta.button")}
               <Arrow className="w-5 h-5" />
             </Button>

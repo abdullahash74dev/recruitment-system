@@ -76,6 +76,29 @@ Deno.serve(async (req) => {
   }
 
   try {
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
+
+    // Rate limit: at most 12 upload attempts per 15 minutes per source IP.
+    const clientIp = (req.headers.get("x-forwarded-for") || "unknown").split(",")[0].trim() || "unknown";
+    const { data: withinLimit, error: rateLimitError } = await supabase.rpc("check_rate_limit", {
+      _key: `upload:${clientIp}`,
+      _max_requests: 12,
+      _window_seconds: 900,
+    });
+
+    if (!rateLimitError && withinLimit === false) {
+      return new Response(
+        JSON.stringify({ error: "Too many upload attempts from this network. Please wait a few minutes and try again." }),
+        {
+          status: 429,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
     const formData = await req.formData();
     const file = formData.get("file") as File | null;
     const folder = (formData.get("folder") as string) || "uploads";
@@ -89,11 +112,6 @@ Deno.serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
-
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
 
     const tokenHash = await sha256Hex(submissionToken);
     const { data: applicant, error: applicantError } = await supabase

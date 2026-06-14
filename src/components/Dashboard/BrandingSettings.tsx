@@ -9,10 +9,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { toast } from "sonner";
-import { Palette, Upload, Save, Image, Wand2, Flag, RotateCcw } from "lucide-react";
+import { Palette, Upload, Save, Image, Wand2, Flag, RotateCcw, Check, Globe, Lock } from "lucide-react";
 import { invalidateSiteSettingsCache } from "@/hooks/useSiteSettings";
 import { refreshSiteLogo } from "@/components/SiteLogo";
 import { MAX_INLINE_IMAGE_SIZE, readImageAsDataUrl } from "@/lib/imageUpload";
+import defaultHeroBg from "@/assets/hero-bg.jpg";
+import { PALETTE_LABELS, type ThemePalette } from "@/contexts/ThemeContext";
+import { useUserPermissions } from "@/hooks/useUserPermissions";
 
 interface Settings {
   id: string;
@@ -49,18 +52,25 @@ interface Settings {
   cta_bg_color: string | null;
   hero_title_size_desktop: string | null;
   hero_title_size_mobile: string | null;
+  // hero / apply page image
+  hero_image_url: string | null;
   // job page
   show_nationality_on_jobs: boolean;
+  // external interface theme
+  public_theme_palette: string;
 }
 
 const BrandingSettings = () => {
   const { lang } = useLanguage();
   const ar = lang === "ar";
+  const { isPrimaryAdmin } = useUserPermissions();
   const [settings, setSettings] = useState<Settings | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [uploadingHero, setUploadingHero] = useState(false);
   const [removingBg, setRemovingBg] = useState<null | "transparent" | "white">(null);
   const [saving, setSaving] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const heroFileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { fetchSettings(); }, []);
 
@@ -98,7 +108,9 @@ const BrandingSettings = () => {
       cta_bg_color: (data as any).cta_bg_color ?? null,
       hero_title_size_desktop: (data as any).hero_title_size_desktop ?? "4rem",
       hero_title_size_mobile: (data as any).hero_title_size_mobile ?? "2rem",
+      hero_image_url: (data as any).hero_image_url ?? null,
       show_nationality_on_jobs: (data as any).show_nationality_on_jobs ?? false,
+      public_theme_palette: (data as any).public_theme_palette ?? "custom",
     });
   };
 
@@ -119,6 +131,24 @@ const BrandingSettings = () => {
       toast.error(ar ? "فشل رفع الشعار" : "Logo upload failed");
     } finally {
       setUploading(false);
+    }
+  };
+
+  const handleHeroImageUpload = async (file: File) => {
+    if (!settings) return;
+    if (file.size > MAX_INLINE_IMAGE_SIZE) {
+      toast.error(ar ? "الصورة كبيرة جداً (حد أقصى 4MB)" : "Image too large (max 4MB)");
+      return;
+    }
+    setUploadingHero(true);
+    try {
+      const url = await readImageAsDataUrl(file);
+      set("hero_image_url", url);
+      toast.success(ar ? "تم تجهيز الصورة" : "Image ready");
+    } catch {
+      toast.error(ar ? "فشل رفع الصورة" : "Image upload failed");
+    } finally {
+      setUploadingHero(false);
     }
   };
 
@@ -159,6 +189,7 @@ const BrandingSettings = () => {
   if (!settings) return null;
 
   const logoH = parseInt(settings.logo_height) || 56;
+  const palettes = Object.keys(PALETTE_LABELS) as ThemePalette[];
 
   return (
     <div className="space-y-6">
@@ -392,28 +423,82 @@ const BrandingSettings = () => {
         </CardContent>
       </Card>
 
-      {/* Colors */}
+      {/* External Interface Theme — independent from the admin dashboard's
+          appearance, and changeable only by the primary admin. */}
+      <Card>
+        <CardContent className="p-4 space-y-4">
+          <div className="flex items-center gap-2">
+            <Globe className="w-4 h-4" />
+            <Label className="font-medium">{ar ? "ثيم الواجهة الخارجية" : "External Interface Theme"}</Label>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {ar
+              ? "هذا الثيم خاص بالموقع العام (صفحات الوظائف والتقديم) فقط، ومستقل تماماً عن مظهر لوحة التحكم الداخلية. تغيير مظهر لوحة التحكم لن يؤثر عليه."
+              : "This theme applies only to the public site (jobs & application pages) and is completely independent from the internal dashboard's appearance. Changing the dashboard's look will not affect it."}
+          </p>
+          {!isPrimaryAdmin && (
+            <p className="text-xs text-amber-600 flex items-center gap-2">
+              <Lock className="w-3.5 h-3.5" />
+              {ar ? "متاح فقط للمدير الأساسي للنظام." : "Available to the system's primary admin only."}
+            </p>
+          )}
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+            {palettes.map((p) => {
+              const meta = PALETTE_LABELS[p];
+              const active = settings.public_theme_palette === p;
+              return (
+                <button
+                  key={p}
+                  type="button"
+                  disabled={!isPrimaryAdmin}
+                  onClick={() => set("public_theme_palette", p)}
+                  className={`flex flex-col items-center gap-1.5 rounded-lg border p-2 text-xs transition ${
+                    active ? "border-primary ring-2 ring-primary/30" : "border-border"
+                  } ${!isPrimaryAdmin ? "cursor-not-allowed opacity-60" : "cursor-pointer hover:border-primary/50"}`}
+                >
+                  <span className="w-full h-6 rounded" style={{ background: `linear-gradient(135deg, ${meta.swatch[0]}, ${meta.swatch[1]})` }} />
+                  <span className="truncate w-full text-center">{ar ? meta.ar : meta.en}</span>
+                  {active && <Check className="w-3.5 h-3.5 text-primary" />}
+                </button>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Colors — used by the "My Custom Theme" external theme option above */}
       <Card>
         <CardContent className="p-4 space-y-4">
           <Label className="font-medium">{ar ? "الألوان" : "Colors"}</Label>
+          <p className="text-xs text-muted-foreground">
+            {ar
+              ? "تُستخدم هذه الألوان عند اختيار \"ثيمي الخاص\" كثيم للواجهة الخارجية أعلاه."
+              : "These colors are used when \"My Custom Theme\" is selected as the external interface theme above."}
+          </p>
+          {!isPrimaryAdmin && (
+            <p className="text-xs text-amber-600 flex items-center gap-2">
+              <Lock className="w-3.5 h-3.5" />
+              {ar ? "متاح فقط للمدير الأساسي للنظام." : "Available to the system's primary admin only."}
+            </p>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label className="text-xs">{ar ? "اللون الرئيسي" : "Primary"}</Label>
               <div className="flex items-center gap-3">
-                <input type="color" value={settings.primary_color}
+                <input type="color" value={settings.primary_color} disabled={!isPrimaryAdmin}
                   onChange={(e) => set("primary_color", e.target.value)}
-                  className="w-10 h-10 rounded border cursor-pointer" />
-                <Input value={settings.primary_color} onChange={(e) => set("primary_color", e.target.value)} dir="ltr" className="w-32" />
+                  className="w-10 h-10 rounded border cursor-pointer disabled:cursor-not-allowed disabled:opacity-60" />
+                <Input value={settings.primary_color} disabled={!isPrimaryAdmin} onChange={(e) => set("primary_color", e.target.value)} dir="ltr" className="w-32" />
                 <div className="h-10 flex-1 rounded" style={{ background: settings.primary_color }} />
               </div>
             </div>
             <div className="space-y-2">
               <Label className="text-xs">{ar ? "اللون الثانوي" : "Accent"}</Label>
               <div className="flex items-center gap-3">
-                <input type="color" value={settings.accent_color}
+                <input type="color" value={settings.accent_color} disabled={!isPrimaryAdmin}
                   onChange={(e) => set("accent_color", e.target.value)}
-                  className="w-10 h-10 rounded border cursor-pointer" />
-                <Input value={settings.accent_color} onChange={(e) => set("accent_color", e.target.value)} dir="ltr" className="w-32" />
+                  className="w-10 h-10 rounded border cursor-pointer disabled:cursor-not-allowed disabled:opacity-60" />
+                <Input value={settings.accent_color} disabled={!isPrimaryAdmin} onChange={(e) => set("accent_color", e.target.value)} dir="ltr" className="w-32" />
                 <div className="h-10 flex-1 rounded" style={{ background: settings.accent_color }} />
               </div>
             </div>
@@ -538,6 +623,45 @@ const BrandingSettings = () => {
                 </div>
               </div>
             ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Hero / Apply Page Image */}
+      <Card>
+        <CardContent className="p-4 space-y-4">
+          <div className="flex items-center gap-2">
+            <Image className="w-4 h-4" />
+            <Label className="font-medium">{ar ? "صورة الواجهة الرئيسية (التقديم)" : "Homepage Hero Image"}</Label>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            {ar
+              ? "هذه الصورة تظهر في خلفية القسم الرئيسي بالصفحة العامة (المكان الذي يبدأ منه المتقدمون رحلة التقديم على الوظائف). يمكنك رفع صورة احترافية بديلة."
+              : "This image is shown in the background of the public homepage hero section — where applicants start their journey. Upload a more professional image to replace the default."}
+          </p>
+          <div className="flex items-center gap-4 flex-wrap">
+            <div className="rounded border bg-muted/30 overflow-hidden" style={{ width: 160, height: 90 }}>
+              <img src={settings.hero_image_url || defaultHeroBg} alt="Hero preview" className="w-full h-full object-cover" />
+            </div>
+            <div className="flex-1 space-y-2 min-w-[200px]">
+              <input ref={heroFileRef} type="file" accept="image/*" className="hidden"
+                onChange={(e) => e.target.files?.[0] && handleHeroImageUpload(e.target.files[0])} />
+              <div className="flex gap-2 flex-wrap">
+                <Button variant="outline" size="sm" onClick={() => heroFileRef.current?.click()} disabled={uploadingHero} className="gap-2">
+                  <Upload className="w-4 h-4" />
+                  {uploadingHero ? "..." : (ar ? "رفع صورة جديدة" : "Upload new image")}
+                </Button>
+                {settings.hero_image_url && (
+                  <Button variant="ghost" size="sm" onClick={() => set("hero_image_url", null)} className="gap-2 text-muted-foreground">
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    {ar ? "استخدام الصورة الافتراضية" : "Use default image"}
+                  </Button>
+                )}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {ar ? "يُفضّل استخدام صورة عريضة (16:9) بجودة عالية، بحجم أقصى 4MB." : "A wide (16:9), high-quality image is recommended, max 4MB."}
+              </p>
+            </div>
           </div>
         </CardContent>
       </Card>
