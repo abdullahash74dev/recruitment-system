@@ -65,7 +65,7 @@ import AINetworkBackground from "@/components/AINetworkBackground";
 import AuroraBackground from "@/components/AuroraBackground";
 import type { ApplicantEmailStatus } from "@/lib/applicantEmailTemplates";
 import { STATUSES_WITH_EMAIL } from "@/lib/applicantEmailTemplates";
-import { Mail, Activity, Bot, UserCog, Target, Globe, Menu } from "lucide-react";
+import { Mail, Activity, Bot, UserCog, Target, Globe, Menu, Palette, ListChecks } from "lucide-react";
 import DashboardSidebar, { type DashboardNavGroup } from "@/components/Dashboard/DashboardSidebar";
 import DashboardSidebarFuturistic from "@/components/Dashboard/DashboardSidebarFuturistic";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -1146,53 +1146,79 @@ const DashboardPage = () => {
 
           {/* SETTINGS TAB */}
           <TabsContent value="settings">
-            <div className="space-y-6">
-              <Card className="border-destructive/40">
-                <CardContent className="p-6">
-                  <DeletePinSettings />
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-6">
-                  <TwoFactorSettings />
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-6">
-                  <SiteContentSettings />
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-6">
-                  <FormFieldsSettings />
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-6">
-                  <BrandingSettings />
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-6">
-                  <DropdownOptionsSettings />
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-6">
-                  <CustomQuestionsSettings />
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-6">
-                  <UIStylingSettings />
-                </CardContent>
-              </Card>
-              <Card>
-                <CardContent className="p-6">
-                  <JobCategoriesManager />
-                </CardContent>
-              </Card>
-            </div>
+            <Tabs defaultValue="appearance">
+              <TabsList className="flex flex-wrap h-auto gap-1.5">
+                <TabsTrigger value="appearance" className="gap-1.5">
+                  <Palette className="w-3.5 h-3.5" />{lang === "ar" ? "المظهر والعلامة التجارية" : "Appearance & Branding"}
+                </TabsTrigger>
+                <TabsTrigger value="content" className="gap-1.5">
+                  <Globe className="w-3.5 h-3.5" />{lang === "ar" ? "محتوى الموقع" : "Site Content"}
+                </TabsTrigger>
+                <TabsTrigger value="forms" className="gap-1.5">
+                  <ListChecks className="w-3.5 h-3.5" />{lang === "ar" ? "النماذج والحقول" : "Forms & Fields"}
+                </TabsTrigger>
+                <TabsTrigger value="security" className="gap-1.5">
+                  <Shield className="w-3.5 h-3.5" />{lang === "ar" ? "الأمان" : "Security"}
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="appearance" className="space-y-6 mt-4">
+                <Card>
+                  <CardContent className="p-6">
+                    <BrandingSettings />
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-6">
+                    <UIStylingSettings />
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="content" className="space-y-6 mt-4">
+                <Card>
+                  <CardContent className="p-6">
+                    <SiteContentSettings />
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="forms" className="space-y-6 mt-4">
+                <Card>
+                  <CardContent className="p-6">
+                    <FormFieldsSettings />
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-6">
+                    <CustomQuestionsSettings />
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-6">
+                    <DropdownOptionsSettings />
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-6">
+                    <JobCategoriesManager />
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="security" className="space-y-6 mt-4">
+                <Card className="border-destructive/40">
+                  <CardContent className="p-6">
+                    <DeletePinSettings />
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-6">
+                    <TwoFactorSettings />
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
           </TabsContent>
 
           {/* JOB PAGE SETTINGS TAB */}
