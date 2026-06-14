@@ -128,9 +128,8 @@ const DashboardSidebarFuturistic = ({
           collapsed ? "w-[88px]" : "w-72",
         )}
       >
-        <div className="relative flex h-full w-full flex-col overflow-hidden rounded-3xl border border-white/10 bg-sidebar/85 shadow-elevated backdrop-blur-2xl">
-          <AINetworkBackground className="opacity-20" />
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-sidebar-primary/10 via-transparent to-accent/10" />
+        <div className="relative flex h-full w-full flex-col overflow-hidden rounded-3xl border border-white/10 gradient-hero shadow-elevated">
+          <AINetworkBackground className="opacity-30" />
           <div className="pointer-events-none absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-accent/70 to-transparent" />
 
           {/* Header */}
@@ -156,7 +155,7 @@ const DashboardSidebarFuturistic = ({
           <button
             type="button"
             onClick={onToggleCollapsed}
-            className="relative z-10 m-3 flex shrink-0 items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 py-2.5 text-xs font-semibold text-sidebar-foreground/80 transition-all duration-300 hover:border-accent/40 hover:bg-accent/10 hover:text-sidebar-foreground hover:shadow-glow"
+            className="relative z-10 m-3 flex shrink-0 items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/[0.08] py-2.5 text-xs font-semibold text-sidebar-foreground/80 transition-all duration-300 hover:border-accent/40 hover:bg-accent/10 hover:text-sidebar-foreground hover:shadow-glow"
           >
             {dir === "rtl"
               ? (collapsed ? <ChevronsLeft className="h-4 w-4" /> : <ChevronsRight className="h-4 w-4" />)
@@ -173,12 +172,11 @@ const DashboardSidebarFuturistic = ({
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-in fade-in-0" onClick={onCloseMobile} />
           <div
             className={cn(
-              "relative z-10 m-3 flex h-[calc(100%-1.5rem)] w-80 flex-col overflow-hidden rounded-3xl border border-white/10 bg-sidebar/90 shadow-elevated backdrop-blur-2xl animate-in duration-200",
+              "relative z-10 m-3 flex h-[calc(100%-1.5rem)] w-80 flex-col overflow-hidden rounded-3xl border border-white/10 gradient-hero shadow-elevated animate-in duration-200",
               dir === "rtl" ? "slide-in-from-right" : "slide-in-from-left",
             )}
           >
-            <AINetworkBackground className="opacity-20" />
-            <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-sidebar-primary/10 via-transparent to-accent/10" />
+            <AINetworkBackground className="opacity-30" />
 
             <div className="relative z-10 flex h-16 shrink-0 items-center justify-between gap-2 border-b border-white/10 px-4">
               <span className="truncate text-sm font-bold text-sidebar-foreground">{title}</span>
