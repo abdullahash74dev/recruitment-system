@@ -14,7 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Users, UserPlus, Phone, CheckCircle2, Download, LogOut, Search, Eye, BarChart3, Briefcase, FileText, ExternalLink, Plus, Pencil, Trash2, FolderOpen, Settings, Database, Archive, RotateCcw, Shield, Sparkles, Stethoscope } from "lucide-react";
+import { Users, UserPlus, Phone, CheckCircle2, Download, LogOut, Search, Eye, BarChart3, Briefcase, FileText, ExternalLink, Plus, Pencil, Trash2, FolderOpen, Settings, Database, Archive, RotateCcw, Shield, Sparkles, Stethoscope, KeyRound } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from "recharts";
 import * as XLSX from "xlsx";
 import SiteLogo from "@/components/SiteLogo";
@@ -41,6 +41,7 @@ import JobsExcelTools from "@/components/Dashboard/JobsExcelTools";
 import SystemLog from "@/components/Dashboard/SystemLog";
 import TrashBin from "@/components/Dashboard/TrashBin";
 import UserPermissionsDialog from "@/components/Dashboard/UserPermissionsDialog";
+import ResetPasswordDialog from "@/components/Dashboard/ResetPasswordDialog";
 import RejectionReasonsSettings from "@/components/Dashboard/RejectionReasonsSettings";
 import JobAdvertisements from "@/components/Dashboard/JobAdvertisements";
 import RecruitmentDashboard from "@/components/Dashboard/Recruitment/RecruitmentDashboard";
@@ -213,6 +214,7 @@ const DashboardPage = () => {
 
   // Permissions dialog state
   const [permDialogUser, setPermDialogUser] = useState<{ id: string; name: string; role: string } | null>(null);
+  const [resetPasswordUser, setResetPasswordUser] = useState<{ id: string; name: string } | null>(null);
 
   // Project form state
   const [showProjectForm, setShowProjectForm] = useState(false);
@@ -514,6 +516,13 @@ const DashboardPage = () => {
     if (result.error) { toast.error(result.error); return; }
     toast.success(t("dash.statusUpdated"));
     fetchUsers();
+  };
+
+  const resetUserPassword = async (userId: string, newPassword: string) => {
+    const result = await callManageUser({ action: "reset_password", user_id: userId, new_password: newPassword });
+    if (result.error) return { error: result.error };
+    toast.success(t("dash.passwordReset"));
+    return {};
   };
 
   const deleteUser = (userId: string) => {
@@ -1067,6 +1076,9 @@ const DashboardPage = () => {
                                     <>
                                       <Button size="sm" variant="ghost" onClick={() => setPermDialogUser({ id: user.user_id, name: user.display_name || user.email, role: userRole?.role || "" })}>
                                         <Shield className="w-4 h-4" />
+                                      </Button>
+                                      <Button size="sm" variant="ghost" title={t("dash.resetPassword")} onClick={() => setResetPasswordUser({ id: user.user_id, name: user.display_name || user.email })}>
+                                        <KeyRound className="w-4 h-4" />
                                       </Button>
                                       <Button size="sm" variant="ghost" className="text-destructive" onClick={() => deleteUser(user.user_id)}>
                                         <Trash2 className="w-4 h-4" />
@@ -1823,6 +1835,16 @@ const DashboardPage = () => {
           userId={permDialogUser.id}
           userName={permDialogUser.name}
           userRole={permDialogUser.role}
+        />
+      )}
+
+      {/* Reset Password Dialog */}
+      {resetPasswordUser && (
+        <ResetPasswordDialog
+          open={!!resetPasswordUser}
+          onOpenChange={(open) => !open && setResetPasswordUser(null)}
+          userName={resetPasswordUser.name}
+          onSubmit={(newPassword) => resetUserPassword(resetPasswordUser.id, newPassword)}
         />
       )}
     </div>

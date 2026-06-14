@@ -351,6 +351,10 @@ const translations: Record<Lang, Record<string, string>> = {
     "dash.userDeleted": "تم حذف المستخدم",
     "dash.roleUpdated": "تم تحديث الصلاحية",
     "dash.statusUpdated": "تم تحديث حالة المستخدم",
+    "dash.resetPassword": "إعادة تعيين كلمة المرور",
+    "dash.resetPasswordFor": "إعادة تعيين كلمة المرور لـ",
+    "dash.resetPasswordDesc": "أدخل كلمة مرور جديدة لهذا المستخدم. سيتم تسجيل خروجه من جميع الأجهزة.",
+    "dash.passwordReset": "تم تغيير كلمة المرور بنجاح",
     "dash.displayName": "اسم العرض",
 
     // Roles
@@ -756,6 +760,10 @@ const translations: Record<Lang, Record<string, string>> = {
     "dash.userDeleted": "User deleted",
     "dash.roleUpdated": "Role updated",
     "dash.statusUpdated": "User status updated",
+    "dash.resetPassword": "Reset Password",
+    "dash.resetPasswordFor": "Reset password for",
+    "dash.resetPasswordDesc": "Enter a new password for this user. They will be signed out of all devices.",
+    "dash.passwordReset": "Password changed successfully",
     "dash.displayName": "Display Name",
 
     // Roles
