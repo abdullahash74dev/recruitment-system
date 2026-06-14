@@ -266,10 +266,10 @@ html.icons-sharp svg { stroke-linecap: square; stroke-linejoin: miter; stroke-wi
 
   /* ===== Premium AI surface utilities ===== */
   .glass-panel {
-    background: hsl(var(--card) / 0.55);
+    background: hsl(var(--card) / 0.65);
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
-    border: 1px solid hsl(var(--border) / 0.4);
+    border: 1px solid hsl(var(--border) / 0.5);
   }
 
   /* ===== Futuristic in-page tab controls ===== */
