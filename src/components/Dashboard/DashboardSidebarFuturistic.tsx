@@ -32,17 +32,21 @@ const NavButton = ({
       style={{ animationDelay: `${delay}ms` }}
       className={cn(
         "animate-fade-in-up group relative flex w-full items-center gap-3 rounded-2xl px-2.5 py-2.5 text-sm font-medium transition-all duration-300 ease-out",
-        "text-sidebar-foreground/80 hover:text-sidebar-foreground hover:bg-white/5",
-        active && "text-sidebar-foreground bg-gradient-to-r from-sidebar-accent/90 via-sidebar-accent/40 to-transparent shadow-glow",
+        active
+          ? "text-sidebar-foreground bg-white/[0.08] ring-1 ring-inset ring-white/10 shadow-glow"
+          : "text-sidebar-foreground/80 hover:text-sidebar-foreground hover:bg-white/[0.06]",
         collapsed && "justify-center px-0",
       )}
     >
+      {active && (
+        <span className="absolute inset-y-2 start-0 w-1 rounded-full bg-accent shadow-glow" />
+      )}
       <span
         className={cn(
           "relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-all duration-300",
           active
             ? "gradient-accent text-accent-foreground shadow-glow scale-105"
-            : "bg-sidebar-accent/30 text-sidebar-foreground/80 group-hover:scale-105 group-hover:bg-sidebar-accent/50 group-hover:text-sidebar-foreground",
+            : "border border-white/10 bg-white/[0.07] text-sidebar-foreground/80 group-hover:scale-105 group-hover:border-accent/40 group-hover:bg-white/[0.14] group-hover:text-sidebar-foreground",
         )}
       >
         <Icon className="h-[18px] w-[18px]" />

@@ -125,11 +125,11 @@ const getCustomTokens = (theme: ThemeMode, colors: CustomThemeColors): ThemeToke
   const accent = hexToHsl(colors.accent, DEFAULT_LIGHT_TOKENS["--accent"]);
   const background = hexToHsl(colors.background, DEFAULT_LIGHT_TOKENS["--background"]);
   const card = hexToHsl(colors.card, DEFAULT_LIGHT_TOKENS["--card"]);
+  const hue = primary.split(" ")[0];
   if (theme === "dark") {
-    const hue = primary.split(" ")[0];
     return { "--background": `${hue} 32% 7%`, "--card": `${hue} 28% 11%`, "--muted": `${hue} 20% 16%`, "--border": `${hue} 18% 22%`, "--input": `${hue} 18% 22%`, "--primary": accent, "--accent": primary, "--ring": accent, "--sidebar-background": `${hue} 38% 9%`, "--sidebar-accent": `${hue} 28% 18%`, "--gradient-primary": `linear-gradient(135deg, hsl(${primary}), hsl(${accent}))`, "--gradient-accent": `linear-gradient(135deg, hsl(${accent}), hsl(${primary}))`, "--gradient-hero": `linear-gradient(160deg, hsl(${hue} 42% 7%), hsl(${primary}), hsl(${accent}))` };
   }
-  return { "--background": background, "--card": card, "--muted": background, "--border": "214 32% 88%", "--input": "214 32% 88%", "--primary": primary, "--accent": accent, "--ring": accent, "--sidebar-background": primary, "--sidebar-accent": accent, "--gradient-primary": `linear-gradient(135deg, hsl(${primary}), hsl(${accent}))`, "--gradient-accent": `linear-gradient(135deg, hsl(${accent}), hsl(${primary}))`, "--gradient-hero": `linear-gradient(160deg, hsl(${primary}), hsl(${accent}))` };
+  return { "--background": background, "--card": card, "--muted": background, "--border": "214 32% 88%", "--input": "214 32% 88%", "--primary": primary, "--accent": accent, "--ring": accent, "--sidebar-background": `${hue} 35% 11%`, "--sidebar-accent": `${hue} 28% 18%`, "--gradient-primary": `linear-gradient(135deg, hsl(${primary}), hsl(${accent}))`, "--gradient-accent": `linear-gradient(135deg, hsl(${accent}), hsl(${primary}))`, "--gradient-hero": `linear-gradient(160deg, hsl(${primary}), hsl(${accent}))` };
 };
 
 const applyThemeTokens = (theme: ThemeMode, palette: ThemePalette, customTheme: CustomThemeColors) => {
