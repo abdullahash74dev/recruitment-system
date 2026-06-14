@@ -727,24 +727,26 @@ const DashboardPage = () => {
       </header>
 
       <main className="max-w-7xl mx-auto w-full p-4 md:p-6 space-y-6">
-        {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {stats.map((stat, i) => (
-            <Card key={i} className="group overflow-hidden hover:shadow-elevated hover:-translate-y-0.5">
-              <CardContent className="p-4 md:p-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-muted-foreground text-xs md:text-sm font-medium">{stat.label}</p>
-                    <p className="text-2xl md:text-3xl font-bold mt-1 tracking-tight">{stat.value}</p>
+        {/* Stats — only relevant for applicants, recruitment & analytics tabs */}
+        {["applicants", "recruitment", "analytics"].includes(activeTab) && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {stats.map((stat, i) => (
+              <Card key={i} className="group overflow-hidden hover:shadow-elevated hover:-translate-y-0.5">
+                <CardContent className="p-4 md:p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-muted-foreground text-xs md:text-sm font-medium">{stat.label}</p>
+                      <p className="text-2xl md:text-3xl font-bold mt-1 tracking-tight">{stat.value}</p>
+                    </div>
+                    <div className={`w-12 h-12 md:w-14 md:h-14 rounded-2xl ${stat.bg} flex items-center justify-center transition-transform duration-300 group-hover:scale-110`}>
+                      <stat.icon className={`w-6 h-6 md:w-7 md:h-7 ${stat.color}`} />
+                    </div>
                   </div>
-                  <div className={`w-12 h-12 md:w-14 md:h-14 rounded-2xl ${stat.bg} flex items-center justify-center transition-transform duration-300 group-hover:scale-110`}>
-                    <stat.icon className={`w-6 h-6 md:w-7 md:h-7 ${stat.color}`} />
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
