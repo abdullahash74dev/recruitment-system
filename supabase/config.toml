@@ -1,4 +1,4 @@
-project_id = "saxuqaybxdsyloauigdv"
+project_id = "pjopugzttogtpgtcsgbo"
 
 [functions.verify-delete-pin]
 verify_jwt = true
