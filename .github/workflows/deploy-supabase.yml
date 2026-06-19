@@ -25,10 +25,8 @@ jobs:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
 
-      - name: Mark pre-existing schema migrations as applied
-        run: |
-          VERSIONS=$(ls supabase/migrations/*.sql | xargs -n1 basename | sed 's/_.*//')
-          supabase migration repair --status applied $VERSIONS
+      - name: Un-skip migrations that were wrongly marked applied
+        run: supabase migration repair --status reverted 20260619050000 20260619060000 20260619070000
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
