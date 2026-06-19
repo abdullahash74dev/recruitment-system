@@ -35,9 +35,24 @@ function trimStringValues(rec: any): any {
   return cleaned;
 }
 
+function sanitizeExtraFields(value: any): Record<string, string> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const out: Record<string, string> = {};
+  for (const [k, v] of Object.entries(value)) {
+    if (v == null || String(v).trim() === "") continue;
+    out[String(k).trim()] = typeof v === "string" ? v.trim() : String(v);
+  }
+  return Object.keys(out).length > 0 ? out : null;
+}
+
 function sanitizeRecord(src: any): any {
   const rec: any = {};
   for (const [key, value] of Object.entries(src || {})) {
+    if (key === "extra_fields") {
+      const ef = sanitizeExtraFields(value);
+      if (ef) rec.extra_fields = ef;
+      continue;
+    }
     if (!ALL_FIELDS.has(key)) continue;
     if (key === "dependents") {
       const n = parseInt(String(value || "0"), 10);
