@@ -1430,6 +1430,20 @@ const DashboardPage = () => {
                   </div>
                 )}
 
+                {!!(selectedApplicant as any).extra_fields && Object.keys((selectedApplicant as any).extra_fields).length > 0 && (
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">{lang === "ar" ? "حقول إضافية" : "Extra fields"}</label>
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      {Object.entries((selectedApplicant as any).extra_fields as Record<string, string>).map(([key, val]) => (
+                        <div key={key} className="border border-border rounded-lg p-2">
+                          <p className="text-muted-foreground text-xs">{key}</p>
+                          <p className="font-medium">{val}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* Attachments */}
                 <div className="space-y-2">
                   <label className="text-sm font-medium flex items-center gap-2"><FileText className="w-4 h-4" />{t("dash.attachments")}</label>

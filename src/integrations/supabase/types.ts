@@ -234,6 +234,7 @@ export type Database = {
           english_level: string | null
           expected_salary: string | null
           experience_cert_url: string | null
+          extra_fields: Json
           facility_management_exp: string | null
           full_name: string
           gender: string | null
@@ -286,6 +287,7 @@ export type Database = {
           english_level?: string | null
           expected_salary?: string | null
           experience_cert_url?: string | null
+          extra_fields?: Json
           facility_management_exp?: string | null
           full_name: string
           gender?: string | null
@@ -338,6 +340,7 @@ export type Database = {
           english_level?: string | null
           expected_salary?: string | null
           experience_cert_url?: string | null
+          extra_fields?: Json
           facility_management_exp?: string | null
           full_name?: string
           gender?: string | null

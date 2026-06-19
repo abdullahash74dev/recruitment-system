@@ -147,6 +147,12 @@ const ApplicantsMappedImport = ({ onChanged }: Props) => {
   const [selectedSheet, setSelectedSheet] = useState<string>("");
   const [sourceSheets, setSourceSheets] = useState<string[]>([]);
   const [appendMode, setAppendMode] = useState(false);
+  // Custom fields: lets the user map a column that has no matching field in the system
+  // (e.g. an extra Google Forms question) — stored per-applicant as JSON in extra_fields.
+  const [customFields, setCustomFields] = useState<{ key: string; label: string }[]>([]);
+  const [showAddField, setShowAddField] = useState(false);
+  const [newFieldLabel, setNewFieldLabel] = useState("");
+  const nextCustomIdRef = useRef(1);
 
   // Restore draft on mount
   useEffect(() => {
@@ -161,6 +167,7 @@ const ApplicantsMappedImport = ({ onChanged }: Props) => {
         setEnabled(d.enabled || {});
         setFileName(d.fileName || "");
         setSavedAt(d.savedAt || "");
+        setCustomFields(d.customFields || []);
       }
     } catch {}
   }, []);
@@ -170,7 +177,7 @@ const ApplicantsMappedImport = ({ onChanged }: Props) => {
     if (rows.length === 0) return;
     try {
       const payload = JSON.stringify({
-        headers, rows, mapping, enabled, fileName,
+        headers, rows, mapping, enabled, fileName, customFields,
         savedAt: new Date().toISOString(),
       });
       localStorage.setItem(STORAGE_KEY, payload);
@@ -179,7 +186,7 @@ const ApplicantsMappedImport = ({ onChanged }: Props) => {
       // quota exceeded — silently drop the rows from persistence
       try { localStorage.removeItem(STORAGE_KEY); } catch {}
     }
-  }, [headers, rows, mapping, enabled, fileName]);
+  }, [headers, rows, mapping, enabled, fileName, customFields]);
 
   const clearDraft = () => {
     localStorage.removeItem(STORAGE_KEY);
@@ -187,7 +194,23 @@ const ApplicantsMappedImport = ({ onChanged }: Props) => {
     setFileName(""); setSavedAt(""); setResult(null);
     setRawSheet(null); setShowHeaderPicker(false); setHeaderRowIdx(0);
     setWorkbook(null); setSheetNames([]); setSelectedSheet(""); setSourceSheets([]); setAppendMode(false);
+    setCustomFields([]); setShowAddField(false); setNewFieldLabel("");
     toast.success("تم مسح المسودة");
+  };
+
+  const addCustomField = (label: string, fromHeader?: string) => {
+    const trimmed = label.trim();
+    if (!trimmed) { toast.error("اكتب اسماً للحقل أولاً"); return; }
+    const key = `custom_${nextCustomIdRef.current++}`;
+    setCustomFields(p => [...p, { key, label: trimmed }]);
+    setMapping(p => ({ ...p, [key]: fromHeader || "" }));
+    setEnabled(p => ({ ...p, [key]: true }));
+  };
+
+  const removeCustomField = (key: string) => {
+    setCustomFields(p => p.filter(f => f.key !== key));
+    setMapping(p => { const n = { ...p }; delete n[key]; return n; });
+    setEnabled(p => { const n = { ...p }; delete n[key]; return n; });
   };
 
   const autoMap = (hdrs: string[]) => {
@@ -492,6 +515,7 @@ const ApplicantsMappedImport = ({ onChanged }: Props) => {
   const buildRecords = () => {
     const cleanMap: Record<string, string | null> = {};
     for (const t of TARGETS) cleanMap[t.key] = enabled[t.key] && mapping[t.key] ? mapping[t.key] : null;
+    const customClean = customFields.filter(f => enabled[f.key] && mapping[f.key]);
     const dateTimeOrder = cleanMap.created_at ? inferDateTimeOrder(rows.map(r => r[cleanMap.created_at as string])) : "dmy";
     const valid: any[] = [];
     const errors: any[] = [];
@@ -519,6 +543,15 @@ const ApplicantsMappedImport = ({ onChanged }: Props) => {
           rec.status = normalizeStatus(value);
         }
         else rec[target] = value === "" || value == null ? null : String(value);
+      }
+      if (customClean.length > 0) {
+        const extra: Record<string, string> = {};
+        for (const f of customClean) {
+          const raw = src[mapping[f.key]];
+          const value = typeof raw === "string" ? raw.trim() : raw;
+          if (value !== "" && value != null) extra[f.label] = String(value);
+        }
+        if (Object.keys(extra).length > 0) rec.extra_fields = extra;
       }
       if (!rec.full_name || String(rec.full_name).trim().length < 2) {
         errors.push({ row: index + 2, name: rec.full_name, errors: ["الاسم الكامل مفقود"] });
@@ -729,8 +762,9 @@ const ApplicantsMappedImport = ({ onChanged }: Props) => {
   };
 
   const mappedCount = useMemo(
-    () => TARGETS.filter(t => enabled[t.key] && mapping[t.key]).length,
-    [enabled, mapping]
+    () => TARGETS.filter(t => enabled[t.key] && mapping[t.key]).length
+      + customFields.filter(f => enabled[f.key] && mapping[f.key]).length,
+    [enabled, mapping, customFields]
   );
 
   return (
@@ -917,6 +951,98 @@ const ApplicantsMappedImport = ({ onChanged }: Props) => {
                     </div>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {headers.length > 0 && (
+              <div className="rounded-lg border overflow-hidden">
+                <div className="flex items-center justify-between gap-2 px-3 py-2 bg-muted/50 text-xs font-semibold border-b">
+                  <span>حقول مخصصة (لعناوين غير موجودة في النظام)</span>
+                  <Button size="sm" variant="outline" onClick={() => setShowAddField(v => !v)}>
+                    + إضافة حقل جديد
+                  </Button>
+                </div>
+
+                {showAddField && (
+                  <div className="p-3 space-y-2 border-b bg-muted/20">
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={newFieldLabel}
+                        onChange={(e) => setNewFieldLabel(e.target.value)}
+                        placeholder="اسم الحقل الجديد (مثلاً: نوع الرخصة)"
+                        className="flex-1 h-8 px-2 rounded border bg-background text-sm"
+                      />
+                      <Button
+                        size="sm"
+                        onClick={() => { addCustomField(newFieldLabel); setNewFieldLabel(""); setShowAddField(false); }}
+                      >
+                        إضافة
+                      </Button>
+                    </div>
+                    <div className="text-[11px] text-muted-foreground">
+                      أو اضغط على أحد عناوين الأعمدة غير المربوطة لاستخدام اسمه مباشرة كحقل جديد:
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {headers
+                        .filter(h => !Object.values(mapping).includes(h))
+                        .map(h => (
+                          <button
+                            key={h}
+                            type="button"
+                            onClick={() => { addCustomField(h, h); setShowAddField(false); }}
+                            className="px-2 py-1 rounded border bg-background text-xs hover:bg-primary/10"
+                          >
+                            {h}
+                          </button>
+                        ))}
+                    </div>
+                  </div>
+                )}
+
+                {customFields.length > 0 ? (
+                  <div className="max-h-[30vh] overflow-auto">
+                    {customFields.map(f => (
+                      <div key={f.key} className="grid grid-cols-12 gap-2 px-3 py-1.5 border-b items-center text-sm">
+                        <div className="col-span-1 flex justify-center">
+                          <Switch
+                            checked={!!enabled[f.key]}
+                            onCheckedChange={(c) => setEnabled(p => ({ ...p, [f.key]: c }))}
+                          />
+                        </div>
+                        <div className="col-span-4">{f.label}</div>
+                        <div className="col-span-6">
+                          <Select
+                            value={mapping[f.key] || "__none__"}
+                            onValueChange={(v) => setMapping(p => ({ ...p, [f.key]: v === "__none__" ? "" : v }))}
+                            disabled={!enabled[f.key]}
+                          >
+                            <SelectTrigger className="h-8">
+                              <SelectValue placeholder="— غير معيّن —" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="__none__">— غير معيّن —</SelectItem>
+                              {headers.map(h => (
+                                <SelectItem key={h} value={h}>{h}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="col-span-1 flex justify-center">
+                          <Button
+                            size="sm" variant="ghost"
+                            className="text-destructive h-7 w-7 p-0"
+                            onClick={() => removeCustomField(f.key)}
+                          >
+                            ✕
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : !showAddField && (
+                  <div className="px-3 py-2 text-xs text-muted-foreground">لا توجد حقول مخصصة بعد.</div>
+                )}
               </div>
             )}
 
