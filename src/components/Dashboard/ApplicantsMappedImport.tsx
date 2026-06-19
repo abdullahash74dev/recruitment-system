@@ -135,6 +135,11 @@ const ApplicantsMappedImport = ({ onChanged }: Props) => {
   const [enabled, setEnabled] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
+  // Raw sheet rows (no header inferred yet) — lets the user pick which row holds the real
+  // column titles instead of forcing them to delete title/blank rows from the file first.
+  const [rawSheet, setRawSheet] = useState<any[][] | null>(null);
+  const [headerRowIdx, setHeaderRowIdx] = useState<number>(0);
+  const [showHeaderPicker, setShowHeaderPicker] = useState(false);
 
   // Restore draft on mount
   useEffect(() => {
@@ -173,6 +178,7 @@ const ApplicantsMappedImport = ({ onChanged }: Props) => {
     localStorage.removeItem(STORAGE_KEY);
     setHeaders([]); setRows([]); setMapping({}); setEnabled({});
     setFileName(""); setSavedAt(""); setResult(null);
+    setRawSheet(null); setShowHeaderPicker(false); setHeaderRowIdx(0);
     toast.success("تم مسح المسودة");
   };
 
@@ -194,6 +200,17 @@ const ApplicantsMappedImport = ({ onChanged }: Props) => {
     return { map, en };
   };
 
+  // Guess which of the first few rows holds the real column titles: title/blank rows
+  // usually have far fewer filled cells than an actual header row.
+  const guessHeaderRow = (raw: any[][]): number => {
+    let best = 0, bestScore = -1;
+    for (let i = 0; i < Math.min(raw.length, 15); i++) {
+      const nonEmpty = (raw[i] || []).filter(c => String(c ?? "").trim() !== "").length;
+      if (nonEmpty > bestScore) { bestScore = nonEmpty; best = i; }
+    }
+    return best;
+  };
+
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -201,22 +218,49 @@ const ApplicantsMappedImport = ({ onChanged }: Props) => {
       const buf = await file.arrayBuffer();
       const wb = XLSX.read(buf, { type: "array", cellDates: true });
       const ws = wb.Sheets[wb.SheetNames[0]];
-      const json: any[] = XLSX.utils.sheet_to_json(ws, { defval: "", raw: false, dateNF: 'yyyy-mm-dd"T"hh:mm:ss' });
-      if (json.length === 0) throw new Error("الملف فارغ");
-      const hdrs = Object.keys(json[0]);
-      setHeaders(hdrs);
-      setRows(json);
+      const raw: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "", raw: false, dateNF: 'yyyy-mm-dd"T"hh:mm:ss' });
+      if (raw.length === 0) throw new Error("الملف فارغ");
+      setRawSheet(raw);
       setFileName(file.name);
-      const { map, en } = autoMap(hdrs);
-      setMapping(map);
-      setEnabled(en);
+      setHeaders([]);
+      setRows([]);
       setResult(null);
-      toast.success(`تم تحميل ${json.length} صف. تم ربط ${Object.values(map).filter(Boolean).length} حقل تلقائياً.`);
+      setHeaderRowIdx(guessHeaderRow(raw));
+      setShowHeaderPicker(true);
     } catch (err: any) {
       toast.error(err.message);
     } finally {
       if (fileRef.current) fileRef.current.value = "";
     }
+  };
+
+  const applyHeaderRow = (idx: number) => {
+    if (!rawSheet) return;
+    const headerCells = rawSheet[idx] || [];
+    const seen = new Map<string, number>();
+    const hdrs = headerCells.map((c, i) => {
+      let name = String(c ?? "").trim();
+      if (!name) name = `عمود ${i + 1}`;
+      const count = seen.get(name) || 0;
+      seen.set(name, count + 1);
+      return count > 0 ? `${name} (${count + 1})` : name;
+    });
+    const dataRows = rawSheet
+      .slice(idx + 1)
+      .filter(r => r.some(c => String(c ?? "").trim() !== ""))
+      .map(r => {
+        const obj: Record<string, any> = {};
+        hdrs.forEach((h, i) => { obj[h] = r[i] ?? ""; });
+        return obj;
+      });
+    setHeaders(hdrs);
+    setRows(dataRows);
+    setHeaderRowIdx(idx);
+    setShowHeaderPicker(false);
+    const { map, en } = autoMap(hdrs);
+    setMapping(map);
+    setEnabled(en);
+    toast.success(`تم تحميل ${dataRows.length} صف. تم ربط ${Object.values(map).filter(Boolean).length} حقل تلقائياً.`);
   };
 
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
@@ -449,6 +493,8 @@ const ApplicantsMappedImport = ({ onChanged }: Props) => {
   };
   const richness = (r: any) => Object.values(r).filter(v => v != null && String(v).trim() !== "").length;
 
+  const INSERT_BATCH_SIZE = 500;
+
   const submit = async () => {
     const { cleanMap, valid, errors: localErrors } = buildRecords();
     if (!cleanMap["full_name"]) {
@@ -473,7 +519,7 @@ const ApplicantsMappedImport = ({ onChanged }: Props) => {
       }
 
       // Build duplicate index from existing applicants (paginated)
-      const existingMap = new Map<string, { id: string; record: any }>();
+      const existingMap = new Map<string, { id: string | null; record: any; pendingIdx?: number }>();
       if (skipDuplicates) {
         setCurrentName("جاري تحميل المتقدمين الحاليين للمقارنة...");
         for (let from = 0; ; from += 1000) {
@@ -492,57 +538,108 @@ const ApplicantsMappedImport = ({ onChanged }: Props) => {
         }
       }
 
+      // Phase 1: classify every row in-memory (no network calls) — this preserves duplicate
+      // detection both against the DB and between rows of the same uploaded file exactly like
+      // the previous row-by-row loop did, just without paying a network round-trip per row.
+      setCurrentName("جارٍ تصنيف الصفوف...");
+      const toInsert: any[] = [];
+      const toInsertRows: number[] = [];
+      const toUpdate: { id: string; created_at: string; name: string; row: number }[] = [];
+
       for (let i = 0; i < valid.length; i++) {
-        if (cancelRef.current) {
-          toast.warning("تم إيقاف الاستيراد");
-          break;
-        }
         const row = valid[i];
         const { safe: safeRowBase, error: dateError } = sanitizeApplicantDates(row);
         if (dateError) {
           errors.push({ row: i + 2, name: row.full_name, errors: [dateError] });
-          setRecentLog(p => [{ name: row.full_name, ok: false, msg: dateError }, ...p].slice(0, 15));
           continue;
         }
         const safeRow: any = { ...safeRowBase, source: importSource };
         if (importSource === "external") safeRow.source_company = sourceCompany.trim() || null;
-        setCurrentName(row.full_name || `صف ${i + 2}`);
         const keys = dupKeys(safeRow);
         const existing = skipDuplicates ? keys.map(k => existingMap.get(k)).find(Boolean) : undefined;
         if (existing) {
-          const merged: any = safeRow.created_at ? { created_at: safeRow.created_at } : {};
-          const changed = !!merged.created_at && new Date(merged.created_at).getTime() !== new Date(existing.record.created_at).getTime();
+          const changed = !!safeRow.created_at && new Date(safeRow.created_at).getTime() !== new Date(existing.record.created_at).getTime();
           if (changed) {
-            const { error } = await supabase.from("applicants").update(merged).eq("id", existing.id);
-            if (error) {
-              errors.push({ row: i + 2, name: row.full_name, errors: [`تحديث وقت التقديم للمكرر فشل: ${error.message}`] });
-              setRecentLog(p => [{ name: row.full_name, ok: false, msg: error.message }, ...p].slice(0, 15));
+            if (existing.pendingIdx != null) {
+              // duplicate of a row earlier in this same file that hasn't been inserted yet —
+              // merge directly into its pending record instead of an extra DB round-trip.
+              toInsert[existing.pendingIdx].created_at = safeRow.created_at;
+              keys.forEach(k => existingMap.set(k, { id: null, record: { ...existing.record, created_at: safeRow.created_at }, pendingIdx: existing.pendingIdx }));
             } else {
-              updated += 1;
-              keys.forEach(k => existingMap.set(k, { id: existing.id, record: { ...existing.record, ...merged } }));
-              setRecentLog(p => [{ name: row.full_name, ok: true, msg: "تم تحديث وقت التقديم فقط" }, ...p].slice(0, 15));
+              toUpdate.push({ id: existing.id as string, created_at: safeRow.created_at, name: row.full_name, row: i + 2 });
+              keys.forEach(k => existingMap.set(k, { id: existing.id, record: { ...existing.record, created_at: safeRow.created_at } }));
             }
+            updated += 1;
           } else {
             skipped += 1;
-            setRecentLog(p => [{ name: row.full_name, ok: true, msg: row.created_at ? "مكرر — نفس وقت التقديم" : "مكرر — لا يوجد وقت تقديم" }, ...p].slice(0, 15));
           }
         } else {
-          const { data, error } = await supabase.from("applicants").insert(safeRow).select("id").single();
-          if (error) {
-            errors.push({ row: i + 2, name: row.full_name, errors: [error.message] });
-            setRecentLog(p => [{ name: row.full_name, ok: false, msg: error.message }, ...p].slice(0, 15));
-          } else {
-            inserted += 1;
-            if (data?.id) keys.forEach(k => existingMap.set(k, { id: data.id, record: safeRow }));
-            setRecentLog(p => [{ name: row.full_name, ok: true }, ...p].slice(0, 15));
-          }
-        }
-        if (i % 5 === 0 || i === valid.length - 1) {
-          setProgress({ done: i + 1, total: valid.length });
-          setResult({ inserted, updated, skipped, failed: errors.length, total: i + 1 + localErrors.length, errors: errors.slice(0, 500) });
+          const idx = toInsert.length;
+          toInsert.push(safeRow);
+          toInsertRows.push(i + 2);
+          keys.forEach(k => existingMap.set(k, { id: null, record: safeRow, pendingIdx: idx }));
         }
       }
-      setProgress({ done: valid.length, total: valid.length });
+
+      const totalWork = toInsert.length + toUpdate.length;
+      let done = 0;
+      setProgress({ done, total: totalWork });
+
+      // Phase 2: insert new rows in large batches through the import-applicants-mapped edge
+      // function (which itself chunks into groups of 200 server-side) instead of one request
+      // per row — this is what makes 80,000+-row files feasible.
+      for (let b = 0; b < toInsert.length; b += INSERT_BATCH_SIZE) {
+        if (cancelRef.current) { toast.warning("تم إيقاف الاستيراد"); break; }
+        const batch = toInsert.slice(b, b + INSERT_BATCH_SIZE);
+        const batchRows = toInsertRows.slice(b, b + INSERT_BATCH_SIZE);
+        const batchNum = Math.floor(b / INSERT_BATCH_SIZE) + 1;
+        const batchTotal = Math.ceil(toInsert.length / INSERT_BATCH_SIZE);
+        setCurrentName(`جارٍ حفظ دفعة ${batchNum} من ${batchTotal} (${batch.length} صف)...`);
+
+        let res: any = null;
+        let lastError: any = null;
+        for (let attempt = 0; attempt < 2 && !res; attempt++) {
+          if (attempt > 0) await new Promise(r => setTimeout(r, 1500));
+          const { data, error } = await supabase.functions.invoke("import-applicants-mapped", { body: { records: batch } });
+          if (!error) res = data; else lastError = error;
+        }
+
+        if (res) {
+          inserted += res.inserted || 0;
+          (res.errors || []).forEach((e: any) => {
+            const idx = e.row - 2;
+            const absRow = batchRows[idx];
+            errors.push({ row: absRow ?? e.row, name: e.name, errors: e.errors });
+          });
+          setRecentLog(p => [{ name: `دفعة ${batchNum}/${batchTotal}`, ok: (res.failed || 0) === 0, msg: `${res.inserted} تم${res.failed ? ` · ${res.failed} فشل` : ""}` }, ...p].slice(0, 15));
+        } else {
+          const msg = lastError?.message || "فشل الاتصال بالخادم";
+          batchRows.forEach((r, idx) => errors.push({ row: r, name: batch[idx]?.full_name, errors: [msg] }));
+          setRecentLog(p => [{ name: `دفعة ${batchNum}/${batchTotal}`, ok: false, msg }, ...p].slice(0, 15));
+        }
+        done += batch.length;
+        setProgress({ done, total: totalWork });
+        setResult({ inserted, updated, skipped, failed: errors.length, total: valid.length + localErrors.length, errors: errors.slice(0, 500) });
+      }
+
+      // Phase 3: timestamp-only updates for rows that duplicate an already-existing DB record.
+      for (let i = 0; i < toUpdate.length; i++) {
+        if (cancelRef.current) { toast.warning("تم إيقاف الاستيراد"); break; }
+        const u = toUpdate[i];
+        setCurrentName(u.name || `صف ${u.row}`);
+        const { error } = await supabase.from("applicants").update({ created_at: u.created_at }).eq("id", u.id);
+        if (error) {
+          errors.push({ row: u.row, name: u.name, errors: [`تحديث وقت التقديم للمكرر فشل: ${error.message}`] });
+          setRecentLog(p => [{ name: u.name, ok: false, msg: error.message }, ...p].slice(0, 15));
+        } else {
+          setRecentLog(p => [{ name: u.name, ok: true, msg: "تم تحديث وقت التقديم فقط" }, ...p].slice(0, 15));
+        }
+        done += 1;
+        setProgress({ done, total: totalWork });
+        setResult({ inserted, updated, skipped, failed: errors.length, total: valid.length + localErrors.length, errors: errors.slice(0, 500) });
+      }
+
+      setProgress({ done: totalWork, total: totalWork });
       setResult({ inserted, updated, skipped, failed: errors.length, total: valid.length + localErrors.length, errors: errors.slice(0, 500), cancelled: cancelRef.current });
       if (inserted > 0 || updated > 0) {
         toast.success(`تم: ${inserted} جديد · ${updated} محدّث · ${skipped} متخطى`);
@@ -614,6 +711,11 @@ const ApplicantsMappedImport = ({ onChanged }: Props) => {
                   مسح المسودة
                 </Button>
               )}
+              {rawSheet && !showHeaderPicker && (
+                <Button size="sm" variant="outline" onClick={() => setShowHeaderPicker(true)}>
+                  تغيير صف العناوين
+                </Button>
+              )}
               <div className="flex items-center gap-2 ms-auto">
                 <label className="flex items-center gap-1.5 text-xs cursor-pointer">
                   <Switch checked={skipDuplicates} onCheckedChange={setSkipDuplicates} />
@@ -621,6 +723,43 @@ const ApplicantsMappedImport = ({ onChanged }: Props) => {
                 </label>
               </div>
             </div>
+
+            {rawSheet && showHeaderPicker && (
+              <div className="rounded-lg border p-3 space-y-2">
+                <div className="text-sm font-semibold">
+                  حدد الصف الذي يحتوي على عناوين الأعمدة (الاسم، الجنس، البريد...)
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  اضغط على رقم الصف الصحيح من القائمة أدناه، ثم اضغط "تأكيد". الصفوف فوقه (عنوان/فراغ) سيتم تجاهلها تلقائياً.
+                </div>
+                <div className="max-h-[40vh] overflow-auto border rounded-md divide-y">
+                  {rawSheet.slice(0, 15).map((r, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => setHeaderRowIdx(idx)}
+                      className={`w-full flex items-stretch text-start ${idx === headerRowIdx ? "bg-primary/10" : "hover:bg-muted/40"}`}
+                    >
+                      <span className={`shrink-0 w-9 flex items-center justify-center text-xs font-mono ${idx === headerRowIdx ? "bg-primary text-primary-foreground" : "bg-muted/50"}`}>
+                        {idx + 1}
+                      </span>
+                      <span className="flex-1 overflow-x-auto flex gap-1.5 px-2 py-1.5 whitespace-nowrap">
+                        {r.slice(0, 30).map((c, ci) => (
+                          <span key={ci} className="px-1.5 py-0.5 rounded bg-muted/40 border text-[11px]">
+                            {String(c ?? "").trim() || "—"}
+                          </span>
+                        ))}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button size="sm" onClick={() => applyHeaderRow(headerRowIdx)}>
+                    تأكيد الصف {headerRowIdx + 1} كعناوين الأعمدة
+                  </Button>
+                </div>
+              </div>
+            )}
 
             {/* مصدر البيانات */}
             <div className="rounded-lg border p-3 bg-amber-50 dark:bg-amber-950/20 space-y-2">
@@ -766,7 +905,7 @@ const ApplicantsMappedImport = ({ onChanged }: Props) => {
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
               {loading
                 ? (progress ? `${progress.done}/${progress.total} — ${currentName || "..."}` : "جاري الحفظ...")
-                : `حفظ ${rows.length} صف شخص بشخص`}
+                : `حفظ ${rows.length} صف`}
             </Button>
           </div>
 
