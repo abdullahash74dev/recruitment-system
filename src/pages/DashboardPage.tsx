@@ -33,6 +33,7 @@ import SiteContentSettings from "@/components/Dashboard/SiteContentSettings";
 import AnalyticsHub from "@/components/Dashboard/AnalyticsHub";
 import ApplicantsImport from "@/components/Dashboard/ApplicantsImport";
 import ApplicantsMappedImport from "@/components/Dashboard/ApplicantsMappedImport";
+import ApplicantsDuplicateCleanup from "@/components/Dashboard/ApplicantsDuplicateCleanup";
 import UIStylingSettings from "@/components/Dashboard/UIStylingSettings";
 import JobPageSettings from "@/components/Dashboard/JobPageSettings";
 import DeletePinSettings from "@/components/Dashboard/DeletePinSettings";
@@ -799,7 +800,7 @@ const DashboardPage = () => {
           )}
           {/* APPLICANTS TAB */}
           <TabsContent value="applicants">
-            {isAdmin && <div className="mb-3 space-y-2"><ApplicantsImport onChanged={fetchApplicants} /><ApplicantsMappedImport onChanged={fetchApplicants} /></div>}
+            {isAdmin && <div className="mb-3 space-y-2"><ApplicantsImport onChanged={fetchApplicants} /><ApplicantsMappedImport onChanged={fetchApplicants} /><ApplicantsDuplicateCleanup applicants={applicants} onChanged={fetchApplicants} /></div>}
             <ApplicantsAdvancedFilters
               applicants={activeApplicants}
               lang={lang}

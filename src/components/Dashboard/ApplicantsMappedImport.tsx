@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Upload, FileSpreadsheet, Loader2, CheckCircle2, AlertTriangle, Download, Wand2, History } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { dupKeys, richness } from "@/lib/applicantDuplicates";
 
 // Target fields with Arabic labels (subset of applicants table)
 const TARGETS: { key: string; label: string; required?: boolean }[] = [
@@ -663,22 +664,6 @@ const ApplicantsMappedImport = ({ onChanged }: Props) => {
     XLSX.utils.book_append_sheet(wb, ws, "Errors");
     XLSX.writeFile(wb, `import_errors_${String(job.file_name || job.id).replace(/[^\w.-]+/g, "_")}.xlsx`);
   };
-
-  const dupKeys = (r: any) => {
-    const n = String(r.full_name || "").trim().toLowerCase().replace(/\s+/g, " ");
-    const p = String(r.phone || "").replace(/\D/g, "");
-    const e = String(r.email || "").trim().toLowerCase();
-    const pos = String(r.desired_position || "").trim().toLowerCase();
-    const keys: string[] = [];
-    if (n && p && e && pos) keys.push(`all:${n}|${p}|${e}|${pos}`);
-    if (n && p && pos) keys.push(`name_phone_pos:${n}|${p}|${pos}`);
-    if (n && e && pos) keys.push(`name_email_pos:${n}|${e}|${pos}`);
-    if (n && p && e) keys.push(`name_phone_email:${n}|${p}|${e}`);
-    if (n && p) keys.push(`name_phone:${n}|${p}`);
-    if (n && e) keys.push(`name_email:${n}|${e}`);
-    return keys;
-  };
-  const richness = (r: any) => Object.values(r).filter(v => v != null && String(v).trim() !== "").length;
 
   const INSERT_BATCH_SIZE = 500;
 
