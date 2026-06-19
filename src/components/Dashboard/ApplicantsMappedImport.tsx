@@ -140,6 +140,13 @@ const ApplicantsMappedImport = ({ onChanged }: Props) => {
   const [rawSheet, setRawSheet] = useState<any[][] | null>(null);
   const [headerRowIdx, setHeaderRowIdx] = useState<number>(0);
   const [showHeaderPicker, setShowHeaderPicker] = useState(false);
+  // Multi-sheet support: keep the parsed workbook around so the user can switch sheets
+  // (or append rows from a second sheet) without re-uploading the file.
+  const [workbook, setWorkbook] = useState<XLSX.WorkBook | null>(null);
+  const [sheetNames, setSheetNames] = useState<string[]>([]);
+  const [selectedSheet, setSelectedSheet] = useState<string>("");
+  const [sourceSheets, setSourceSheets] = useState<string[]>([]);
+  const [appendMode, setAppendMode] = useState(false);
 
   // Restore draft on mount
   useEffect(() => {
@@ -179,6 +186,7 @@ const ApplicantsMappedImport = ({ onChanged }: Props) => {
     setHeaders([]); setRows([]); setMapping({}); setEnabled({});
     setFileName(""); setSavedAt(""); setResult(null);
     setRawSheet(null); setShowHeaderPicker(false); setHeaderRowIdx(0);
+    setWorkbook(null); setSheetNames([]); setSelectedSheet(""); setSourceSheets([]); setAppendMode(false);
     toast.success("تم مسح المسودة");
   };
 
@@ -211,27 +219,65 @@ const ApplicantsMappedImport = ({ onChanged }: Props) => {
     return best;
   };
 
+  const parseSheetRaw = (wb: XLSX.WorkBook, sheetName: string): any[][] => {
+    const ws = wb.Sheets[sheetName];
+    return XLSX.utils.sheet_to_json(ws, { header: 1, defval: "", raw: false, dateNF: 'yyyy-mm-dd"T"hh:mm:ss' });
+  };
+
+  // Pick the sheet most likely to hold the real data: compare each sheet's row span
+  // (fast — reads the sheet dimensions, not its full content) instead of always assuming
+  // the first sheet, since exports often have an empty/summary sheet before the data sheet.
+  const pickBestSheet = (wb: XLSX.WorkBook): string => {
+    let best = wb.SheetNames[0];
+    let bestScore = -1;
+    for (const name of wb.SheetNames) {
+      const ref = wb.Sheets[name]?.["!ref"];
+      const score = ref ? XLSX.utils.decode_range(ref).e.r + 1 : 0;
+      if (score > bestScore) { bestScore = score; best = name; }
+    }
+    return best;
+  };
+
+  const selectSheet = (wb: XLSX.WorkBook, sheetName: string) => {
+    const raw = parseSheetRaw(wb, sheetName);
+    setSelectedSheet(sheetName);
+    setRawSheet(raw);
+    setHeaderRowIdx(guessHeaderRow(raw));
+    setShowHeaderPicker(true);
+    if (raw.length === 0) toast.warning(`الشيت "${sheetName}" يبدو فارغاً — جرّب اختيار شيت آخر من القائمة بالأعلى.`);
+  };
+
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     try {
       const buf = await file.arrayBuffer();
       const wb = XLSX.read(buf, { type: "array", cellDates: true });
-      const ws = wb.Sheets[wb.SheetNames[0]];
-      const raw: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "", raw: false, dateNF: 'yyyy-mm-dd"T"hh:mm:ss' });
-      if (raw.length === 0) throw new Error("الملف فارغ");
-      setRawSheet(raw);
+      if (wb.SheetNames.length === 0) throw new Error("الملف لا يحتوي على أي شيت بيانات");
+      setWorkbook(wb);
+      setSheetNames(wb.SheetNames);
+      setSourceSheets([]);
+      setAppendMode(false);
       setFileName(file.name);
       setHeaders([]);
       setRows([]);
       setResult(null);
-      setHeaderRowIdx(guessHeaderRow(raw));
-      setShowHeaderPicker(true);
+      selectSheet(wb, pickBestSheet(wb));
     } catch (err: any) {
       toast.error(err.message);
     } finally {
       if (fileRef.current) fileRef.current.value = "";
     }
+  };
+
+  // Open the same sheet/header picker but in "append" mode: confirming will add the chosen
+  // sheet's rows on top of the rows already loaded instead of replacing them — this is how
+  // the user combines e.g. Sheet 2 and Sheet 3 of the same workbook into one import batch.
+  const startAppendFromSheet = () => {
+    if (!workbook) return;
+    setAppendMode(true);
+    const other = sheetNames.find(n => n !== selectedSheet) || sheetNames[0];
+    selectSheet(workbook, other);
   };
 
   const applyHeaderRow = (idx: number) => {
@@ -253,14 +299,28 @@ const ApplicantsMappedImport = ({ onChanged }: Props) => {
         hdrs.forEach((h, i) => { obj[h] = r[i] ?? ""; });
         return obj;
       });
-    setHeaders(hdrs);
-    setRows(dataRows);
     setHeaderRowIdx(idx);
     setShowHeaderPicker(false);
-    const { map, en } = autoMap(hdrs);
-    setMapping(map);
-    setEnabled(en);
-    toast.success(`تم تحميل ${dataRows.length} صف. تم ربط ${Object.values(map).filter(Boolean).length} حقل تلقائياً.`);
+
+    if (appendMode) {
+      setRows(prev => [...prev, ...dataRows]);
+      setHeaders(prev => {
+        const merged = [...prev];
+        hdrs.forEach(h => { if (!merged.includes(h)) merged.push(h); });
+        return merged;
+      });
+      setSourceSheets(prev => prev.includes(selectedSheet) ? prev : [...prev, selectedSheet]);
+      setAppendMode(false);
+      toast.success(`تمت إضافة ${dataRows.length} صف من شيت "${selectedSheet}".`);
+    } else {
+      setHeaders(hdrs);
+      setRows(dataRows);
+      setSourceSheets([selectedSheet]);
+      const { map, en } = autoMap(hdrs);
+      setMapping(map);
+      setEnabled(en);
+      toast.success(`تم تحميل ${dataRows.length} صف من شيت "${selectedSheet}". تم ربط ${Object.values(map).filter(Boolean).length} حقل تلقائياً.`);
+    }
   };
 
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
@@ -703,6 +763,7 @@ const ApplicantsMappedImport = ({ onChanged }: Props) => {
               {headers.length > 0 && (
                 <span className="text-sm text-muted-foreground">
                   {fileName && <b className="me-1">{fileName}</b>}
+                  {sourceSheets.length > 0 && <span className="me-1">(شيت: {sourceSheets.join("، ")})</span>}
                   {headers.length} عمود · {rows.length} صف · مفعّل: {mappedCount}
                 </span>
               )}
@@ -712,8 +773,13 @@ const ApplicantsMappedImport = ({ onChanged }: Props) => {
                 </Button>
               )}
               {rawSheet && !showHeaderPicker && (
-                <Button size="sm" variant="outline" onClick={() => setShowHeaderPicker(true)}>
+                <Button size="sm" variant="outline" onClick={() => { setAppendMode(false); setShowHeaderPicker(true); }}>
                   تغيير صف العناوين
+                </Button>
+              )}
+              {rawSheet && !showHeaderPicker && sheetNames.length > 1 && rows.length > 0 && (
+                <Button size="sm" variant="outline" onClick={startAppendFromSheet}>
+                  + إضافة بيانات من شيت آخر
                 </Button>
               )}
               <div className="flex items-center gap-2 ms-auto">
@@ -726,8 +792,22 @@ const ApplicantsMappedImport = ({ onChanged }: Props) => {
 
             {rawSheet && showHeaderPicker && (
               <div className="rounded-lg border p-3 space-y-2">
+                {sheetNames.length > 1 && (
+                  <div className="flex items-center gap-2 flex-wrap pb-1 border-b">
+                    <span className="text-xs font-medium">الشيت (Sheet):</span>
+                    <Select value={selectedSheet} onValueChange={(v) => workbook && selectSheet(workbook, v)}>
+                      <SelectTrigger className="h-8 w-56"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {sheetNames.map(n => <SelectItem key={n} value={n}>{n}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    <span className="text-[11px] text-muted-foreground">تم اختيار الشيت الأكثر بيانات تلقائياً — غيّره هنا إذا احتجت.</span>
+                  </div>
+                )}
                 <div className="text-sm font-semibold">
-                  حدد الصف الذي يحتوي على عناوين الأعمدة (الاسم، الجنس، البريد...)
+                  {appendMode
+                    ? `أضف بيانات من شيت إضافي إلى الصفوف المحمّلة حالياً (${rows.length} صف) — حدد صف العناوين`
+                    : "حدد الصف الذي يحتوي على عناوين الأعمدة (الاسم، الجنس، البريد...)"}
                 </div>
                 <div className="text-xs text-muted-foreground">
                   اضغط على رقم الصف الصحيح من القائمة أدناه، ثم اضغط "تأكيد". الصفوف فوقه (عنوان/فراغ) سيتم تجاهلها تلقائياً.
@@ -755,7 +835,9 @@ const ApplicantsMappedImport = ({ onChanged }: Props) => {
                 </div>
                 <div className="flex justify-end gap-2">
                   <Button size="sm" onClick={() => applyHeaderRow(headerRowIdx)}>
-                    تأكيد الصف {headerRowIdx + 1} كعناوين الأعمدة
+                    {appendMode
+                      ? `إلحاق شيت "${selectedSheet}" من الصف ${headerRowIdx + 1}`
+                      : `تأكيد الصف ${headerRowIdx + 1} كعناوين الأعمدة`}
                   </Button>
                 </div>
               </div>
