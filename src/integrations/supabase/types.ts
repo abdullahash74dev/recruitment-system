@@ -212,6 +212,66 @@ export type Database = {
           },
         ]
       }
+      applicant_import_jobs: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          errors: Json
+          failed_rows: number
+          file_name: string | null
+          id: string
+          imported_by: string | null
+          imported_by_email: string | null
+          import_source: string
+          inserted_rows: number
+          skipped_rows: number
+          source_company: string | null
+          source_sheets: string[] | null
+          status: string
+          total_rows: number
+          updated_at: string
+          updated_rows: number
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          errors?: Json
+          failed_rows?: number
+          file_name?: string | null
+          id?: string
+          imported_by?: string | null
+          imported_by_email?: string | null
+          import_source?: string
+          inserted_rows?: number
+          skipped_rows?: number
+          source_company?: string | null
+          source_sheets?: string[] | null
+          status?: string
+          total_rows?: number
+          updated_at?: string
+          updated_rows?: number
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          errors?: Json
+          failed_rows?: number
+          file_name?: string | null
+          id?: string
+          imported_by?: string | null
+          imported_by_email?: string | null
+          import_source?: string
+          inserted_rows?: number
+          skipped_rows?: number
+          source_company?: string | null
+          source_sheets?: string[] | null
+          status?: string
+          total_rows?: number
+          updated_at?: string
+          updated_rows?: number
+        }
+        Relationships: []
+      }
       applicants: {
         Row: {
           arabic_level: string | null

@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Upload, FileSpreadsheet, Loader2, CheckCircle2, AlertTriangle, Download, Wand2 } from "lucide-react";
+import { Upload, FileSpreadsheet, Loader2, CheckCircle2, AlertTriangle, Download, Wand2, History } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -119,8 +119,54 @@ const AUTO_MAP_PRESETS: { match: (h: string) => boolean; target: string }[] = [
 
 interface Props { onChanged: () => void; }
 
-const STORAGE_KEY = "applicants_mapped_import_draft_v1";
 const ALLOWED_STATUSES = new Set(["new", "reviewing", "phone_interview", "in_person_interview", "accepted", "hired", "rejected", "withdrawn"]);
+
+// Draft storage uses IndexedDB instead of localStorage: large files (tens of thousands of
+// rows) easily exceed localStorage's ~5-10MB quota, which used to fail silently and left
+// the user with nothing to recover if the tab was closed or killed mid-import.
+const DRAFT_DB_NAME = "applicants_import_drafts";
+const DRAFT_STORE = "draft";
+const DRAFT_KEY = "current";
+
+const openDraftDb = (): Promise<IDBDatabase> => new Promise((resolve, reject) => {
+  const req = indexedDB.open(DRAFT_DB_NAME, 1);
+  req.onupgradeneeded = () => { req.result.createObjectStore(DRAFT_STORE); };
+  req.onsuccess = () => resolve(req.result);
+  req.onerror = () => reject(req.error);
+});
+
+const saveDraft = async (payload: any): Promise<void> => {
+  const db = await openDraftDb();
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(DRAFT_STORE, "readwrite");
+    tx.objectStore(DRAFT_STORE).put(payload, DRAFT_KEY);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+  db.close();
+};
+
+const loadDraft = async (): Promise<any | null> => {
+  const db = await openDraftDb();
+  const result = await new Promise<any>((resolve, reject) => {
+    const req = db.transaction(DRAFT_STORE, "readonly").objectStore(DRAFT_STORE).get(DRAFT_KEY);
+    req.onsuccess = () => resolve(req.result ?? null);
+    req.onerror = () => reject(req.error);
+  });
+  db.close();
+  return result;
+};
+
+const clearDraftDb = async (): Promise<void> => {
+  const db = await openDraftDb();
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(DRAFT_STORE, "readwrite");
+    tx.objectStore(DRAFT_STORE).delete(DRAFT_KEY);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+  db.close();
+};
 
 const ApplicantsMappedImport = ({ onChanged }: Props) => {
   const fileRef = useRef<HTMLInputElement>(null);
@@ -154,12 +200,10 @@ const ApplicantsMappedImport = ({ onChanged }: Props) => {
   const [newFieldLabel, setNewFieldLabel] = useState("");
   const nextCustomIdRef = useRef(1);
 
-  // Restore draft on mount
+  // Restore draft on mount (IndexedDB, not localStorage — large files need far more than
+  // the ~5-10MB quota, and the previous localStorage code failed silently past that limit).
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (!raw) return;
-      const d = JSON.parse(raw);
+    loadDraft().then(d => {
       if (d?.rows?.length) {
         setHeaders(d.headers || []);
         setRows(d.rows || []);
@@ -168,28 +212,26 @@ const ApplicantsMappedImport = ({ onChanged }: Props) => {
         setFileName(d.fileName || "");
         setSavedAt(d.savedAt || "");
         setCustomFields(d.customFields || []);
+        setSourceSheets(d.sourceSheets || []);
       }
-    } catch {}
+    }).catch(() => {});
   }, []);
 
-  // Persist draft whenever data changes
+  // Persist draft whenever data changes (debounced so we don't rewrite tens of MB on every
+  // single toggle/keystroke).
   useEffect(() => {
     if (rows.length === 0) return;
-    try {
-      const payload = JSON.stringify({
-        headers, rows, mapping, enabled, fileName, customFields,
-        savedAt: new Date().toISOString(),
-      });
-      localStorage.setItem(STORAGE_KEY, payload);
-      setSavedAt(new Date().toISOString());
-    } catch (e) {
-      // quota exceeded — silently drop the rows from persistence
-      try { localStorage.removeItem(STORAGE_KEY); } catch {}
-    }
-  }, [headers, rows, mapping, enabled, fileName, customFields]);
+    const t = setTimeout(() => {
+      const savedAtNow = new Date().toISOString();
+      saveDraft({ headers, rows, mapping, enabled, fileName, customFields, sourceSheets, savedAt: savedAtNow })
+        .then(() => setSavedAt(savedAtNow))
+        .catch(() => toast.error("تعذّر حفظ المسودة تلقائياً (مساحة التخزين في المتصفح ممتلئة) — يفضّل عدم إغلاق الصفحة قبل إكمال الاستيراد."));
+    }, 600);
+    return () => clearTimeout(t);
+  }, [headers, rows, mapping, enabled, fileName, customFields, sourceSheets]);
 
   const clearDraft = () => {
-    localStorage.removeItem(STORAGE_KEY);
+    clearDraftDb().catch(() => {});
     setHeaders([]); setRows([]); setMapping({}); setEnabled({});
     setFileName(""); setSavedAt(""); setResult(null);
     setRawSheet(null); setShowHeaderPicker(false); setHeaderRowIdx(0);
@@ -570,6 +612,58 @@ const ApplicantsMappedImport = ({ onChanged }: Props) => {
   const [sourceCompany, setSourceCompany] = useState<string>("");
   const cancelRef = useRef<boolean>(false);
 
+  // Import history: every import run is recorded in applicant_import_jobs (DB-backed, not
+  // just React state) so it survives a closed tab, a crashed browser, or a phone that went
+  // to sleep mid-import — the user can always come back and see exactly what happened.
+  const [jobHistory, setJobHistory] = useState<any[]>([]);
+  const [showHistory, setShowHistory] = useState(false);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [staleJob, setStaleJob] = useState<any | null>(null);
+  const STALE_AFTER_MS = 2 * 60 * 1000;
+
+  const loadJobHistory = async () => {
+    setLoadingHistory(true);
+    try {
+      const { data, error } = await supabase
+        .from("applicant_import_jobs")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(20);
+      if (error) throw error;
+      setJobHistory(data || []);
+    } catch (e: any) {
+      toast.error(e.message || "تعذّر تحميل سجل الاستيراد");
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
+  // When the tool is opened, check whether a previous import was left "running" — i.e. the
+  // tab/browser died before it could mark itself completed/failed/cancelled — and surface it.
+  useEffect(() => {
+    if (!open) return;
+    (async () => {
+      const { data } = await supabase
+        .from("applicant_import_jobs")
+        .select("*")
+        .eq("status", "running")
+        .order("created_at", { ascending: false })
+        .limit(1);
+      const job = data?.[0];
+      setStaleJob(job && Date.now() - new Date(job.updated_at).getTime() > STALE_AFTER_MS ? job : null);
+    })();
+  }, [open]);
+
+  const downloadJobErrors = (job: any) => {
+    if (!job?.errors?.length) return;
+    const ws = XLSX.utils.json_to_sheet(job.errors.map((e: any) => ({
+      row: e.row, name: e.name, errors: Array.isArray(e.errors) ? e.errors.join(" | ") : e.errors,
+    })));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Errors");
+    XLSX.writeFile(wb, `import_errors_${String(job.file_name || job.id).replace(/[^\w.-]+/g, "_")}.xlsx`);
+  };
+
   const dupKeys = (r: any) => {
     const n = String(r.full_name || "").trim().toLowerCase().replace(/\s+/g, " ");
     const p = String(r.phone || "").replace(/\D/g, "");
@@ -604,17 +698,48 @@ const ApplicantsMappedImport = ({ onChanged }: Props) => {
     let updated = 0;
     let skipped = 0;
     const errors: any[] = [...localErrors];
+
+    // Record this run in applicant_import_jobs right away — before the slow duplicate-check
+    // phase even starts — so a durable record exists no matter how early the tab dies. This
+    // tracking is best-effort: if it fails, the import itself must still proceed normally.
+    let jobId: string | null = null;
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      const { data: job } = await supabase.from("applicant_import_jobs").insert({
+        file_name: fileName || null,
+        source_sheets: sourceSheets.length ? sourceSheets : null,
+        import_source: importSource,
+        source_company: importSource === "external" ? (sourceCompany.trim() || null) : null,
+        status: "running",
+        total_rows: valid.length + localErrors.length,
+        imported_by: userData.user?.id || null,
+        imported_by_email: userData.user?.email || null,
+      }).select("id").single();
+      jobId = job?.id || null;
+    } catch { /* best-effort tracking only */ }
+
+    const updateJob = async (patch: Record<string, any>) => {
+      if (!jobId) return;
+      try { await supabase.from("applicant_import_jobs").update(patch).eq("id", jobId); } catch { /* best-effort */ }
+    };
+
     try {
       if (valid.length === 0) {
         setResult({ inserted: 0, failed: errors.length, total: errors.length, errors: errors.slice(0, 500) });
         toast.error("لا توجد صفوف صالحة للحفظ؛ راجع تقرير الأخطاء.");
+        await updateJob({ status: "failed", error_message: "لا توجد صفوف صالحة للحفظ", failed_rows: errors.length, errors: errors.slice(0, 1000) });
         return;
       }
 
-      // Build duplicate index from existing applicants (paginated)
+      // Build duplicate index from existing applicants (paginated) — shown on the same
+      // progress bar as the rest of the import so this phase (which can take a while on a
+      // large applicants table) doesn't look frozen.
       const existingMap = new Map<string, { id: string | null; record: any; pendingIdx?: number }>();
       if (skipDuplicates) {
-        setCurrentName("جاري تحميل المتقدمين الحاليين للمقارنة...");
+        const { count: existingTotal } = await supabase.from("applicants").select("id", { count: "exact", head: true });
+        let loaded = 0;
+        setProgress({ done: 0, total: existingTotal || 1 });
+        setCurrentName(`جاري تحميل المتقدمين الحاليين للمقارنة... (0/${existingTotal ?? "?"})`);
         for (let from = 0; ; from += 1000) {
           const { data, error } = await supabase
             .from("applicants")
@@ -627,6 +752,9 @@ const ApplicantsMappedImport = ({ onChanged }: Props) => {
               if (!prev || richness(row) > richness(prev.record)) existingMap.set(k, { id: row.id, record: row });
             }
           });
+          loaded += (data || []).length;
+          setProgress({ done: Math.min(loaded, existingTotal || loaded), total: existingTotal || loaded });
+          setCurrentName(`جاري تحميل المتقدمين الحاليين للمقارنة... (${loaded}/${existingTotal ?? "?"})`);
           if (!data || data.length < 1000) break;
         }
       }
@@ -713,6 +841,9 @@ const ApplicantsMappedImport = ({ onChanged }: Props) => {
         done += batch.length;
         setProgress({ done, total: totalWork });
         setResult({ inserted, updated, skipped, failed: errors.length, total: valid.length + localErrors.length, errors: errors.slice(0, 500) });
+        // Persist progress counts after every batch — this is what makes the job durable:
+        // even if the tab dies on the very next line, the DB already reflects what was saved.
+        await updateJob({ inserted_rows: inserted, updated_rows: updated, skipped_rows: skipped, failed_rows: errors.length });
       }
 
       // Phase 3: timestamp-only updates for rows that duplicate an already-existing DB record.
@@ -727,6 +858,7 @@ const ApplicantsMappedImport = ({ onChanged }: Props) => {
         } else {
           setRecentLog(p => [{ name: u.name, ok: true, msg: "تم تحديث وقت التقديم فقط" }, ...p].slice(0, 15));
         }
+        await updateJob({ inserted_rows: inserted, updated_rows: updated, skipped_rows: skipped, failed_rows: errors.length });
         done += 1;
         setProgress({ done, total: totalWork });
         setResult({ inserted, updated, skipped, failed: errors.length, total: valid.length + localErrors.length, errors: errors.slice(0, 500) });
@@ -734,6 +866,11 @@ const ApplicantsMappedImport = ({ onChanged }: Props) => {
 
       setProgress({ done: totalWork, total: totalWork });
       setResult({ inserted, updated, skipped, failed: errors.length, total: valid.length + localErrors.length, errors: errors.slice(0, 500), cancelled: cancelRef.current });
+      await updateJob({
+        status: cancelRef.current ? "cancelled" : "completed",
+        inserted_rows: inserted, updated_rows: updated, skipped_rows: skipped, failed_rows: errors.length,
+        errors: errors.slice(0, 1000),
+      });
       if (inserted > 0 || updated > 0) {
         toast.success(`تم: ${inserted} جديد · ${updated} محدّث · ${skipped} متخطى`);
         onChanged();
@@ -743,6 +880,7 @@ const ApplicantsMappedImport = ({ onChanged }: Props) => {
     } catch (err: any) {
       toast.error(err.message);
       setResult({ error: err.message, inserted, failed: errors.length, total: valid.length, errors });
+      await updateJob({ status: "failed", error_message: String(err.message || err), inserted_rows: inserted, updated_rows: updated, skipped_rows: skipped, failed_rows: errors.length, errors: errors.slice(0, 1000) });
     } finally {
       setLoading(false);
       setCurrentName("");
@@ -789,11 +927,25 @@ const ApplicantsMappedImport = ({ onChanged }: Props) => {
           </DialogHeader>
 
           <div className="flex-1 overflow-auto space-y-4 pr-1">
+            {staleJob && (
+              <div className="rounded-lg border border-amber-300 bg-amber-50 dark:bg-amber-950/20 p-3 text-sm flex items-center justify-between gap-2 flex-wrap">
+                <span>
+                  ⚠️ توجد عملية استيراد سابقة لم تكتمل (الملف: <b>{staleJob.file_name || "—"}</b> —
+                  {" "}{staleJob.inserted_rows} محفوظ من {staleJob.total_rows}، توقفت منذ
+                  {" "}{Math.round((Date.now() - new Date(staleJob.updated_at).getTime()) / 60000)} دقيقة).
+                  {" "}إذا كان نفس الملف محمّلاً بالأسفل، اضغط "حفظ" مرة أخرى لإكمالها بأمان دون تكرار ما تم حفظه.
+                </span>
+                <Button size="sm" variant="outline" onClick={() => { setShowHistory(true); loadJobHistory(); }}>عرض السجل</Button>
+              </div>
+            )}
             <div className="flex flex-wrap gap-2 items-center">
               <Button onClick={() => fileRef.current?.click()} className="gap-1">
                 <Upload className="w-4 h-4" /> اختر ملف Excel / CSV
               </Button>
               <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" onChange={handleFile} className="hidden" />
+              <Button size="sm" variant="outline" className="gap-1" onClick={() => { setShowHistory(true); loadJobHistory(); }}>
+                <History className="w-3.5 h-3.5" /> سجل عمليات الاستيراد
+              </Button>
               {headers.length > 0 && (
                 <span className="text-sm text-muted-foreground">
                   {fileName && <b className="me-1">{fileName}</b>}
@@ -1117,6 +1269,69 @@ const ApplicantsMappedImport = ({ onChanged }: Props) => {
             </Button>
           </div>
 
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showHistory} onOpenChange={setShowHistory}>
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle>سجل عمليات الاستيراد</DialogTitle>
+            <DialogDescription>
+              آخر 20 عملية استيراد — تبقى محفوظة حتى لو أُغلق المتصفح أو توقفت العملية بالنص.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex-1 overflow-auto space-y-2">
+            {loadingHistory && (
+              <div className="text-sm text-muted-foreground flex items-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin" /> جارٍ التحميل...
+              </div>
+            )}
+            {!loadingHistory && jobHistory.length === 0 && (
+              <div className="text-sm text-muted-foreground">لا توجد عمليات استيراد سابقة.</div>
+            )}
+            {jobHistory.map(job => {
+              const isStaleRunning = job.status === "running" && Date.now() - new Date(job.updated_at).getTime() > STALE_AFTER_MS;
+              const statusLabel = isStaleRunning
+                ? "متوقفة (لم تكتمل)"
+                : job.status === "running" ? "قيد التنفيذ..."
+                : job.status === "completed" ? "مكتملة"
+                : job.status === "cancelled" ? "أوقفت يدوياً"
+                : "فشلت";
+              const statusColor = isStaleRunning ? "text-amber-600"
+                : job.status === "running" ? "text-primary"
+                : job.status === "completed" ? "text-emerald-600"
+                : job.status === "cancelled" ? "text-muted-foreground"
+                : "text-destructive";
+              return (
+                <div key={job.id} className="rounded-lg border p-3 text-sm space-y-1">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <b>{job.file_name || "—"}</b>
+                    <span className={statusColor}>{statusLabel}</span>
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {new Date(job.created_at).toLocaleString("ar")}
+                    {job.imported_by_email ? ` · ${job.imported_by_email}` : ""}
+                  </div>
+                  <div className="flex gap-3 flex-wrap text-xs">
+                    <span>الإجمالي: {job.total_rows}</span>
+                    <span className="text-emerald-600">جديد: {job.inserted_rows}</span>
+                    <span className="text-primary">محدّث: {job.updated_rows}</span>
+                    <span className="text-muted-foreground">متخطى: {job.skipped_rows}</span>
+                    <span className="text-destructive">فشل: {job.failed_rows}</span>
+                  </div>
+                  {job.error_message && <div className="text-xs text-destructive">{job.error_message}</div>}
+                  {job.errors?.length > 0 && (
+                    <Button size="sm" variant="outline" className="gap-1" onClick={() => downloadJobErrors(job)}>
+                      <Download className="w-3.5 h-3.5" /> تقرير الأخطاء
+                    </Button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          <div className="flex justify-end pt-3 border-t mt-3">
+            <Button variant="outline" onClick={() => setShowHistory(false)}>إغلاق</Button>
+          </div>
         </DialogContent>
       </Dialog>
     </>
