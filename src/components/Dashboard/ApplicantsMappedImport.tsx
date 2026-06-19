@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Upload, FileSpreadsheet, Loader2, CheckCircle2, AlertTriangle, Download, Wand2, History } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { dupKeys, richness } from "@/lib/applicantDuplicates";
 
 // Target fields with Arabic labels (subset of applicants table)
 const TARGETS: { key: string; label: string; required?: boolean }[] = [
@@ -117,7 +118,7 @@ const AUTO_MAP_PRESETS: { match: (h: string) => boolean; target: string }[] = [
 ];
 
 
-interface Props { onChanged: () => void; }
+interface Props { onChanged: () => void | Promise<void>; onImportComplete?: () => void; }
 
 const ALLOWED_STATUSES = new Set(["new", "reviewing", "phone_interview", "in_person_interview", "accepted", "hired", "rejected", "withdrawn"]);
 
@@ -168,7 +169,7 @@ const clearDraftDb = async (): Promise<void> => {
   db.close();
 };
 
-const ApplicantsMappedImport = ({ onChanged }: Props) => {
+const ApplicantsMappedImport = ({ onChanged, onImportComplete }: Props) => {
   const fileRef = useRef<HTMLInputElement>(null);
   const [open, setOpen] = useState(false);
   const [headers, setHeaders] = useState<string[]>([]);
@@ -664,22 +665,6 @@ const ApplicantsMappedImport = ({ onChanged }: Props) => {
     XLSX.writeFile(wb, `import_errors_${String(job.file_name || job.id).replace(/[^\w.-]+/g, "_")}.xlsx`);
   };
 
-  const dupKeys = (r: any) => {
-    const n = String(r.full_name || "").trim().toLowerCase().replace(/\s+/g, " ");
-    const p = String(r.phone || "").replace(/\D/g, "");
-    const e = String(r.email || "").trim().toLowerCase();
-    const pos = String(r.desired_position || "").trim().toLowerCase();
-    const keys: string[] = [];
-    if (n && p && e && pos) keys.push(`all:${n}|${p}|${e}|${pos}`);
-    if (n && p && pos) keys.push(`name_phone_pos:${n}|${p}|${pos}`);
-    if (n && e && pos) keys.push(`name_email_pos:${n}|${e}|${pos}`);
-    if (n && p && e) keys.push(`name_phone_email:${n}|${p}|${e}`);
-    if (n && p) keys.push(`name_phone:${n}|${p}`);
-    if (n && e) keys.push(`name_email:${n}|${e}`);
-    return keys;
-  };
-  const richness = (r: any) => Object.values(r).filter(v => v != null && String(v).trim() !== "").length;
-
   const INSERT_BATCH_SIZE = 500;
 
   const submit = async () => {
@@ -873,7 +858,10 @@ const ApplicantsMappedImport = ({ onChanged }: Props) => {
       });
       if (inserted > 0 || updated > 0) {
         toast.success(`تم: ${inserted} جديد · ${updated} محدّث · ${skipped} متخطى`);
-        onChanged();
+        await onChanged();
+        // Only newly inserted rows can introduce duplicates the import's own matching missed
+        // (e.g. legacy rows it has no key overlap with) — updated/skipped rows were already deduped.
+        if (inserted > 0) onImportComplete?.();
       }
       if (errors.length > 0) toast.warning(`${errors.length} صف لم يُحفظ — راجع التقرير`);
       if (inserted === 0 && updated === 0 && !cancelRef.current) toast.error("لم يتم حفظ أي صف؛ راجع تقرير الأخطاء.");
