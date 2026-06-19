@@ -135,6 +135,11 @@ const ApplicantsMappedImport = ({ onChanged }: Props) => {
   const [enabled, setEnabled] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
+  // Raw sheet rows (no header inferred yet) — lets the user pick which row holds the real
+  // column titles instead of forcing them to delete title/blank rows from the file first.
+  const [rawSheet, setRawSheet] = useState<any[][] | null>(null);
+  const [headerRowIdx, setHeaderRowIdx] = useState<number>(0);
+  const [showHeaderPicker, setShowHeaderPicker] = useState(false);
 
   // Restore draft on mount
   useEffect(() => {
@@ -173,6 +178,7 @@ const ApplicantsMappedImport = ({ onChanged }: Props) => {
     localStorage.removeItem(STORAGE_KEY);
     setHeaders([]); setRows([]); setMapping({}); setEnabled({});
     setFileName(""); setSavedAt(""); setResult(null);
+    setRawSheet(null); setShowHeaderPicker(false); setHeaderRowIdx(0);
     toast.success("تم مسح المسودة");
   };
 
@@ -194,6 +200,17 @@ const ApplicantsMappedImport = ({ onChanged }: Props) => {
     return { map, en };
   };
 
+  // Guess which of the first few rows holds the real column titles: title/blank rows
+  // usually have far fewer filled cells than an actual header row.
+  const guessHeaderRow = (raw: any[][]): number => {
+    let best = 0, bestScore = -1;
+    for (let i = 0; i < Math.min(raw.length, 15); i++) {
+      const nonEmpty = (raw[i] || []).filter(c => String(c ?? "").trim() !== "").length;
+      if (nonEmpty > bestScore) { bestScore = nonEmpty; best = i; }
+    }
+    return best;
+  };
+
   const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -201,22 +218,49 @@ const ApplicantsMappedImport = ({ onChanged }: Props) => {
       const buf = await file.arrayBuffer();
       const wb = XLSX.read(buf, { type: "array", cellDates: true });
       const ws = wb.Sheets[wb.SheetNames[0]];
-      const json: any[] = XLSX.utils.sheet_to_json(ws, { defval: "", raw: false, dateNF: 'yyyy-mm-dd"T"hh:mm:ss' });
-      if (json.length === 0) throw new Error("الملف فارغ");
-      const hdrs = Object.keys(json[0]);
-      setHeaders(hdrs);
-      setRows(json);
+      const raw: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, defval: "", raw: false, dateNF: 'yyyy-mm-dd"T"hh:mm:ss' });
+      if (raw.length === 0) throw new Error("الملف فارغ");
+      setRawSheet(raw);
       setFileName(file.name);
-      const { map, en } = autoMap(hdrs);
-      setMapping(map);
-      setEnabled(en);
+      setHeaders([]);
+      setRows([]);
       setResult(null);
-      toast.success(`تم تحميل ${json.length} صف. تم ربط ${Object.values(map).filter(Boolean).length} حقل تلقائياً.`);
+      setHeaderRowIdx(guessHeaderRow(raw));
+      setShowHeaderPicker(true);
     } catch (err: any) {
       toast.error(err.message);
     } finally {
       if (fileRef.current) fileRef.current.value = "";
     }
+  };
+
+  const applyHeaderRow = (idx: number) => {
+    if (!rawSheet) return;
+    const headerCells = rawSheet[idx] || [];
+    const seen = new Map<string, number>();
+    const hdrs = headerCells.map((c, i) => {
+      let name = String(c ?? "").trim();
+      if (!name) name = `عمود ${i + 1}`;
+      const count = seen.get(name) || 0;
+      seen.set(name, count + 1);
+      return count > 0 ? `${name} (${count + 1})` : name;
+    });
+    const dataRows = rawSheet
+      .slice(idx + 1)
+      .filter(r => r.some(c => String(c ?? "").trim() !== ""))
+      .map(r => {
+        const obj: Record<string, any> = {};
+        hdrs.forEach((h, i) => { obj[h] = r[i] ?? ""; });
+        return obj;
+      });
+    setHeaders(hdrs);
+    setRows(dataRows);
+    setHeaderRowIdx(idx);
+    setShowHeaderPicker(false);
+    const { map, en } = autoMap(hdrs);
+    setMapping(map);
+    setEnabled(en);
+    toast.success(`تم تحميل ${dataRows.length} صف. تم ربط ${Object.values(map).filter(Boolean).length} حقل تلقائياً.`);
   };
 
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
@@ -667,6 +711,11 @@ const ApplicantsMappedImport = ({ onChanged }: Props) => {
                   مسح المسودة
                 </Button>
               )}
+              {rawSheet && !showHeaderPicker && (
+                <Button size="sm" variant="outline" onClick={() => setShowHeaderPicker(true)}>
+                  تغيير صف العناوين
+                </Button>
+              )}
               <div className="flex items-center gap-2 ms-auto">
                 <label className="flex items-center gap-1.5 text-xs cursor-pointer">
                   <Switch checked={skipDuplicates} onCheckedChange={setSkipDuplicates} />
@@ -674,6 +723,43 @@ const ApplicantsMappedImport = ({ onChanged }: Props) => {
                 </label>
               </div>
             </div>
+
+            {rawSheet && showHeaderPicker && (
+              <div className="rounded-lg border p-3 space-y-2">
+                <div className="text-sm font-semibold">
+                  حدد الصف الذي يحتوي على عناوين الأعمدة (الاسم، الجنس، البريد...)
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  اضغط على رقم الصف الصحيح من القائمة أدناه، ثم اضغط "تأكيد". الصفوف فوقه (عنوان/فراغ) سيتم تجاهلها تلقائياً.
+                </div>
+                <div className="max-h-[40vh] overflow-auto border rounded-md divide-y">
+                  {rawSheet.slice(0, 15).map((r, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => setHeaderRowIdx(idx)}
+                      className={`w-full flex items-stretch text-start ${idx === headerRowIdx ? "bg-primary/10" : "hover:bg-muted/40"}`}
+                    >
+                      <span className={`shrink-0 w-9 flex items-center justify-center text-xs font-mono ${idx === headerRowIdx ? "bg-primary text-primary-foreground" : "bg-muted/50"}`}>
+                        {idx + 1}
+                      </span>
+                      <span className="flex-1 overflow-x-auto flex gap-1.5 px-2 py-1.5 whitespace-nowrap">
+                        {r.slice(0, 30).map((c, ci) => (
+                          <span key={ci} className="px-1.5 py-0.5 rounded bg-muted/40 border text-[11px]">
+                            {String(c ?? "").trim() || "—"}
+                          </span>
+                        ))}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button size="sm" onClick={() => applyHeaderRow(headerRowIdx)}>
+                    تأكيد الصف {headerRowIdx + 1} كعناوين الأعمدة
+                  </Button>
+                </div>
+              </div>
+            )}
 
             {/* مصدر البيانات */}
             <div className="rounded-lg border p-3 bg-amber-50 dark:bg-amber-950/20 space-y-2">
