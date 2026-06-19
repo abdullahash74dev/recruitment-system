@@ -118,7 +118,7 @@ const AUTO_MAP_PRESETS: { match: (h: string) => boolean; target: string }[] = [
 ];
 
 
-interface Props { onChanged: () => void; }
+interface Props { onChanged: () => void | Promise<void>; onImportComplete?: () => void; }
 
 const ALLOWED_STATUSES = new Set(["new", "reviewing", "phone_interview", "in_person_interview", "accepted", "hired", "rejected", "withdrawn"]);
 
@@ -169,7 +169,7 @@ const clearDraftDb = async (): Promise<void> => {
   db.close();
 };
 
-const ApplicantsMappedImport = ({ onChanged }: Props) => {
+const ApplicantsMappedImport = ({ onChanged, onImportComplete }: Props) => {
   const fileRef = useRef<HTMLInputElement>(null);
   const [open, setOpen] = useState(false);
   const [headers, setHeaders] = useState<string[]>([]);
@@ -858,7 +858,10 @@ const ApplicantsMappedImport = ({ onChanged }: Props) => {
       });
       if (inserted > 0 || updated > 0) {
         toast.success(`تم: ${inserted} جديد · ${updated} محدّث · ${skipped} متخطى`);
-        onChanged();
+        await onChanged();
+        // Only newly inserted rows can introduce duplicates the import's own matching missed
+        // (e.g. legacy rows it has no key overlap with) — updated/skipped rows were already deduped.
+        if (inserted > 0) onImportComplete?.();
       }
       if (errors.length > 0) toast.warning(`${errors.length} صف لم يُحفظ — راجع التقرير`);
       if (inserted === 0 && updated === 0 && !cancelRef.current) toast.error("لم يتم حفظ أي صف؛ راجع تقرير الأخطاء.");

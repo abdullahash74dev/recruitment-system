@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
@@ -25,6 +25,8 @@ interface Applicant {
 interface Props {
   applicants: any[];
   onChanged: () => void;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }
 
 // How many ids to send per request — keeps a single .in() filter from growing unbounded.
@@ -49,9 +51,8 @@ const chunk = (ids: string[]): string[][] => {
   return out;
 };
 
-export default function ApplicantsDuplicateCleanup({ applicants, onChanged }: Props) {
+export default function ApplicantsDuplicateCleanup({ applicants, onChanged, open, onOpenChange }: Props) {
   const { requestDelete } = useDeletePin();
-  const [open, setOpen] = useState(false);
   const [scanned, setScanned] = useState(false);
   const [groups, setGroups] = useState<Applicant[][]>([]);
   const [keepIds, setKeepIds] = useState<Record<string, string>>({});
@@ -71,6 +72,12 @@ export default function ApplicantsDuplicateCleanup({ applicants, onChanged }: Pr
     setVisibleCount(25);
     setScanned(true);
   };
+
+  // Re-scan every time the dialog opens — whether opened manually or right after an import finishes.
+  useEffect(() => {
+    if (open) runScan();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   const filteredGroups = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -135,14 +142,14 @@ export default function ApplicantsDuplicateCleanup({ applicants, onChanged }: Pr
       <div className="flex flex-wrap items-center gap-2 p-3 rounded-lg border bg-muted/30">
         <Copy className="w-4 h-4 text-muted-foreground" />
         <span className="text-sm font-semibold">كشف وتنظيف المكررات:</span>
-        <Button size="sm" variant="outline" onClick={() => { setOpen(true); runScan(); }} className="gap-1">
+        <Button size="sm" variant="outline" onClick={() => onOpenChange(true)} className="gap-1">
           <Search className="w-3.5 h-3.5" />
           فحص المتقدمين الحاليين ({applicants.length})
         </Button>
-        <span className="text-xs text-muted-foreground">يبحث عن تكرار سابق بين كل المتقدمين المسجلين فعلياً، ويتيح أرشفة أو حذف النسخ الزائدة بأمان.</span>
+        <span className="text-xs text-muted-foreground">يبحث عن تكرار سابق بين كل المتقدمين المسجلين فعلياً، ويتيح أرشفة أو حذف النسخ الزائدة بأمان. يفتح تلقائياً أيضاً بعد كل استيراد ناجح.</span>
       </div>
 
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2"><Copy className="w-5 h-5 text-primary" />مراجعة المكررات</DialogTitle>
@@ -166,10 +173,10 @@ export default function ApplicantsDuplicateCleanup({ applicants, onChanged }: Pr
                 <Input value={search} onChange={e => { setSearch(e.target.value); setVisibleCount(25); }} placeholder="ابحث بالاسم / الجوال / الإيميل داخل المجموعات" className="max-w-sm" />
                 <span className="text-xs text-muted-foreground">{activeGroups.length} مجموعة قيد المراجعة{ignored.size > 0 ? ` · تم تجاوز ${ignored.size}` : ""}</span>
                 <div className="flex gap-2 ms-auto">
-                  <Button size="sm" variant="outline" disabled={busy || removalIds.length === 0} onClick={archiveSelected} className="gap-1">
+                  <Button size="sm" variant="default" disabled={busy || removalIds.length === 0} onClick={archiveSelected} className="gap-1">
                     {busy ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Archive className="w-3.5 h-3.5" />} أرشفة المقترح للإزالة ({removalIds.length})
                   </Button>
-                  <Button size="sm" variant="destructive" disabled={busy || removalIds.length === 0} onClick={deleteSelected} className="gap-1">
+                  <Button size="sm" variant="outline" disabled={busy || removalIds.length === 0} onClick={deleteSelected} className="gap-1 text-destructive border-destructive/40 hover:bg-destructive/10">
                     <Trash2 className="w-3.5 h-3.5" /> حذف نهائي ({removalIds.length})
                   </Button>
                 </div>

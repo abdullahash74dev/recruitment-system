@@ -166,6 +166,7 @@ const DashboardPage = () => {
   const { navStyle } = useTheme();
   const { permissions, hasPermission, role: currentUserRole, loading: permsLoading } = useUserPermissions();
   const { requestDelete } = useDeletePin();
+  const [dupCleanupOpen, setDupCleanupOpen] = useState(false);
   const [applicants, setApplicants] = useState<Applicant[]>([]);
   const [jobs, setJobs] = useState<JobPosting[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -800,7 +801,13 @@ const DashboardPage = () => {
           )}
           {/* APPLICANTS TAB */}
           <TabsContent value="applicants">
-            {isAdmin && <div className="mb-3 space-y-2"><ApplicantsImport onChanged={fetchApplicants} /><ApplicantsMappedImport onChanged={fetchApplicants} /><ApplicantsDuplicateCleanup applicants={applicants} onChanged={fetchApplicants} /></div>}
+            {isAdmin && (
+              <div className="mb-3 space-y-2">
+                <ApplicantsImport onChanged={fetchApplicants} onImportComplete={() => setDupCleanupOpen(true)} />
+                <ApplicantsMappedImport onChanged={fetchApplicants} onImportComplete={() => setDupCleanupOpen(true)} />
+                <ApplicantsDuplicateCleanup applicants={applicants} onChanged={fetchApplicants} open={dupCleanupOpen} onOpenChange={setDupCleanupOpen} />
+              </div>
+            )}
             <ApplicantsAdvancedFilters
               applicants={activeApplicants}
               lang={lang}

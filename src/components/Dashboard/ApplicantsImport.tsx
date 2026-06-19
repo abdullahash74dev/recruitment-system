@@ -34,9 +34,9 @@ const HEADERS_AR: Record<string, string> = {
   notes: "ملاحظات", status: "الحالة (new/reviewing/...)",
 };
 
-interface Props { onChanged: () => void; }
+interface Props { onChanged: () => void | Promise<void>; onImportComplete?: () => void; }
 
-const ApplicantsImport = ({ onChanged }: Props) => {
+const ApplicantsImport = ({ onChanged, onImportComplete }: Props) => {
   const { lang } = useLanguage();
   const fileRef = useRef<HTMLInputElement>(null);
   const [open, setOpen] = useState(false);
@@ -116,7 +116,8 @@ const ApplicantsImport = ({ onChanged }: Props) => {
       setResult(data);
       if (data.inserted > 0) {
         toast.success(lang === "ar" ? `تم استيراد ${data.inserted} متقدم` : `Imported ${data.inserted} applicants`);
-        onChanged();
+        await onChanged();
+        onImportComplete?.();
       }
       if (data.failed > 0) {
         toast.warning(lang === "ar" ? `${data.failed} صف مرفوض - راجع التقرير` : `${data.failed} rows rejected - see report`);
