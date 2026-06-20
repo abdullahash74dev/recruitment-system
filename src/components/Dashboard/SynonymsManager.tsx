@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { Loader2, Sparkles, Trash2, Plus, RefreshCw, ShieldAlert } from "lucide-react";
 import { useValueSynonyms, normText } from "@/hooks/useValueSynonyms";
 import ApplyNormalizationDialog from "./ApplyNormalizationDialog";
+import { getFunctionErrorMessage } from "@/lib/functionError";
 
 type Row = { id: string; field_name: string; canonical_ar: string; canonical_en: string | null; synonyms: string[]; is_active: boolean };
 
@@ -175,7 +176,7 @@ export default function SynonymsManager() {
       body: { field_name: activeField, source_table: opt.table, source_column: opt.column, autosave: true },
     });
     setAiBusy(false);
-    if (error) return toast.error(error.message);
+    if (error) return toast.error(await getFunctionErrorMessage(error, "فشل الاقتراح بالذكاء الاصطناعي"));
     toast.success(`تم اقتراح وحفظ ${data?.groups?.length || 0} مجموعة`);
     load();
   };
