@@ -288,7 +288,9 @@ const DashboardPage = () => {
     try {
       const FIRST_BATCH = 200; // small enough to land almost instantly, regardless of table size
       const PAGE_SIZE = 1000;
-      const CONCURRENCY = 6; // fetch several pages at once instead of one round-trip at a time
+      const CONCURRENCY = 4; // fetch several pages at once, but not so many that a slow/mobile link gets saturated
+      const PAGE_TIMEOUT_MS = 20000; // a single stalled request on a flaky connection must not freeze the whole load forever
+      const MAX_RETRIES = 2;
 
       // First paint: grab just enough rows for page 1 of the table + rough stats, with an exact total count.
       const { data: firstData, error: firstError, count } = await supabase
@@ -305,24 +307,54 @@ const DashboardPage = () => {
       if (total <= first.length) return; // already have everything
 
       // Background: stream in the rest in parallel batches, merging as each batch lands.
+      // Each page gets its own timeout + a couple of retries so one bad request (common on
+      // mobile data) can't hang the whole background load indefinitely.
+      const fetchPage = async (from: number, to: number): Promise<Applicant[]> => {
+        for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+          try {
+            const result = await Promise.race([
+              supabase.from("applicants").select("*").order("created_at", { ascending: false }).range(from, to),
+              new Promise<never>((_, reject) => setTimeout(() => reject(new Error("timeout")), PAGE_TIMEOUT_MS)),
+            ]);
+            if (result.error) throw result.error;
+            return (result.data || []) as Applicant[];
+          } catch (e) {
+            if (attempt === MAX_RETRIES) {
+              console.error(`Failed to load applicants range ${from}-${to} after ${MAX_RETRIES + 1} attempts`, e);
+              return [];
+            }
+            await new Promise((r) => setTimeout(r, 1000 * (attempt + 1))); // backoff before retrying
+          }
+        }
+        return [];
+      };
+
       const remainingStart = first.length;
       const pageCount = Math.ceil((total - remainingStart) / PAGE_SIZE);
       const pages: Applicant[][] = new Array(pageCount);
       let loaded = first.length;
+      let failedPages = 0;
       for (let start = 0; start < pageCount; start += CONCURRENCY) {
         const batch = Array.from({ length: Math.min(CONCURRENCY, pageCount - start) }, (_, i) => start + i);
         const results = await Promise.all(batch.map(p => {
           const from = remainingStart + p * PAGE_SIZE;
-          return supabase.from("applicants").select("*").order("created_at", { ascending: false }).range(from, from + PAGE_SIZE - 1);
+          return fetchPage(from, from + PAGE_SIZE - 1);
         }));
         for (let i = 0; i < results.length; i++) {
-          const { data, error } = results[i];
-          if (error) { toast.error(error.message); return; }
-          pages[batch[i]] = (data || []) as Applicant[];
-          loaded += (data || []).length;
+          pages[batch[i]] = results[i];
+          loaded += results[i].length;
+          if (results[i].length === 0) failedPages++;
         }
         setApplicants([...first, ...pages.flat()]);
         setApplicantsLoadProgress({ loaded, total });
+      }
+      if (failedPages > 0) {
+        setApplicantsLoadProgress({ loaded: total, total }); // stop showing "still loading" — we're done retrying
+        toast.error(
+          lang === "ar"
+            ? `تعذّر تحميل بعض البيانات (${failedPages} صفحة) بسبب ضعف الاتصال — أعد تحميل الصفحة للمحاولة مجدداً`
+            : `Some data (${failedPages} page${failedPages > 1 ? "s" : ""}) failed to load due to a weak connection — refresh to retry`
+        );
       }
     } finally {
       setApplicantsLoading(false);
