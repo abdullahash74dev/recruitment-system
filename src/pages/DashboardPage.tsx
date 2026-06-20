@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { supabase } from "@/integrations/supabase/client";
 import TopBar from "@/components/TopBar";
@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -161,6 +162,28 @@ const STATUS_COLORS: Record<ApplicantStatus, string> = {
 
 const CHART_COLORS = ["#3b82f6", "#eab308", "#a855f7", "#6366f1", "#22c55e", "#10b981", "#ef4444", "#6b7280"];
 
+// Small ring showing how much of a background fetch has landed so far (e.g. streaming in 45k+ rows).
+const CircularProgress = ({ percent, size = 44 }: { percent: number; size?: number }) => {
+  const stroke = 4;
+  const radius = (size - stroke) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference - (Math.min(100, Math.max(0, percent)) / 100) * circumference;
+  return (
+    <svg width={size} height={size} className="shrink-0">
+      <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="currentColor" strokeOpacity={0.15} strokeWidth={stroke} />
+      <circle
+        cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="currentColor" strokeWidth={stroke}
+        strokeDasharray={circumference} strokeDashoffset={offset} strokeLinecap="round"
+        transform={`rotate(-90 ${size / 2} ${size / 2})`}
+        className="text-primary transition-[stroke-dashoffset] duration-300"
+      />
+      <text x="50%" y="50%" textAnchor="middle" dy="0.32em" className="text-[10px] font-semibold fill-current">
+        {Math.round(percent)}%
+      </text>
+    </svg>
+  );
+};
+
 const DashboardPage = () => {
   const { t, dir, lang } = useLanguage();
   const { navStyle } = useTheme();
@@ -168,9 +191,14 @@ const DashboardPage = () => {
   const { requestDelete } = useDeletePin();
   const [dupCleanupOpen, setDupCleanupOpen] = useState(false);
   const [applicants, setApplicants] = useState<Applicant[]>([]);
+  const [applicantsLoading, setApplicantsLoading] = useState(true);
+  const [applicantsLoadProgress, setApplicantsLoadProgress] = useState({ loaded: 0, total: 0 });
   const [jobs, setJobs] = useState<JobPosting[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
+  const [searchTermDebounced, setSearchTermDebounced] = useState("");
   const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [applicantsPage, setApplicantsPage] = useState(1);
+  const [archivePage, setArchivePage] = useState(1);
   const [jobsSearch, setJobsSearch] = useState("");
   const [usersSearch, setUsersSearch] = useState("");
   const [projectsSearch, setProjectsSearch] = useState("");
@@ -190,6 +218,16 @@ const DashboardPage = () => {
     try { localStorage.setItem("akg-sidebar-collapsed", String(sidebarCollapsed)); }
     catch { /* ignore */ }
   }, [sidebarCollapsed]);
+
+  // Debounce search so filtering a large applicants list doesn't recompute on every keystroke.
+  useEffect(() => {
+    const id = setTimeout(() => setSearchTermDebounced(searchTerm), 250);
+    return () => clearTimeout(id);
+  }, [searchTerm]);
+
+  // Jump back to page 1 whenever the visible result set changes, so the pager never points past the end.
+  useEffect(() => { setApplicantsPage(1); }, [searchTermDebounced, filterStatus, advFilters, aiSelectedIds]);
+  useEffect(() => { setArchivePage(1); }, [searchTermDebounced]);
 
   // Job form state
   const [showJobForm, setShowJobForm] = useState(false);
@@ -243,19 +281,50 @@ const DashboardPage = () => {
   }, []);
 
   const fetchApplicants = async () => {
-    const pageSize = 1000;
-    const all: Applicant[] = [];
-    for (let from = 0; ; from += pageSize) {
-      const { data, error } = await supabase
+    setApplicantsLoading(true);
+    setApplicantsLoadProgress({ loaded: 0, total: 0 });
+    try {
+      const FIRST_BATCH = 200; // small enough to land almost instantly, regardless of table size
+      const PAGE_SIZE = 1000;
+      const CONCURRENCY = 6; // fetch several pages at once instead of one round-trip at a time
+
+      // First paint: grab just enough rows for page 1 of the table + rough stats, with an exact total count.
+      const { data: firstData, error: firstError, count } = await supabase
         .from("applicants")
-        .select("*")
+        .select("*", { count: "exact" })
         .order("created_at", { ascending: false })
-        .range(from, from + pageSize - 1);
-      if (error) { toast.error(error.message); return; }
-      all.push(...((data || []) as Applicant[]));
-      if (!data || data.length < pageSize) break;
+        .range(0, FIRST_BATCH - 1);
+      if (firstError) { toast.error(firstError.message); return; }
+      const total = count || 0;
+      const first = (firstData || []) as Applicant[];
+      setApplicants(first);
+      setApplicantsLoadProgress({ loaded: first.length, total });
+      setApplicantsLoading(false);
+      if (total <= first.length) return; // already have everything
+
+      // Background: stream in the rest in parallel batches, merging as each batch lands.
+      const remainingStart = first.length;
+      const pageCount = Math.ceil((total - remainingStart) / PAGE_SIZE);
+      const pages: Applicant[][] = new Array(pageCount);
+      let loaded = first.length;
+      for (let start = 0; start < pageCount; start += CONCURRENCY) {
+        const batch = Array.from({ length: Math.min(CONCURRENCY, pageCount - start) }, (_, i) => start + i);
+        const results = await Promise.all(batch.map(p => {
+          const from = remainingStart + p * PAGE_SIZE;
+          return supabase.from("applicants").select("*").order("created_at", { ascending: false }).range(from, from + PAGE_SIZE - 1);
+        }));
+        for (let i = 0; i < results.length; i++) {
+          const { data, error } = results[i];
+          if (error) { toast.error(error.message); return; }
+          pages[batch[i]] = (data || []) as Applicant[];
+          loaded += (data || []).length;
+        }
+        setApplicants([...first, ...pages.flat()]);
+        setApplicantsLoadProgress({ loaded, total });
+      }
+    } finally {
+      setApplicantsLoading(false);
     }
-    setApplicants(all);
   };
 
   const fetchJobs = async () => {
@@ -574,25 +643,53 @@ const DashboardPage = () => {
     setProjectForm(emptyProjectForm);
   };
 
-  const activeApplicants = applicants.filter(a => !a.is_archived);
-  const archivedApplicants = applicants.filter(a => a.is_archived);
+  const activeApplicants = useMemo(() => applicants.filter(a => !a.is_archived), [applicants]);
+  const archivedApplicants = useMemo(() => applicants.filter(a => a.is_archived), [applicants]);
 
-  const filtered = applyAdvancedFilters(
+  // Export / advanced-filter / duplicate-scan all need the *complete* dataset to be correct —
+  // lock them out while a background fetch is still streaming in the rest of the rows.
+  const dataStreaming = applicantsLoading || (applicantsLoadProgress.total > 0 && applicantsLoadProgress.loaded < applicantsLoadProgress.total);
+  const notifyStillLoading = () => toast.info(lang === "ar"
+    ? "انتظر اكتمال تحميل كل بيانات المتقدمين لاستخدام هذه الميزة"
+    : "Wait for all applicants data to finish loading to use this feature");
+
+  const filtered = useMemo(() => applyAdvancedFilters(
     activeApplicants.filter(a => {
-      const matchSearch = a.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        (a.desired_position || "").toLowerCase().includes(searchTerm.toLowerCase());
+      const matchSearch = a.full_name.toLowerCase().includes(searchTermDebounced.toLowerCase()) ||
+        (a.desired_position || "").toLowerCase().includes(searchTermDebounced.toLowerCase());
       const matchStatus = filterStatus === "all" || a.status === filterStatus;
       return matchSearch && matchStatus;
     }),
     advFilters,
     aiSelectedIds,
+  ), [activeApplicants, searchTermDebounced, filterStatus, advFilters, aiSelectedIds]);
+
+  const filteredArchived = useMemo(() => archivedApplicants.filter(a => {
+    const matchSearch = a.full_name.toLowerCase().includes(searchTermDebounced.toLowerCase()) ||
+      (a.desired_position || "").toLowerCase().includes(searchTermDebounced.toLowerCase());
+    return matchSearch;
+  }), [archivedApplicants, searchTermDebounced]);
+
+  // Only the current page is ever mounted in the DOM — keeps the table fast no matter how many rows match.
+  const APPLICANTS_PAGE_SIZE = 50;
+  const pagedFiltered = useMemo(
+    () => filtered.slice((applicantsPage - 1) * APPLICANTS_PAGE_SIZE, applicantsPage * APPLICANTS_PAGE_SIZE),
+    [filtered, applicantsPage]
+  );
+  const pagedFilteredArchived = useMemo(
+    () => filteredArchived.slice((archivePage - 1) * APPLICANTS_PAGE_SIZE, archivePage * APPLICANTS_PAGE_SIZE),
+    [filteredArchived, archivePage]
   );
 
-  const filteredArchived = archivedApplicants.filter(a => {
-    const matchSearch = a.full_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (a.desired_position || "").toLowerCase().includes(searchTerm.toLowerCase());
-    return matchSearch;
-  });
+  // Archiving/restoring a row can shrink the list below the current page without touching the filters above.
+  useEffect(() => {
+    const maxPage = Math.max(1, Math.ceil(filtered.length / APPLICANTS_PAGE_SIZE));
+    if (applicantsPage > maxPage) setApplicantsPage(maxPage);
+  }, [filtered.length, applicantsPage]);
+  useEffect(() => {
+    const maxPage = Math.max(1, Math.ceil(filteredArchived.length / APPLICANTS_PAGE_SIZE));
+    if (archivePage > maxPage) setArchivePage(maxPage);
+  }, [filteredArchived.length, archivePage]);
 
   const archiveApplicant = async (id: string) => {
     if (!confirm(lang === "ar" ? "هل تريد أرشفة هذا المتقدم؟" : "Archive this applicant?")) return;
@@ -612,28 +709,27 @@ const DashboardPage = () => {
     }
   };
 
-  // Chart data
-  const statusData = STATUSES.map((s, i) => ({
+  // Chart data — recomputed only when the underlying applicants actually change, not on every render.
+  const statusData = useMemo(() => STATUSES.map((s, i) => ({
     name: t(`status.${s}`), value: activeApplicants.filter(a => a.status === s).length, fill: CHART_COLORS[i],
-  })).filter(d => d.value > 0);
+  })).filter(d => d.value > 0), [activeApplicants, lang]);
 
-  const positionData = Object.entries(
+  const positionData = useMemo(() => Object.entries(
     activeApplicants.reduce((acc, a) => { const pos = a.desired_position || "N/A"; acc[pos] = (acc[pos] || 0) + 1; return acc; }, {} as Record<string, number>)
-  ).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([name, value]) => ({ name: name.substring(0, 20), value }));
+  ).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([name, value]) => ({ name: name.substring(0, 20), value })), [activeApplicants]);
 
-  const monthlyData = (() => {
+  const monthlyData = useMemo(() => {
     const months: Record<string, number> = {};
     activeApplicants.forEach(a => { const m = new Date(a.created_at).toLocaleDateString(lang === "ar" ? "ar-SA" : "en-US", { month: "short", year: "numeric" }); months[m] = (months[m] || 0) + 1; });
     return Object.entries(months).map(([name, value]) => ({ name, value })).reverse().slice(0, 12).reverse();
-  })();
+  }, [activeApplicants, lang]);
 
-
-  const stats = [
+  const stats = useMemo(() => [
     { label: t("dash.totalApplicants"), value: activeApplicants.length, icon: Users, color: "text-blue-500", bg: "bg-blue-500/10" },
     { label: t("dash.newApplicants"), value: activeApplicants.filter(a => a.status === "new").length, icon: UserPlus, color: "text-yellow-500", bg: "bg-yellow-500/10" },
     { label: t("dash.inInterview"), value: activeApplicants.filter(a => ["phone_interview", "in_person_interview"].includes(a.status)).length, icon: Phone, color: "text-purple-500", bg: "bg-purple-500/10" },
     { label: t("dash.hired"), value: activeApplicants.filter(a => a.status === "hired").length, icon: CheckCircle2, color: "text-green-500", bg: "bg-green-500/10" },
-  ];
+  ], [activeApplicants, lang]);
 
   // Search filters for Jobs / Users / Projects tabs
   const filteredJobs = jobs.filter(job => {
@@ -763,23 +859,53 @@ const DashboardPage = () => {
       <main className="max-w-7xl mx-auto w-full p-4 md:p-6 space-y-6 content-fade-in">
         {/* Stats — only on the Applicants tab; Recruitment & Analytics have their own dedicated KPI sections */}
         {activeTab === "applicants" && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {stats.map((stat, i) => (
-              <Card key={i} className="group overflow-hidden hover:shadow-elevated hover:-translate-y-0.5">
-                <CardContent className="p-4 md:p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-muted-foreground text-xs md:text-sm font-medium">{stat.label}</p>
-                      <p className="text-2xl md:text-3xl font-bold mt-1 tracking-tight">{stat.value}</p>
+          <>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {applicantsLoading && applicants.length === 0 ? (
+                Array.from({ length: 4 }).map((_, i) => (
+                  <Card key={i} className="overflow-hidden">
+                    <CardContent className="p-4 md:p-6">
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-2">
+                          <Skeleton className="h-3 w-20" />
+                          <Skeleton className="h-7 w-12" />
+                        </div>
+                        <Skeleton className="w-12 h-12 md:w-14 md:h-14 rounded-2xl" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))
+              ) : stats.map((stat, i) => (
+                <Card key={i} className="group overflow-hidden hover:shadow-elevated hover:-translate-y-0.5">
+                  <CardContent className="p-4 md:p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-muted-foreground text-xs md:text-sm font-medium">{stat.label}</p>
+                        <p className="text-2xl md:text-3xl font-bold mt-1 tracking-tight">{stat.value}</p>
+                      </div>
+                      <div className={`w-12 h-12 md:w-14 md:h-14 rounded-2xl ${stat.bg} flex items-center justify-center transition-transform duration-300 group-hover:scale-110`}>
+                        <stat.icon className={`w-6 h-6 md:w-7 md:h-7 ${stat.color}`} />
+                      </div>
                     </div>
-                    <div className={`w-12 h-12 md:w-14 md:h-14 rounded-2xl ${stat.bg} flex items-center justify-center transition-transform duration-300 group-hover:scale-110`}>
-                      <stat.icon className={`w-6 h-6 md:w-7 md:h-7 ${stat.color}`} />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+
+            {applicantsLoadProgress.total > 0 && applicantsLoadProgress.loaded < applicantsLoadProgress.total && (
+              <div className="flex items-center gap-3 p-3 rounded-lg border bg-muted/30">
+                <CircularProgress percent={(applicantsLoadProgress.loaded / applicantsLoadProgress.total) * 100} />
+                <div className="text-sm">
+                  <p className="font-medium">{lang === "ar" ? "جاري تحميل بقية بيانات المتقدمين في الخلفية..." : "Loading the rest of the applicants in the background..."}</p>
+                  <p className="text-muted-foreground text-xs">
+                    {lang === "ar"
+                      ? `تم تحميل ${applicantsLoadProgress.loaded.toLocaleString()} من إجمالي ${applicantsLoadProgress.total.toLocaleString()} — الأرقام أعلاه والجدول يتحدثان تلقائياً`
+                      : `Loaded ${applicantsLoadProgress.loaded.toLocaleString()} of ${applicantsLoadProgress.total.toLocaleString()} — the stats and table above update automatically`}
+                  </p>
+                </div>
+              </div>
+            )}
+          </>
         )}
 
         {/* Tabs */}
@@ -805,7 +931,7 @@ const DashboardPage = () => {
               <div className="mb-3 space-y-2">
                 <ApplicantsImport onChanged={fetchApplicants} onImportComplete={() => setDupCleanupOpen(true)} />
                 <ApplicantsMappedImport onChanged={fetchApplicants} onImportComplete={() => setDupCleanupOpen(true)} />
-                <ApplicantsDuplicateCleanup applicants={applicants} onChanged={fetchApplicants} open={dupCleanupOpen} onOpenChange={setDupCleanupOpen} />
+                <ApplicantsDuplicateCleanup applicants={applicants} onChanged={fetchApplicants} open={dupCleanupOpen} onOpenChange={setDupCleanupOpen} locked={dataStreaming} />
               </div>
             )}
             <ApplicantsAdvancedFilters
@@ -817,6 +943,7 @@ const DashboardPage = () => {
               setAiSelectedIds={setAiSelectedIds}
               aiSummary={aiSummary}
               setAiSummary={setAiSummary}
+              locked={dataStreaming}
             />
             <Card>
               <CardHeader className="pb-4">
@@ -834,7 +961,13 @@ const DashboardPage = () => {
                         {STATUSES.map(s => <SelectItem key={s} value={s}>{t(`status.${s}`)}</SelectItem>)}
                       </SelectContent>
                     </Select>
-                    <Button onClick={exportExcel} variant="outline" className="gap-2"><Download className="w-4 h-4" />{t("dash.export")}</Button>
+                    <Button
+                      onClick={() => { if (dataStreaming) { notifyStillLoading(); return; } exportExcel(); }}
+                      variant="outline"
+                      className={`gap-2 ${dataStreaming ? "opacity-50" : ""}`}
+                    >
+                      <Download className="w-4 h-4" />{t("dash.export")}
+                    </Button>
                     {selectedIds.size > 0 && (
                       <Button onClick={() => setShowTransferDialog(true)} className="gap-2 gradient-accent text-accent-foreground">
                         <Briefcase className="w-4 h-4" />{lang === "ar" ? `نقل (${selectedIds.size}) إلى التوظيف` : `Transfer (${selectedIds.size}) to Recruitment`}
@@ -868,9 +1001,21 @@ const DashboardPage = () => {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filtered.length === 0 ? (
+                      {applicantsLoading && applicants.length === 0 ? (
+                        Array.from({ length: 8 }).map((_, i) => (
+                          <TableRow key={i}>
+                            <TableCell><Skeleton className="h-4 w-4" /></TableCell>
+                            <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                            <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                            <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                            <TableCell><Skeleton className="h-5 w-16 rounded-full" /></TableCell>
+                            <TableCell><Skeleton className="h-4 w-20" /></TableCell>
+                            <TableCell><Skeleton className="h-4 w-16" /></TableCell>
+                          </TableRow>
+                        ))
+                      ) : filtered.length === 0 ? (
                         <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">{t("dash.search")}</TableCell></TableRow>
-                      ) : filtered.map(a => (
+                      ) : pagedFiltered.map(a => (
                         <TableRow key={a.id} className="cursor-pointer hover:bg-muted/50" onClick={() => { setSelectedApplicant(a); setEditNotes(a.notes || ""); }}>
                           <TableCell onClick={(e) => e.stopPropagation()}>
                             <Checkbox
@@ -907,6 +1052,20 @@ const DashboardPage = () => {
                     </TableBody>
                   </Table>
                 </div>
+                {filtered.length > APPLICANTS_PAGE_SIZE && (
+                  <div className="flex items-center justify-between gap-3 mt-3 text-sm">
+                    <span className="text-muted-foreground">
+                      {lang === "ar"
+                        ? `عرض ${(applicantsPage - 1) * APPLICANTS_PAGE_SIZE + 1}-${Math.min(applicantsPage * APPLICANTS_PAGE_SIZE, filtered.length)} من ${filtered.length}`
+                        : `Showing ${(applicantsPage - 1) * APPLICANTS_PAGE_SIZE + 1}-${Math.min(applicantsPage * APPLICANTS_PAGE_SIZE, filtered.length)} of ${filtered.length}`}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <Button size="sm" variant="outline" disabled={applicantsPage <= 1} onClick={() => setApplicantsPage(p => p - 1)}>{lang === "ar" ? "السابق" : "Previous"}</Button>
+                      <span className="text-muted-foreground">{applicantsPage} / {Math.ceil(filtered.length / APPLICANTS_PAGE_SIZE)}</span>
+                      <Button size="sm" variant="outline" disabled={applicantsPage >= Math.ceil(filtered.length / APPLICANTS_PAGE_SIZE)} onClick={() => setApplicantsPage(p => p + 1)}>{lang === "ar" ? "التالي" : "Next"}</Button>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -938,7 +1097,7 @@ const DashboardPage = () => {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {filteredArchived.map(a => (
+                        {pagedFilteredArchived.map(a => (
                           <TableRow key={a.id}>
                             <TableCell className="font-medium">{a.full_name}</TableCell>
                             <TableCell>{a.desired_position}</TableCell>
@@ -954,6 +1113,20 @@ const DashboardPage = () => {
                         ))}
                       </TableBody>
                     </Table>
+                  </div>
+                )}
+                {filteredArchived.length > APPLICANTS_PAGE_SIZE && (
+                  <div className="flex items-center justify-between gap-3 mt-3 text-sm">
+                    <span className="text-muted-foreground">
+                      {lang === "ar"
+                        ? `عرض ${(archivePage - 1) * APPLICANTS_PAGE_SIZE + 1}-${Math.min(archivePage * APPLICANTS_PAGE_SIZE, filteredArchived.length)} من ${filteredArchived.length}`
+                        : `Showing ${(archivePage - 1) * APPLICANTS_PAGE_SIZE + 1}-${Math.min(archivePage * APPLICANTS_PAGE_SIZE, filteredArchived.length)} of ${filteredArchived.length}`}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <Button size="sm" variant="outline" disabled={archivePage <= 1} onClick={() => setArchivePage(p => p - 1)}>{lang === "ar" ? "السابق" : "Previous"}</Button>
+                      <span className="text-muted-foreground">{archivePage} / {Math.ceil(filteredArchived.length / APPLICANTS_PAGE_SIZE)}</span>
+                      <Button size="sm" variant="outline" disabled={archivePage >= Math.ceil(filteredArchived.length / APPLICANTS_PAGE_SIZE)} onClick={() => setArchivePage(p => p + 1)}>{lang === "ar" ? "التالي" : "Next"}</Button>
+                    </div>
                   </div>
                 )}
               </CardContent>

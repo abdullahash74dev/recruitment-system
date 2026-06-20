@@ -27,6 +27,7 @@ interface Props {
   onChanged: () => void;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  locked?: boolean;
 }
 
 // How many ids to send per request — keeps a single .in() filter from growing unbounded.
@@ -51,7 +52,7 @@ const chunk = (ids: string[]): string[][] => {
   return out;
 };
 
-export default function ApplicantsDuplicateCleanup({ applicants, onChanged, open, onOpenChange }: Props) {
+export default function ApplicantsDuplicateCleanup({ applicants, onChanged, open, onOpenChange, locked }: Props) {
   const { requestDelete } = useDeletePin();
   const [scanned, setScanned] = useState(false);
   const [groups, setGroups] = useState<Applicant[][]>([]);
@@ -142,7 +143,15 @@ export default function ApplicantsDuplicateCleanup({ applicants, onChanged, open
       <div className="flex flex-wrap items-center gap-2 p-3 rounded-lg border bg-muted/30">
         <Copy className="w-4 h-4 text-muted-foreground" />
         <span className="text-sm font-semibold">كشف وتنظيف المكررات:</span>
-        <Button size="sm" variant="outline" onClick={() => onOpenChange(true)} className="gap-1">
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => {
+            if (locked) { toast.info("انتظر اكتمال تحميل كل بيانات المتقدمين لاستخدام هذه الميزة"); return; }
+            onOpenChange(true);
+          }}
+          className={`gap-1 ${locked ? "opacity-50" : ""}`}
+        >
           <Search className="w-3.5 h-3.5" />
           فحص المتقدمين الحاليين ({applicants.length})
         </Button>
