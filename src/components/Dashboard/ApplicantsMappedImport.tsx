@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Upload, FileSpreadsheet, Loader2, CheckCircle2, AlertTriangle, Download, Wand2, History } from "lucide-react";
+import { Upload, FileSpreadsheet, Loader2, CheckCircle2, AlertTriangle, Download, Wand2, History, BookmarkPlus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { dupKeys, richness } from "@/lib/applicantDuplicates";
@@ -644,6 +644,77 @@ const ApplicantsMappedImport = ({ onChanged, onImportComplete }: Props) => {
   const [staleJob, setStaleJob] = useState<any | null>(null);
   const STALE_AFTER_MS = 2 * 60 * 1000;
 
+  // Saved mapping templates: a named, reusable snapshot of the mapping/source settings,
+  // independent of any single job or file. Lets a recurring source (e.g. the same external
+  // data-bank export every time) be re-imported with the exact same column mapping instead of
+  // redoing it by hand — including for old/failed jobs that predate per-job resume support and
+  // have no stored file or snapshot to resume from at all.
+  const [templates, setTemplates] = useState<any[]>([]);
+  const [templateName, setTemplateName] = useState("");
+  const [savingTemplate, setSavingTemplate] = useState(false);
+  const [selectedTemplateId, setSelectedTemplateId] = useState("");
+
+  const loadTemplates = async () => {
+    const { data, error } = await supabase
+      .from("applicant_import_templates")
+      .select("*")
+      .order("updated_at", { ascending: false });
+    if (!error) setTemplates(data || []);
+  };
+
+  useEffect(() => {
+    if (open) loadTemplates();
+  }, [open]);
+
+  const saveAsTemplate = async () => {
+    const name = templateName.trim() || sourceCompany.trim();
+    if (!name) { toast.error("اكتب اسماً للقالب (أو حدد اسم شركة المصدر أولاً)"); return; }
+    setSavingTemplate(true);
+    try {
+      const { data: userData } = await supabase.auth.getUser();
+      const { error } = await supabase.from("applicant_import_templates").upsert({
+        name,
+        mapping_snapshot: { mapping, enabled, customFields, importSource, sourceCompany },
+        created_by: userData.user?.id || null,
+        created_by_email: userData.user?.email || null,
+      }, { onConflict: "name" });
+      if (error) throw error;
+      toast.success(`تم حفظ القالب "${name}" — يمكنك تطبيقه على أي ملف قادم بنفس التركيب`);
+      setTemplateName("");
+      loadTemplates();
+    } catch (e: any) {
+      toast.error(e.message || "تعذّر حفظ القالب");
+    } finally {
+      setSavingTemplate(false);
+    }
+  };
+
+  const applyTemplate = (tpl: any) => {
+    const snap = tpl.mapping_snapshot || {};
+    setMapping(snap.mapping || {});
+    setEnabled(snap.enabled || {});
+    setCustomFields(snap.customFields || []);
+    setImportSource(snap.importSource || "direct");
+    setSourceCompany(snap.sourceCompany || "");
+    // Keep generated custom-field ids ahead of whatever the template restored, so adding a
+    // new custom field afterwards can't collide with a key the template just brought back.
+    const maxId = (snap.customFields || []).reduce((m: number, f: any) => {
+      const n = parseInt(String(f.key || "").replace("custom_", ""), 10);
+      return Number.isFinite(n) ? Math.max(m, n) : m;
+    }, 0);
+    nextCustomIdRef.current = maxId + 1;
+    toast.success(`تم تطبيق قالب "${tpl.name}" — راجع الربط ثم اضغط "حفظ"`);
+  };
+
+  const deleteTemplate = async (id: string, name: string) => {
+    if (!confirm(`حذف قالب "${name}"؟`)) return;
+    const { error } = await supabase.from("applicant_import_templates").delete().eq("id", id);
+    if (error) { toast.error(error.message); return; }
+    if (selectedTemplateId === id) setSelectedTemplateId("");
+    toast.success("تم حذف القالب");
+    loadTemplates();
+  };
+
   const loadJobHistory = async () => {
     setLoadingHistory(true);
     try {
@@ -1141,6 +1212,59 @@ const ApplicantsMappedImport = ({ onChanged, onImportComplete }: Props) => {
               </div>
               <div className="text-[11px] text-muted-foreground">سيتم تمييز هذه السجلات بشارة خاصة وفلتر مستقل في القائمة.</div>
             </div>
+
+            {headers.length > 0 && (
+              <div className="rounded-lg border p-3 bg-sky-50 dark:bg-sky-950/20 space-y-2">
+                <div className="text-sm font-semibold flex items-center gap-2">
+                  <span>📋 قوالب الإعدادات (لإعادة استخدام نفس الربط مع ملفات مشابهة)</span>
+                </div>
+                {templates.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-2 text-sm">
+                    <Select value={selectedTemplateId} onValueChange={setSelectedTemplateId}>
+                      <SelectTrigger className="h-8 flex-1 min-w-[200px]"><SelectValue placeholder="اختر قالباً محفوظاً" /></SelectTrigger>
+                      <SelectContent>
+                        {templates.map(t => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={!selectedTemplateId}
+                      onClick={() => { const t = templates.find(x => x.id === selectedTemplateId); if (t) applyTemplate(t); }}
+                    >
+                      تطبيق القالب
+                    </Button>
+                    {selectedTemplateId && (
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="text-destructive h-8 w-8"
+                        onClick={() => { const t = templates.find(x => x.id === selectedTemplateId); if (t) deleteTemplate(t.id, t.name); }}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    )}
+                  </div>
+                )}
+                <div className="flex flex-wrap items-center gap-2 text-sm">
+                  <input
+                    type="text"
+                    value={templateName}
+                    onChange={(e) => setTemplateName(e.target.value)}
+                    placeholder={sourceCompany ? `اسم القالب (افتراضياً: ${sourceCompany})` : "اسم القالب (مثلاً: فهد الكستبان)"}
+                    className="flex-1 min-w-[200px] h-8 px-2 rounded border bg-background text-sm"
+                  />
+                  <Button size="sm" variant="outline" onClick={saveAsTemplate} disabled={savingTemplate} className="gap-1">
+                    <BookmarkPlus className="w-3.5 h-3.5" />
+                    {savingTemplate ? "جاري الحفظ..." : "حفظ الربط الحالي كقالب"}
+                  </Button>
+                </div>
+                <div className="text-[11px] text-muted-foreground">
+                  احفظ الربط الحالي مرة واحدة، ثم طبّقه على أي ملف جديد من نفس المصدر بضغطة واحدة — بدون إعادة اختيار الحقول.
+                </div>
+              </div>
+            )}
+
             {savedAt && rows.length > 0 && (
               <div className="text-xs text-emerald-600">
                 💾 محفوظ تلقائياً ({new Date(savedAt).toLocaleString("ar")}) — سيبقى الملف بعد إعادة فتح الصفحة.

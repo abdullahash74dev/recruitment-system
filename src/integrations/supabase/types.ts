@@ -219,11 +219,13 @@ export type Database = {
           errors: Json
           failed_rows: number
           file_name: string | null
+          file_path: string | null
           id: string
           imported_by: string | null
           imported_by_email: string | null
           import_source: string
           inserted_rows: number
+          mapping_snapshot: Json | null
           skipped_rows: number
           source_company: string | null
           source_sheets: string[] | null
@@ -238,11 +240,13 @@ export type Database = {
           errors?: Json
           failed_rows?: number
           file_name?: string | null
+          file_path?: string | null
           id?: string
           imported_by?: string | null
           imported_by_email?: string | null
           import_source?: string
           inserted_rows?: number
+          mapping_snapshot?: Json | null
           skipped_rows?: number
           source_company?: string | null
           source_sheets?: string[] | null
@@ -257,11 +261,13 @@ export type Database = {
           errors?: Json
           failed_rows?: number
           file_name?: string | null
+          file_path?: string | null
           id?: string
           imported_by?: string | null
           imported_by_email?: string | null
           import_source?: string
           inserted_rows?: number
+          mapping_snapshot?: Json | null
           skipped_rows?: number
           source_company?: string | null
           source_sheets?: string[] | null
@@ -269,6 +275,36 @@ export type Database = {
           total_rows?: number
           updated_at?: string
           updated_rows?: number
+        }
+        Relationships: []
+      }
+      applicant_import_templates: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          created_by_email: string | null
+          id: string
+          mapping_snapshot: Json
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          created_by_email?: string | null
+          id?: string
+          mapping_snapshot?: Json
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          created_by_email?: string | null
+          id?: string
+          mapping_snapshot?: Json
+          name?: string
+          updated_at?: string
         }
         Relationships: []
       }
