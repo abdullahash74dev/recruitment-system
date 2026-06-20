@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import { Loader2, Save, Play, FileText, Trash2, Sparkles } from "lucide-react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { getFunctionErrorMessage } from "@/lib/functionError";
 
 type Scope = "applicants" | "recruitment" | "jobs";
 
@@ -98,7 +99,7 @@ export default function ReportBuilder() {
       body: { config: buildConfig() },
     });
     setRunning(false);
-    if (error) return toast.error(error.message);
+    if (error) return toast.error(await getFunctionErrorMessage(error, "فشل إنشاء التقرير"));
     if (data?.error) return toast.error(data.error);
     setLastResult(data);
     toast.success("تم إنشاء التقرير");
