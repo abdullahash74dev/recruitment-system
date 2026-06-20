@@ -15,7 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Users, UserPlus, Phone, CheckCircle2, Download, LogOut, Search, Eye, BarChart3, Briefcase, FileText, ExternalLink, Plus, Pencil, Trash2, FolderOpen, Settings, Database, Archive, RotateCcw, Shield, Sparkles, Stethoscope, KeyRound } from "lucide-react";
+import { Users, UserPlus, Phone, CheckCircle2, Download, LogOut, Search, Eye, BarChart3, Briefcase, FileText, ExternalLink, Plus, Pencil, Trash2, FolderOpen, Settings, Database, Archive, RotateCcw, Shield, Sparkles, Stethoscope, KeyRound, Tag } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from "recharts";
 import * as XLSX from "xlsx";
 import SiteLogo from "@/components/SiteLogo";
@@ -50,6 +50,7 @@ import RecruitmentDashboard from "@/components/Dashboard/Recruitment/Recruitment
 import ApplicantEmailDialog from "@/components/Dashboard/ApplicantEmailDialog";
 import ApplicantEmailHistory from "@/components/Dashboard/ApplicantEmailHistory";
 import TransferToRecruitmentDialog from "@/components/Dashboard/TransferToRecruitmentDialog";
+import BulkSourceCorrectionDialog from "@/components/Dashboard/BulkSourceCorrectionDialog";
 import ApplicantsAdvancedFilters, { AdvancedFilter, applyAdvancedFilters } from "@/components/Dashboard/ApplicantsAdvancedFilters";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useUserPermissions } from "@/hooks/useUserPermissions";
@@ -272,6 +273,7 @@ const DashboardPage = () => {
   const [emailDialog, setEmailDialog] = useState<{ applicantId: string; status: ApplicantEmailStatus } | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showTransferDialog, setShowTransferDialog] = useState(false);
+  const [showSourceCorrectionDialog, setShowSourceCorrectionDialog] = useState(false);
 
   useEffect(() => {
     fetchApplicants();
@@ -971,6 +973,11 @@ const DashboardPage = () => {
                     {selectedIds.size > 0 && (
                       <Button onClick={() => setShowTransferDialog(true)} className="gap-2 gradient-accent text-accent-foreground">
                         <Briefcase className="w-4 h-4" />{lang === "ar" ? `نقل (${selectedIds.size}) إلى التوظيف` : `Transfer (${selectedIds.size}) to Recruitment`}
+                      </Button>
+                    )}
+                    {selectedIds.size > 0 && (
+                      <Button onClick={() => setShowSourceCorrectionDialog(true)} variant="outline" className="gap-2">
+                        <Tag className="w-4 h-4" />{lang === "ar" ? `تصحيح مصدر (${selectedIds.size})` : `Correct source (${selectedIds.size})`}
                       </Button>
                     )}
                   </div>
@@ -1699,6 +1706,14 @@ const DashboardPage = () => {
           applicants={applicants.filter(a => selectedIds.has(a.id))}
           onClose={() => setShowTransferDialog(false)}
           onTransferred={() => setSelectedIds(new Set())}
+        />
+      )}
+
+      {showSourceCorrectionDialog && (
+        <BulkSourceCorrectionDialog
+          applicants={applicants.filter(a => selectedIds.has(a.id))}
+          onClose={() => setShowSourceCorrectionDialog(false)}
+          onUpdated={() => { setSelectedIds(new Set()); fetchApplicants(); }}
         />
       )}
 
