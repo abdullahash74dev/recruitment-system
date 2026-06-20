@@ -48,7 +48,11 @@ Deno.serve(async (req) => {
     const { data: { user } } = await userClient.auth.getUser();
     if (!user) return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     const admin = createClient(url, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-    const { data: isAdmin } = await admin.rpc("has_role", { _user_id: user.id, _role: "admin" });
+    const { data: isAdmin, error: roleError } = await admin.rpc("has_role", { _user_id: user.id, _role: "admin" });
+    if (roleError) {
+      console.error("has_role check failed:", roleError);
+      return new Response(JSON.stringify({ error: "Role check failed", details: roleError.message }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
     if (!isAdmin) return new Response(JSON.stringify({ error: "Forbidden - admin only" }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
     const { field_names = [], dryRun = true, pin, signature } = await req.json();
