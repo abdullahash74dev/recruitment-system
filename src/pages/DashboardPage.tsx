@@ -646,6 +646,13 @@ const DashboardPage = () => {
   const activeApplicants = useMemo(() => applicants.filter(a => !a.is_archived), [applicants]);
   const archivedApplicants = useMemo(() => applicants.filter(a => a.is_archived), [applicants]);
 
+  // Export / advanced-filter / duplicate-scan all need the *complete* dataset to be correct —
+  // lock them out while a background fetch is still streaming in the rest of the rows.
+  const dataStreaming = applicantsLoading || (applicantsLoadProgress.total > 0 && applicantsLoadProgress.loaded < applicantsLoadProgress.total);
+  const notifyStillLoading = () => toast.info(lang === "ar"
+    ? "انتظر اكتمال تحميل كل بيانات المتقدمين لاستخدام هذه الميزة"
+    : "Wait for all applicants data to finish loading to use this feature");
+
   const filtered = useMemo(() => applyAdvancedFilters(
     activeApplicants.filter(a => {
       const matchSearch = a.full_name.toLowerCase().includes(searchTermDebounced.toLowerCase()) ||
@@ -924,7 +931,7 @@ const DashboardPage = () => {
               <div className="mb-3 space-y-2">
                 <ApplicantsImport onChanged={fetchApplicants} onImportComplete={() => setDupCleanupOpen(true)} />
                 <ApplicantsMappedImport onChanged={fetchApplicants} onImportComplete={() => setDupCleanupOpen(true)} />
-                <ApplicantsDuplicateCleanup applicants={applicants} onChanged={fetchApplicants} open={dupCleanupOpen} onOpenChange={setDupCleanupOpen} />
+                <ApplicantsDuplicateCleanup applicants={applicants} onChanged={fetchApplicants} open={dupCleanupOpen} onOpenChange={setDupCleanupOpen} locked={dataStreaming} />
               </div>
             )}
             <ApplicantsAdvancedFilters
@@ -936,6 +943,7 @@ const DashboardPage = () => {
               setAiSelectedIds={setAiSelectedIds}
               aiSummary={aiSummary}
               setAiSummary={setAiSummary}
+              locked={dataStreaming}
             />
             <Card>
               <CardHeader className="pb-4">
@@ -954,11 +962,9 @@ const DashboardPage = () => {
                       </SelectContent>
                     </Select>
                     <Button
-                      onClick={exportExcel}
+                      onClick={() => { if (dataStreaming) { notifyStillLoading(); return; } exportExcel(); }}
                       variant="outline"
-                      className="gap-2"
-                      disabled={applicantsLoadProgress.total > 0 && applicantsLoadProgress.loaded < applicantsLoadProgress.total}
-                      title={applicantsLoadProgress.total > 0 && applicantsLoadProgress.loaded < applicantsLoadProgress.total ? (lang === "ar" ? "انتظر اكتمال تحميل البيانات" : "Wait for the data to finish loading") : undefined}
+                      className={`gap-2 ${dataStreaming ? "opacity-50" : ""}`}
                     >
                       <Download className="w-4 h-4" />{t("dash.export")}
                     </Button>

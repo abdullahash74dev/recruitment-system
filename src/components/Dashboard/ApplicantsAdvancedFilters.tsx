@@ -54,11 +54,12 @@ interface Props {
   setAiSelectedIds: (s: Set<string> | null) => void;
   aiSummary: string;
   setAiSummary: (s: string) => void;
+  locked?: boolean;
 }
 
 export default function ApplicantsAdvancedFilters({
   applicants, lang, filters, setFilters,
-  aiSelectedIds, setAiSelectedIds, aiSummary, setAiSummary,
+  aiSelectedIds, setAiSelectedIds, aiSummary, setAiSummary, locked,
 }: Props) {
   const [newField, setNewField] = useState<string>("nationality");
   const [picked, setPicked] = useState<Set<string>>(new Set());
@@ -394,8 +395,16 @@ export default function ApplicantsAdvancedFilters({
 
 
   return (
-    <Card className="mb-3">
-      <CardContent className="p-3 space-y-3">
+    <Card className="mb-3 relative overflow-hidden">
+      {locked && (
+        <div
+          className="absolute inset-0 z-10 cursor-not-allowed"
+          onClick={() => toast.info(lang === "ar"
+            ? "انتظر اكتمال تحميل كل بيانات المتقدمين لاستخدام هذه الميزة"
+            : "Wait for all applicants data to finish loading to use this feature")}
+        />
+      )}
+      <CardContent className={`p-3 space-y-3 ${locked ? "opacity-50 pointer-events-none select-none" : ""}`}>
         {/* Field filter row */}
         <div className="flex flex-wrap items-end gap-2">
           <div className="flex-1 min-w-[150px]">
