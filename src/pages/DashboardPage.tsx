@@ -162,6 +162,28 @@ const STATUS_COLORS: Record<ApplicantStatus, string> = {
 
 const CHART_COLORS = ["#3b82f6", "#eab308", "#a855f7", "#6366f1", "#22c55e", "#10b981", "#ef4444", "#6b7280"];
 
+// Small ring showing how much of a background fetch has landed so far (e.g. streaming in 45k+ rows).
+const CircularProgress = ({ percent, size = 44 }: { percent: number; size?: number }) => {
+  const stroke = 4;
+  const radius = (size - stroke) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference - (Math.min(100, Math.max(0, percent)) / 100) * circumference;
+  return (
+    <svg width={size} height={size} className="shrink-0">
+      <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="currentColor" strokeOpacity={0.15} strokeWidth={stroke} />
+      <circle
+        cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="currentColor" strokeWidth={stroke}
+        strokeDasharray={circumference} strokeDashoffset={offset} strokeLinecap="round"
+        transform={`rotate(-90 ${size / 2} ${size / 2})`}
+        className="text-primary transition-[stroke-dashoffset] duration-300"
+      />
+      <text x="50%" y="50%" textAnchor="middle" dy="0.32em" className="text-[10px] font-semibold fill-current">
+        {Math.round(percent)}%
+      </text>
+    </svg>
+  );
+};
+
 const DashboardPage = () => {
   const { t, dir, lang } = useLanguage();
   const { navStyle } = useTheme();
@@ -170,6 +192,7 @@ const DashboardPage = () => {
   const [dupCleanupOpen, setDupCleanupOpen] = useState(false);
   const [applicants, setApplicants] = useState<Applicant[]>([]);
   const [applicantsLoading, setApplicantsLoading] = useState(true);
+  const [applicantsLoadProgress, setApplicantsLoadProgress] = useState({ loaded: 0, total: 0 });
   const [jobs, setJobs] = useState<JobPosting[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [searchTermDebounced, setSearchTermDebounced] = useState("");
@@ -259,27 +282,46 @@ const DashboardPage = () => {
 
   const fetchApplicants = async () => {
     setApplicantsLoading(true);
+    setApplicantsLoadProgress({ loaded: 0, total: 0 });
     try {
-      const pageSize = 1000;
-      const concurrency = 6; // fetch several pages at once instead of one round-trip at a time
-      const { count, error: countError } = await supabase
+      const FIRST_BATCH = 200; // small enough to land almost instantly, regardless of table size
+      const PAGE_SIZE = 1000;
+      const CONCURRENCY = 6; // fetch several pages at once instead of one round-trip at a time
+
+      // First paint: grab just enough rows for page 1 of the table + rough stats, with an exact total count.
+      const { data: firstData, error: firstError, count } = await supabase
         .from("applicants")
-        .select("id", { count: "exact", head: true });
-      if (countError) { toast.error(countError.message); return; }
-      const pageCount = Math.max(1, Math.ceil((count || 0) / pageSize));
+        .select("*", { count: "exact" })
+        .order("created_at", { ascending: false })
+        .range(0, FIRST_BATCH - 1);
+      if (firstError) { toast.error(firstError.message); return; }
+      const total = count || 0;
+      const first = (firstData || []) as Applicant[];
+      setApplicants(first);
+      setApplicantsLoadProgress({ loaded: first.length, total });
+      setApplicantsLoading(false);
+      if (total <= first.length) return; // already have everything
+
+      // Background: stream in the rest in parallel batches, merging as each batch lands.
+      const remainingStart = first.length;
+      const pageCount = Math.ceil((total - remainingStart) / PAGE_SIZE);
       const pages: Applicant[][] = new Array(pageCount);
-      for (let start = 0; start < pageCount; start += concurrency) {
-        const batch = Array.from({ length: Math.min(concurrency, pageCount - start) }, (_, i) => start + i);
-        const results = await Promise.all(batch.map(p =>
-          supabase.from("applicants").select("*").order("created_at", { ascending: false }).range(p * pageSize, p * pageSize + pageSize - 1)
-        ));
+      let loaded = first.length;
+      for (let start = 0; start < pageCount; start += CONCURRENCY) {
+        const batch = Array.from({ length: Math.min(CONCURRENCY, pageCount - start) }, (_, i) => start + i);
+        const results = await Promise.all(batch.map(p => {
+          const from = remainingStart + p * PAGE_SIZE;
+          return supabase.from("applicants").select("*").order("created_at", { ascending: false }).range(from, from + PAGE_SIZE - 1);
+        }));
         for (let i = 0; i < results.length; i++) {
           const { data, error } = results[i];
           if (error) { toast.error(error.message); return; }
           pages[batch[i]] = (data || []) as Applicant[];
+          loaded += (data || []).length;
         }
+        setApplicants([...first, ...pages.flat()]);
+        setApplicantsLoadProgress({ loaded, total });
       }
-      setApplicants(pages.flat());
     } finally {
       setApplicantsLoading(false);
     }
@@ -810,37 +852,53 @@ const DashboardPage = () => {
       <main className="max-w-7xl mx-auto w-full p-4 md:p-6 space-y-6 content-fade-in">
         {/* Stats — only on the Applicants tab; Recruitment & Analytics have their own dedicated KPI sections */}
         {activeTab === "applicants" && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {applicantsLoading && applicants.length === 0 ? (
-              Array.from({ length: 4 }).map((_, i) => (
-                <Card key={i} className="overflow-hidden">
+          <>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {applicantsLoading && applicants.length === 0 ? (
+                Array.from({ length: 4 }).map((_, i) => (
+                  <Card key={i} className="overflow-hidden">
+                    <CardContent className="p-4 md:p-6">
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-2">
+                          <Skeleton className="h-3 w-20" />
+                          <Skeleton className="h-7 w-12" />
+                        </div>
+                        <Skeleton className="w-12 h-12 md:w-14 md:h-14 rounded-2xl" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))
+              ) : stats.map((stat, i) => (
+                <Card key={i} className="group overflow-hidden hover:shadow-elevated hover:-translate-y-0.5">
                   <CardContent className="p-4 md:p-6">
                     <div className="flex items-center justify-between">
-                      <div className="space-y-2">
-                        <Skeleton className="h-3 w-20" />
-                        <Skeleton className="h-7 w-12" />
+                      <div>
+                        <p className="text-muted-foreground text-xs md:text-sm font-medium">{stat.label}</p>
+                        <p className="text-2xl md:text-3xl font-bold mt-1 tracking-tight">{stat.value}</p>
                       </div>
-                      <Skeleton className="w-12 h-12 md:w-14 md:h-14 rounded-2xl" />
+                      <div className={`w-12 h-12 md:w-14 md:h-14 rounded-2xl ${stat.bg} flex items-center justify-center transition-transform duration-300 group-hover:scale-110`}>
+                        <stat.icon className={`w-6 h-6 md:w-7 md:h-7 ${stat.color}`} />
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
-              ))
-            ) : stats.map((stat, i) => (
-              <Card key={i} className="group overflow-hidden hover:shadow-elevated hover:-translate-y-0.5">
-                <CardContent className="p-4 md:p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-muted-foreground text-xs md:text-sm font-medium">{stat.label}</p>
-                      <p className="text-2xl md:text-3xl font-bold mt-1 tracking-tight">{stat.value}</p>
-                    </div>
-                    <div className={`w-12 h-12 md:w-14 md:h-14 rounded-2xl ${stat.bg} flex items-center justify-center transition-transform duration-300 group-hover:scale-110`}>
-                      <stat.icon className={`w-6 h-6 md:w-7 md:h-7 ${stat.color}`} />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+              ))}
+            </div>
+
+            {applicantsLoadProgress.total > 0 && applicantsLoadProgress.loaded < applicantsLoadProgress.total && (
+              <div className="flex items-center gap-3 p-3 rounded-lg border bg-muted/30">
+                <CircularProgress percent={(applicantsLoadProgress.loaded / applicantsLoadProgress.total) * 100} />
+                <div className="text-sm">
+                  <p className="font-medium">{lang === "ar" ? "جاري تحميل بقية بيانات المتقدمين في الخلفية..." : "Loading the rest of the applicants in the background..."}</p>
+                  <p className="text-muted-foreground text-xs">
+                    {lang === "ar"
+                      ? `تم تحميل ${applicantsLoadProgress.loaded.toLocaleString()} من إجمالي ${applicantsLoadProgress.total.toLocaleString()} — الأرقام أعلاه والجدول يتحدثان تلقائياً`
+                      : `Loaded ${applicantsLoadProgress.loaded.toLocaleString()} of ${applicantsLoadProgress.total.toLocaleString()} — the stats and table above update automatically`}
+                  </p>
+                </div>
+              </div>
+            )}
+          </>
         )}
 
         {/* Tabs */}
@@ -895,7 +953,15 @@ const DashboardPage = () => {
                         {STATUSES.map(s => <SelectItem key={s} value={s}>{t(`status.${s}`)}</SelectItem>)}
                       </SelectContent>
                     </Select>
-                    <Button onClick={exportExcel} variant="outline" className="gap-2"><Download className="w-4 h-4" />{t("dash.export")}</Button>
+                    <Button
+                      onClick={exportExcel}
+                      variant="outline"
+                      className="gap-2"
+                      disabled={applicantsLoadProgress.total > 0 && applicantsLoadProgress.loaded < applicantsLoadProgress.total}
+                      title={applicantsLoadProgress.total > 0 && applicantsLoadProgress.loaded < applicantsLoadProgress.total ? (lang === "ar" ? "انتظر اكتمال تحميل البيانات" : "Wait for the data to finish loading") : undefined}
+                    >
+                      <Download className="w-4 h-4" />{t("dash.export")}
+                    </Button>
                     {selectedIds.size > 0 && (
                       <Button onClick={() => setShowTransferDialog(true)} className="gap-2 gradient-accent text-accent-foreground">
                         <Briefcase className="w-4 h-4" />{lang === "ar" ? `نقل (${selectedIds.size}) إلى التوظيف` : `Transfer (${selectedIds.size}) to Recruitment`}
