@@ -23,6 +23,7 @@ import {
   normalizeCity, normalizeNationality, normalizeEducation, normalizeGender,
   isSaudi, parseSalary, groupByNormalized,
 } from "@/lib/analyticsNormalize";
+import { getFunctionErrorMessage } from "@/lib/functionError";
 import { supabase } from "@/integrations/supabase/client";
 import { useValueSynonyms } from "@/hooks/useValueSynonyms";
 import { toast } from "sonner";
@@ -289,8 +290,8 @@ const AnalyticsHub = ({ applicants, jobs = [] }: Props) => {
       if (data?.error === "credits_exhausted") { toast.error(lang === "ar" ? "نفدت الأرصدة" : "AI credits exhausted"); return; }
       setAiInsights(data);
       toast.success(lang === "ar" ? "تم التحليل" : "Insights ready");
-    } catch (e: any) {
-      toast.error(e.message || "Error");
+    } catch (e) {
+      toast.error(await getFunctionErrorMessage(e, lang === "ar" ? "حدث خطأ" : "Error"));
     } finally { setAiLoading(false); }
   };
 
