@@ -176,6 +176,16 @@ const ApplicantsMappedImport = ({ onChanged, onImportComplete }: Props) => {
   const [rows, setRows] = useState<Record<string, any>[]>([]);
   const [fileName, setFileName] = useState<string>("");
   const [savedAt, setSavedAt] = useState<string>("");
+  // Kept around (not persisted to the local draft -- it can be large) so a "Save" click can
+  // upload the exact original file alongside the job row, which is what makes server-side
+  // resume possible without asking the user to re-pick the file from disk.
+  const [rawFile, setRawFile] = useState<File | null>(null);
+  // Declared up here (not next to the rest of the submit-time state below) so the draft
+  // restore/persist effects further down can reference them -- losing this selection on a
+  // refresh previously meant a resumed import silently fell back to "direct", erasing the
+  // external-source tag the user had picked for the batch.
+  const [importSource, setImportSource] = useState<"direct" | "external">("direct");
+  const [sourceCompany, setSourceCompany] = useState<string>("");
   // mapping: target -> sourceHeader (or "" = skip)
   const [mapping, setMapping] = useState<Record<string, string>>({});
   // enabled: target -> boolean
@@ -214,30 +224,35 @@ const ApplicantsMappedImport = ({ onChanged, onImportComplete }: Props) => {
         setSavedAt(d.savedAt || "");
         setCustomFields(d.customFields || []);
         setSourceSheets(d.sourceSheets || []);
+        setImportSource(d.importSource || "direct");
+        setSourceCompany(d.sourceCompany || "");
       }
     }).catch(() => {});
   }, []);
 
   // Persist draft whenever data changes (debounced so we don't rewrite tens of MB on every
-  // single toggle/keystroke).
+  // single toggle/keystroke). importSource/sourceCompany are included so a batch tagged as
+  // coming from a specific external source doesn't silently revert to "direct" if the tab
+  // is closed and the draft is restored later.
   useEffect(() => {
     if (rows.length === 0) return;
     const t = setTimeout(() => {
       const savedAtNow = new Date().toISOString();
-      saveDraft({ headers, rows, mapping, enabled, fileName, customFields, sourceSheets, savedAt: savedAtNow })
+      saveDraft({ headers, rows, mapping, enabled, fileName, customFields, sourceSheets, importSource, sourceCompany, savedAt: savedAtNow })
         .then(() => setSavedAt(savedAtNow))
         .catch(() => toast.error("تعذّر حفظ المسودة تلقائياً (مساحة التخزين في المتصفح ممتلئة) — يفضّل عدم إغلاق الصفحة قبل إكمال الاستيراد."));
     }, 600);
     return () => clearTimeout(t);
-  }, [headers, rows, mapping, enabled, fileName, customFields, sourceSheets]);
+  }, [headers, rows, mapping, enabled, fileName, customFields, sourceSheets, importSource, sourceCompany]);
 
   const clearDraft = () => {
     clearDraftDb().catch(() => {});
     setHeaders([]); setRows([]); setMapping({}); setEnabled({});
-    setFileName(""); setSavedAt(""); setResult(null);
+    setFileName(""); setSavedAt(""); setResult(null); setRawFile(null);
     setRawSheet(null); setShowHeaderPicker(false); setHeaderRowIdx(0);
     setWorkbook(null); setSheetNames([]); setSelectedSheet(""); setSourceSheets([]); setAppendMode(false);
     setCustomFields([]); setShowAddField(false); setNewFieldLabel("");
+    setImportSource("direct"); setSourceCompany("");
     toast.success("تم مسح المسودة");
   };
 
@@ -290,6 +305,30 @@ const ApplicantsMappedImport = ({ onChanged, onImportComplete }: Props) => {
     return XLSX.utils.sheet_to_json(ws, { header: 1, defval: "", raw: false, dateNF: 'yyyy-mm-dd"T"hh:mm:ss' });
   };
 
+  // Turn raw sheet rows + the chosen header-row index into (deduped) headers + row objects.
+  // Shared by the manual header picker and by "Resume" (which re-derives this from a job's
+  // stored mapping_snapshot instead of the user re-picking the header row by hand).
+  const buildHeaderedRows = (raw: any[][], idx: number) => {
+    const headerCells = raw[idx] || [];
+    const seen = new Map<string, number>();
+    const hdrs = headerCells.map((c, i) => {
+      let name = String(c ?? "").trim();
+      if (!name) name = `عمود ${i + 1}`;
+      const count = seen.get(name) || 0;
+      seen.set(name, count + 1);
+      return count > 0 ? `${name} (${count + 1})` : name;
+    });
+    const dataRows = raw
+      .slice(idx + 1)
+      .filter(r => r.some(c => String(c ?? "").trim() !== ""))
+      .map(r => {
+        const obj: Record<string, any> = {};
+        hdrs.forEach((h, i) => { obj[h] = r[i] ?? ""; });
+        return obj;
+      });
+    return { hdrs, dataRows };
+  };
+
   // Pick the sheet most likely to hold the real data: compare each sheet's row span
   // (fast — reads the sheet dimensions, not its full content) instead of always assuming
   // the first sheet, since exports often have an empty/summary sheet before the data sheet.
@@ -325,6 +364,7 @@ const ApplicantsMappedImport = ({ onChanged, onImportComplete }: Props) => {
       setSourceSheets([]);
       setAppendMode(false);
       setFileName(file.name);
+      setRawFile(file);
       setHeaders([]);
       setRows([]);
       setResult(null);
@@ -348,23 +388,7 @@ const ApplicantsMappedImport = ({ onChanged, onImportComplete }: Props) => {
 
   const applyHeaderRow = (idx: number) => {
     if (!rawSheet) return;
-    const headerCells = rawSheet[idx] || [];
-    const seen = new Map<string, number>();
-    const hdrs = headerCells.map((c, i) => {
-      let name = String(c ?? "").trim();
-      if (!name) name = `عمود ${i + 1}`;
-      const count = seen.get(name) || 0;
-      seen.set(name, count + 1);
-      return count > 0 ? `${name} (${count + 1})` : name;
-    });
-    const dataRows = rawSheet
-      .slice(idx + 1)
-      .filter(r => r.some(c => String(c ?? "").trim() !== ""))
-      .map(r => {
-        const obj: Record<string, any> = {};
-        hdrs.forEach((h, i) => { obj[h] = r[i] ?? ""; });
-        return obj;
-      });
+    const { hdrs, dataRows } = buildHeaderedRows(rawSheet, idx);
     setHeaderRowIdx(idx);
     setShowHeaderPicker(false);
 
@@ -609,8 +633,6 @@ const ApplicantsMappedImport = ({ onChanged, onImportComplete }: Props) => {
   const [currentName, setCurrentName] = useState<string>("");
   const [recentLog, setRecentLog] = useState<{ name: string; ok: boolean; msg?: string }[]>([]);
   const [skipDuplicates, setSkipDuplicates] = useState<boolean>(true);
-  const [importSource, setImportSource] = useState<"direct" | "external">("direct");
-  const [sourceCompany, setSourceCompany] = useState<string>("");
   const cancelRef = useRef<boolean>(false);
 
   // Import history: every import run is recorded in applicant_import_jobs (DB-backed, not
@@ -665,6 +687,63 @@ const ApplicantsMappedImport = ({ onChanged, onImportComplete }: Props) => {
     XLSX.writeFile(wb, `import_errors_${String(job.file_name || job.id).replace(/[^\w.-]+/g, "_")}.xlsx`);
   };
 
+  const [resuming, setResuming] = useState(false);
+
+  // Rebuilds the whole import screen — file, sheet(s), header row, field mapping, custom
+  // fields, and the direct/external source tag — from a previous job's saved file + snapshot.
+  // This is what lets an interrupted import be continued with one click instead of forcing a
+  // fresh upload and re-doing every field/source choice from scratch.
+  const resumeFromJob = async (job: any) => {
+    if (!job?.file_path) {
+      toast.error("لا يوجد ملف محفوظ لهذه العملية — يجب رفع الملف من جديد لاستكمالها");
+      return;
+    }
+    setResuming(true);
+    try {
+      const { data: blob, error } = await supabase.storage.from("import-drafts").download(job.file_path);
+      if (error) throw error;
+      const buf = await blob.arrayBuffer();
+      const wb = XLSX.read(buf, { type: "array", cellDates: true });
+      const snap = job.mapping_snapshot || {};
+      const sheets: string[] = (job.source_sheets?.length ? job.source_sheets : snap.sourceSheets) || [pickBestSheet(wb)];
+      const idx = Number.isInteger(snap.headerRowIdx) ? snap.headerRowIdx : guessHeaderRow(parseSheetRaw(wb, sheets[0]));
+
+      let mergedHeaders: string[] = [];
+      let mergedRows: Record<string, any>[] = [];
+      for (const sheetName of sheets) {
+        if (!wb.SheetNames.includes(sheetName)) continue;
+        const { hdrs, dataRows } = buildHeaderedRows(parseSheetRaw(wb, sheetName), idx);
+        mergedRows = [...mergedRows, ...dataRows];
+        hdrs.forEach(h => { if (!mergedHeaders.includes(h)) mergedHeaders.push(h); });
+      }
+
+      setWorkbook(wb);
+      setSheetNames(wb.SheetNames);
+      setSelectedSheet(sheets[sheets.length - 1] || wb.SheetNames[0]);
+      setSourceSheets(sheets);
+      setHeaderRowIdx(idx);
+      setRawSheet(null);
+      setShowHeaderPicker(false);
+      setHeaders(mergedHeaders);
+      setRows(mergedRows);
+      setFileName(job.file_name || "");
+      setRawFile(null); // the stored file already lives in the bucket; nothing new to (re-)upload unless edited
+      setMapping(snap.mapping || {});
+      setEnabled(snap.enabled || {});
+      setCustomFields(snap.customFields || []);
+      setImportSource(snap.importSource || job.import_source || "direct");
+      setSourceCompany(snap.sourceCompany || job.source_company || "");
+      setResult(null);
+      setShowHistory(false);
+      setOpen(true);
+      toast.success(`تم استرجاع الملف والإعدادات السابقة (${mergedRows.length} صف) — راجعها ثم اضغط "حفظ" للاستكمال`);
+    } catch (e: any) {
+      toast.error(e.message || "تعذّر استرجاع الملف المحفوظ لهذه العملية");
+    } finally {
+      setResuming(false);
+    }
+  };
+
   const INSERT_BATCH_SIZE = 500;
 
   const submit = async () => {
@@ -687,6 +766,9 @@ const ApplicantsMappedImport = ({ onChanged, onImportComplete }: Props) => {
     // Record this run in applicant_import_jobs right away — before the slow duplicate-check
     // phase even starts — so a durable record exists no matter how early the tab dies. This
     // tracking is best-effort: if it fails, the import itself must still proceed normally.
+    // mapping_snapshot + the uploaded file itself are what let a later "Resume" rebuild this
+    // exact screen (mapping, enabled fields, custom fields, source tag) without the user
+    // re-uploading the file or re-selecting anything.
     let jobId: string | null = null;
     try {
       const { data: userData } = await supabase.auth.getUser();
@@ -699,8 +781,14 @@ const ApplicantsMappedImport = ({ onChanged, onImportComplete }: Props) => {
         total_rows: valid.length + localErrors.length,
         imported_by: userData.user?.id || null,
         imported_by_email: userData.user?.email || null,
+        mapping_snapshot: { mapping, enabled, customFields, sourceSheets, headerRowIdx, importSource, sourceCompany },
       }).select("id").single();
       jobId = job?.id || null;
+      if (jobId && rawFile) {
+        const path = `${jobId}/${rawFile.name}`;
+        const { error: uploadError } = await supabase.storage.from("import-drafts").upload(path, rawFile, { upsert: true });
+        if (!uploadError) await supabase.from("applicant_import_jobs").update({ file_path: path }).eq("id", jobId);
+      }
     } catch { /* best-effort tracking only */ }
 
     const updateJob = async (patch: Record<string, any>) => {
@@ -921,9 +1009,19 @@ const ApplicantsMappedImport = ({ onChanged, onImportComplete }: Props) => {
                   ⚠️ توجد عملية استيراد سابقة لم تكتمل (الملف: <b>{staleJob.file_name || "—"}</b> —
                   {" "}{staleJob.inserted_rows} محفوظ من {staleJob.total_rows}، توقفت منذ
                   {" "}{Math.round((Date.now() - new Date(staleJob.updated_at).getTime()) / 60000)} دقيقة).
-                  {" "}إذا كان نفس الملف محمّلاً بالأسفل، اضغط "حفظ" مرة أخرى لإكمالها بأمان دون تكرار ما تم حفظه.
+                  {" "}{staleJob.file_path
+                    ? "اضغط \"استكمال\" لاسترجاع الملف ونفس الحقول ومصدر البيانات تلقائياً دون رفع جديد."
+                    : "لا يوجد ملف محفوظ لها — إذا كان نفس الملف محمّلاً بالأسفل، اضغط \"حفظ\" مرة أخرى لإكمالها بأمان دون تكرار ما تم حفظه."}
                 </span>
-                <Button size="sm" variant="outline" onClick={() => { setShowHistory(true); loadJobHistory(); }}>عرض السجل</Button>
+                <div className="flex gap-2 shrink-0">
+                  {staleJob.file_path && (
+                    <Button size="sm" disabled={resuming} onClick={() => resumeFromJob(staleJob)} className="gap-1">
+                      {resuming ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null}
+                      استكمال
+                    </Button>
+                  )}
+                  <Button size="sm" variant="outline" onClick={() => { setShowHistory(true); loadJobHistory(); }}>عرض السجل</Button>
+                </div>
               </div>
             )}
             <div className="flex flex-wrap gap-2 items-center">
@@ -1249,7 +1347,7 @@ const ApplicantsMappedImport = ({ onChanged, onImportComplete }: Props) => {
                 إيقاف الاستيراد
               </Button>
             )}
-            <Button onClick={submit} disabled={loading || rows.length === 0} className="gap-1">
+            <Button onClick={submit} disabled={loading || resuming || rows.length === 0} className="gap-1">
               {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
               {loading
                 ? (progress ? `${progress.done}/${progress.total} — ${currentName || "..."}` : "جاري الحفظ...")
@@ -1308,11 +1406,18 @@ const ApplicantsMappedImport = ({ onChanged, onImportComplete }: Props) => {
                     <span className="text-destructive">فشل: {job.failed_rows}</span>
                   </div>
                   {job.error_message && <div className="text-xs text-destructive">{job.error_message}</div>}
-                  {job.errors?.length > 0 && (
-                    <Button size="sm" variant="outline" className="gap-1" onClick={() => downloadJobErrors(job)}>
-                      <Download className="w-3.5 h-3.5" /> تقرير الأخطاء
-                    </Button>
-                  )}
+                  <div className="flex gap-2 flex-wrap">
+                    {job.status !== "completed" && job.file_path && (
+                      <Button size="sm" disabled={resuming} className="gap-1" onClick={() => resumeFromJob(job)}>
+                        {resuming ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : null} استكمال
+                      </Button>
+                    )}
+                    {job.errors?.length > 0 && (
+                      <Button size="sm" variant="outline" className="gap-1" onClick={() => downloadJobErrors(job)}>
+                        <Download className="w-3.5 h-3.5" /> تقرير الأخطاء
+                      </Button>
+                    )}
+                  </div>
                 </div>
               );
             })}
