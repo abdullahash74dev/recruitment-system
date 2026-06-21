@@ -29,9 +29,16 @@ export const normText = (s: string | null | undefined) =>
 let cache: SynonymRow[] | null = null;
 const listeners = new Set<(rows: SynonymRow[]) => void>();
 
+// lookupSynonym() is called once per applicant in several places (filtering,
+// analytics charts) and redoes several regex passes per call — on 60k+ rows
+// that's enough to block the main thread. Memoize per field/lang/normalized
+// value (nested maps, not a concatenated string key, so no collision risk).
+let lookupCache = new Map<string, Map<string, Map<string, string | null>>>();
+
 async function fetchRows() {
   const { data } = await supabase.from("value_synonyms").select("*");
   cache = (data || []) as SynonymRow[];
+  lookupCache = new Map();
   listeners.forEach(l => l(cache!));
   return cache;
 }
@@ -74,7 +81,26 @@ export function lookupSynonym(
   if (!cache || !value) return null;
   const v = normText(value);
   if (!v) return null;
-  const fieldRows = cache.filter(r => r.field_name === fieldName);
+
+  let byLang = lookupCache.get(fieldName);
+  if (!byLang) {
+    byLang = new Map();
+    lookupCache.set(fieldName, byLang);
+  }
+  let byValue = byLang.get(lang);
+  if (!byValue) {
+    byValue = new Map();
+    byLang.set(lang, byValue);
+  }
+  if (byValue.has(v)) return byValue.get(v)!;
+
+  const result = resolveSynonym(fieldName, v, lang);
+  byValue.set(v, result);
+  return result;
+}
+
+function resolveSynonym(fieldName: string, v: string, lang: "ar" | "en"): string | null {
+  const fieldRows = cache!.filter(r => r.field_name === fieldName);
   if (fieldRows.length === 0) return null;
 
   // Exact match first
