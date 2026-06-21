@@ -7,7 +7,6 @@ import { TrendingUp, TrendingDown, Clock, UserCheck, UserX, Target, Activity } f
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface KPIs {
-  totalApplicants: number;
   totalLast30: number;
   totalPrev30: number;
   hired: number;
@@ -32,16 +31,16 @@ const ExecutiveKPIs = () => {
     const d30 = new Date(now.getTime() - 30 * 86400000).toISOString();
     const d60 = new Date(now.getTime() - 60 * 86400000).toISOString();
 
-    const [appsRes, candRes] = await Promise.all([
-      supabase.from("applicants").select("id, created_at, status", { count: "exact" }),
+    const [last30Res, prev30Res, candRes] = await Promise.all([
+      supabase.from("applicants").select("id", { count: "exact", head: true }).gte("created_at", d30),
+      supabase.from("applicants").select("id", { count: "exact", head: true }).gte("created_at", d60).lt("created_at", d30),
       supabase.from("recruitment_candidates").select("id, status, created_at, hire_date, actual_start_date, expected_start_date"),
     ]);
 
-    const apps = appsRes.data || [];
     const cands = candRes.data || [];
 
-    const totalLast30 = apps.filter((a: any) => a.created_at >= d30).length;
-    const totalPrev30 = apps.filter((a: any) => a.created_at >= d60 && a.created_at < d30).length;
+    const totalLast30 = last30Res.count || 0;
+    const totalPrev30 = prev30Res.count || 0;
 
     const hired = cands.filter((c: any) => ["hired", "started"].includes(c.status)).length;
     const rejected = cands.filter((c: any) => c.status === "rejected").length;
@@ -76,7 +75,6 @@ const ExecutiveKPIs = () => {
     const monthlyHires = Object.entries(monthBuckets).map(([month, hires]) => ({ month, hires }));
 
     setKpis({
-      totalApplicants: apps.length,
       totalLast30,
       totalPrev30,
       hired,

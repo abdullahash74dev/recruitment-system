@@ -53,14 +53,22 @@ interface ReportConfig {
 
 async function fetchData(scope: string, filters: Record<string, any> = {}) {
   const table = SCOPE_TABLES[scope] || "applicants";
-  let q = admin.from(table).select("*");
-  for (const [k, v] of Object.entries(filters)) {
-    if (v === null || v === undefined || v === "") continue;
-    q = q.eq(k, v);
+  // Paginated: a flat .limit() silently truncates reports once a scope's
+  // table exceeds the page size, so rebuild the filtered query per page instead.
+  const PAGE_SIZE = 1000;
+  const rows: any[] = [];
+  for (let from = 0; ; from += PAGE_SIZE) {
+    let q = admin.from(table).select("*");
+    for (const [k, v] of Object.entries(filters)) {
+      if (v === null || v === undefined || v === "") continue;
+      q = q.eq(k, v);
+    }
+    const { data, error } = await q.range(from, from + PAGE_SIZE - 1);
+    if (error) throw error;
+    rows.push(...(data || []));
+    if (!data || data.length < PAGE_SIZE) break;
   }
-  const { data, error } = await q.limit(10000);
-  if (error) throw error;
-  return data || [];
+  return rows;
 }
 
 function applyNormalization(rows: any[], lang: Lang, synMap: Map<string, { ar: string; en: string }>) {

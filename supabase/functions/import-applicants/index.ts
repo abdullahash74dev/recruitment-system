@@ -241,9 +241,18 @@ Deno.serve(async (req) => {
     // AI flags
     const ai = useAi ? await aiAnalyze(rows) : { insights: "", flags: {} };
 
-    // Pre-load existing for dup check
-    const { data: existing } = await supabase.from("applicants").select("email,phone,full_name");
-    const existingKeys = new Set((existing || []).map((e: any) =>
+    // Pre-load existing for dup check, paginated because the table can exceed the default 1000-row read limit
+    const existing: any[] = [];
+    {
+      const PAGE_SIZE = 1000;
+      for (let from = 0; ; from += PAGE_SIZE) {
+        const { data: page, error: pageError } = await supabase.from("applicants").select("email,phone,full_name").range(from, from + PAGE_SIZE - 1);
+        if (pageError) throw pageError;
+        existing.push(...(page || []));
+        if (!page || page.length < PAGE_SIZE) break;
+      }
+    }
+    const existingKeys = new Set(existing.map((e: any) =>
       `${(e.email || "").toLowerCase().trim()}|${(e.phone || "").replace(/\D/g, "")}|${(e.full_name || "").toLowerCase().trim()}`
     ));
 
