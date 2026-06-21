@@ -274,6 +274,7 @@ const DashboardPage = () => {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showTransferDialog, setShowTransferDialog] = useState(false);
   const [showSourceCorrectionDialog, setShowSourceCorrectionDialog] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   useEffect(() => {
     fetchApplicants();
@@ -427,56 +428,104 @@ const DashboardPage = () => {
     return data?.signedUrl || "";
   };
 
-  const exportExcel = () => {
-    const rows = filtered.map(a => ({
-      [t("dash.name")]: a.full_name,
-      [t("field.email")]: a.email,
-      [t("field.phone")]: a.phone,
-      [t("field.gender")]: a.gender,
-      [t("field.nationality")]: a.nationality,
-      [t("field.birthDate")]: a.birth_date,
-      [t("field.maritalStatus")]: a.marital_status,
-      [t("field.dependents")]: a.dependents,
-      [t("field.currentCity")]: a.current_city,
-      [t("field.hasTransport")]: a.has_transport,
-      [t("dash.position")]: a.desired_position,
-      [t("field.jobType")]: a.job_type,
-      [t("dash.city")]: a.preferred_city,
-      [t("field.hearAbout")]: a.hear_about,
-      [t("field.educationLevel")]: a.education_level,
-      [t("field.major")]: a.major,
-      [t("field.university")]: a.university,
-      [t("field.graduationYear")]: a.graduation_year,
-      [t("field.gpa")]: a.gpa,
-      [t("field.currentlyStudying")]: a.currently_studying,
-      [t("field.currentStudy")]: a.current_study,
-      [t("field.yearsExperience")]: a.years_experience,
-      [t("field.currentlyEmployed")]: a.currently_employed,
-      [t("field.currentTitle")]: a.current_title,
-      [t("field.currentTasks")]: a.current_tasks,
-      [t("field.selfSummary")]: a.self_summary,
-      [t("field.otherExperience")]: a.other_experience,
-      [t("field.arabicLevel")]: a.arabic_level,
-      [t("field.englishLevel")]: a.english_level,
-      [t("field.otherLanguage")]: a.other_language,
-      [t("field.linkedin")]: a.linkedin,
-      [t("field.currentSalary")]: a.current_salary,
-      [t("field.expectedSalary")]: a.expected_salary,
-      [t("field.availableDate")]: a.available_date,
-      [t("dash.status")]: t(`status.${a.status}`),
-      [t("dash.date")]: new Date(a.created_at).toLocaleDateString(lang === "ar" ? "ar-SA" : "en-US"),
-      [t("dash.notes")]: a.notes,
-      [t("field.resume")]: getFileUrl(a.resume_url),
-      [t("field.degreeCopy")]: getFileUrl(a.degree_url),
-      [t("field.experienceCert")]: getFileUrl(a.experience_cert_url),
-      [t("field.trainingCerts")]: getFileUrl(a.training_certs_url),
-      [t("field.otherDocs")]: getFileUrl(a.other_docs_url),
-    }));
-    const ws = XLSX.utils.json_to_sheet(rows);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, t("dash.applicants"));
-    XLSX.writeFile(wb, `applicants_${new Date().toISOString().split("T")[0]}.xlsx`);
-    toast.success(lang === "ar" ? `تم تصدير ${rows.length} متقدم` : `Exported ${rows.length} applicants`);
+  const exportExcel = async () => {
+    setIsExporting(true);
+    try {
+      const applicantIds = filtered.map(a => a.id);
+      const [{ data: customQuestions }, { data: customAnswers }] = await Promise.all([
+        supabase
+          .from("custom_questions")
+          .select("id, question_ar, question_en")
+          .eq("is_active", true)
+          .order("step_number", { ascending: true })
+          .order("sort_order", { ascending: true }),
+        applicantIds.length
+          ? supabase.from("custom_answers").select("applicant_id, question_id, answer").in("applicant_id", applicantIds)
+          : Promise.resolve({ data: [] as { applicant_id: string; question_id: string; answer: string | null }[] }),
+      ]);
+
+      const answersByApplicant = new Map<string, Map<string, string>>();
+      (customAnswers || []).forEach(ans => {
+        if (!answersByApplicant.has(ans.applicant_id)) answersByApplicant.set(ans.applicant_id, new Map());
+        answersByApplicant.get(ans.applicant_id)!.set(ans.question_id, ans.answer || "");
+      });
+
+      const rows = filtered.map(a => ({
+        [t("dash.name")]: a.full_name,
+        [t("field.email")]: a.email,
+        [t("field.phone")]: a.phone,
+        [t("field.gender")]: a.gender,
+        [t("field.nationality")]: a.nationality,
+        [t("field.birthDate")]: a.birth_date,
+        [t("field.maritalStatus")]: a.marital_status,
+        [t("field.dependents")]: a.dependents,
+        [t("field.currentCity")]: a.current_city,
+        [t("field.hasTransport")]: a.has_transport,
+        [t("dash.position")]: a.desired_position,
+        [t("field.jobType")]: a.job_type,
+        [t("dash.city")]: a.preferred_city,
+        [t("field.hearAbout")]: a.hear_about,
+        [t("field.educationLevel")]: a.education_level,
+        [t("field.major")]: a.major,
+        [t("field.university")]: a.university,
+        [t("field.graduationYear")]: a.graduation_year,
+        [t("field.gpa")]: a.gpa,
+        [t("field.currentlyStudying")]: a.currently_studying,
+        [t("field.currentStudy")]: a.current_study,
+        [t("field.yearsExperience")]: a.years_experience,
+        [t("field.currentlyEmployed")]: a.currently_employed,
+        [t("field.currentTitle")]: a.current_title,
+        [t("field.currentTasks")]: a.current_tasks,
+        [t("field.selfSummary")]: a.self_summary,
+        [t("field.otherExperience")]: a.other_experience,
+        [t("field.arabicLevel")]: a.arabic_level,
+        [t("field.englishLevel")]: a.english_level,
+        [t("field.otherLanguage")]: a.other_language,
+        [t("field.linkedin")]: a.linkedin,
+        [t("field.currentSalary")]: a.current_salary,
+        [t("field.expectedSalary")]: a.expected_salary,
+        [t("field.availableDate")]: a.available_date,
+        [t("dash.status")]: t(`status.${a.status}`),
+        [t("dash.date")]: new Date(a.created_at).toLocaleDateString(lang === "ar" ? "ar-SA" : "en-US"),
+        [t("dash.notes")]: a.notes,
+        [t("field.resume")]: getFileUrl(a.resume_url),
+        [t("field.degreeCopy")]: getFileUrl(a.degree_url),
+        [t("field.experienceCert")]: getFileUrl(a.experience_cert_url),
+        [t("field.trainingCerts")]: getFileUrl(a.training_certs_url),
+        [t("field.otherDocs")]: getFileUrl(a.other_docs_url),
+        ...Object.fromEntries(
+          (customQuestions || []).map(q => [
+            (lang === "ar" ? q.question_ar : q.question_en || q.question_ar) || q.id,
+            answersByApplicant.get(a.id)?.get(q.id) || "",
+          ])
+        ),
+      }));
+
+      const externalCompanies = Array.from(
+        new Set(filtered.map(a => a.source_company?.trim()).filter((c): c is string => !!c))
+      );
+      const exportDate = new Date().toLocaleDateString(lang === "ar" ? "ar-SA" : "en-US");
+      const signatureLines = externalCompanies.map(company =>
+        lang === "ar"
+          ? `جميع الحقوق محفوظة لشركة ${company} · تاريخ التصدير: ${exportDate}`
+          : `All rights reserved to ${company} · Export date: ${exportDate}`
+      );
+
+      const dataStartRow = signatureLines.length ? signatureLines.length + 2 : 1;
+      const ws = XLSX.utils.json_to_sheet(rows, { origin: `A${dataStartRow}` });
+      if (signatureLines.length) {
+        XLSX.utils.sheet_add_aoa(ws, signatureLines.map(line => [line]), { origin: "A1" });
+      }
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, t("dash.applicants"));
+      XLSX.writeFile(wb, `applicants_${new Date().toISOString().split("T")[0]}.xlsx`);
+      toast.success(lang === "ar" ? `تم تصدير ${rows.length} متقدم` : `Exported ${rows.length} applicants`);
+    } catch (err) {
+      console.error(err);
+      toast.error(lang === "ar" ? "حدث خطأ أثناء التصدير" : "Export failed");
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   // Job CRUD
@@ -1000,6 +1049,7 @@ const DashboardPage = () => {
                     <Button
                       onClick={() => { if (dataStreaming) { notifyStillLoading(); return; } exportExcel(); }}
                       variant="outline"
+                      disabled={isExporting}
                       className={`gap-2 ${dataStreaming ? "opacity-50" : ""}`}
                     >
                       <Download className="w-4 h-4" />{t("dash.export")}
