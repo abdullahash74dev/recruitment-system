@@ -106,11 +106,23 @@ Deno.serve(async (req) => {
       if (!fieldLookup || fieldLookup.size === 0) continue;
 
       // Fetch all applicants with at least one of the relevant columns set
+      // (paginated: a flat .limit() would silently skip applicants past the page size
+      // once the table exceeds it, leaving the rest un-normalized)
       const selectCols = ["id", ...cols].join(",");
-      const { data: apps } = await admin.from("applicants").select(selectCols).limit(10000);
+      const apps: any[] = [];
+      const PAGE_SIZE = 1000;
+      for (let from = 0; ; from += PAGE_SIZE) {
+        const { data: page, error: pageError } = await admin
+          .from("applicants")
+          .select(selectCols)
+          .range(from, from + PAGE_SIZE - 1);
+        if (pageError) throw pageError;
+        apps.push(...(page || []));
+        if (!page || page.length < PAGE_SIZE) break;
+      }
 
       const counts = new Map<string, number>(); // "col|from->to" -> count
-      (apps || []).forEach((a: any) => {
+      apps.forEach((a: any) => {
         const updates: Record<string, string> = {};
         for (const col of cols) {
           const v = a[col];

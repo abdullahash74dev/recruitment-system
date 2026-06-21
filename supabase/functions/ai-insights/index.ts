@@ -17,6 +17,23 @@ const admin = createClient(supabaseUrl, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY"
 type ApplicantRow = { status: string | null; desired_position: string | null; created_at: string; is_archived: boolean | null };
 type JobRow = { title_ar: string; title_en: string | null; is_active: boolean };
 
+// Fetch every applicant row (paginated): a flat .limit() caps out well below
+// the real table size and silently makes the insights blind to most of the data.
+async function fetchAllApplicantRows(): Promise<ApplicantRow[]> {
+  const PAGE_SIZE = 1000;
+  const rows: ApplicantRow[] = [];
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await admin
+      .from("applicants")
+      .select("status, desired_position, created_at, is_archived")
+      .range(from, from + PAGE_SIZE - 1);
+    if (error) throw error;
+    rows.push(...((data as ApplicantRow[]) || []));
+    if (!data || data.length < PAGE_SIZE) break;
+  }
+  return rows;
+}
+
 function buildStats(applicants: ApplicantRow[], jobs: JobRow[]) {
   const active = applicants.filter((a) => a.is_archived !== true);
 
@@ -162,12 +179,12 @@ serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const lang: string = body?.lang === "ar" ? "ar" : "en";
 
-    const [{ data: applicants }, { data: jobs }] = await Promise.all([
-      admin.from("applicants").select("status, desired_position, created_at, is_archived").limit(2000),
+    const [applicants, { data: jobs }] = await Promise.all([
+      fetchAllApplicantRows(),
       admin.from("job_postings").select("title_ar, title_en, is_active"),
     ]);
 
-    const stats = buildStats((applicants as ApplicantRow[]) || [], (jobs as JobRow[]) || []);
+    const stats = buildStats(applicants, (jobs as JobRow[]) || []);
 
     const result = await generateInsights(lang, stats, u.user.id, u.user.email ?? null);
     if ("error" in result) {

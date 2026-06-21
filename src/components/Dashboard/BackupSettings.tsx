@@ -7,6 +7,25 @@ import { toast } from "sonner";
 import { Download, Database, FileSpreadsheet, FileJson } from "lucide-react";
 import * as XLSX from "xlsx";
 
+type BackupTable = "applicants" | "job_postings" | "custom_questions" | "custom_answers" | "projects" | "profiles";
+
+// Paginated fetch: a flat .select("*") is silently capped at the platform's
+// default row limit, which would make a backup report "success" while only
+// capturing a fraction of large tables like applicants.
+const fetchAllRows = async (table: BackupTable, orderBy?: string) => {
+  const PAGE_SIZE = 1000;
+  const rows: any[] = [];
+  for (let from = 0; ; from += PAGE_SIZE) {
+    let q = supabase.from(table).select("*");
+    if (orderBy) q = q.order(orderBy, { ascending: false });
+    const { data, error } = await q.range(from, from + PAGE_SIZE - 1);
+    if (error) throw error;
+    rows.push(...(data || []));
+    if (!data || data.length < PAGE_SIZE) break;
+  }
+  return rows;
+};
+
 const BackupSettings = () => {
   const { lang, t } = useLanguage();
   const [exporting, setExporting] = useState(false);
@@ -14,14 +33,14 @@ const BackupSettings = () => {
   const exportAllData = async (format: "xlsx" | "json") => {
     setExporting(true);
     try {
-      // Fetch all tables
-      const [applicantsRes, jobsRes, customQRes, customARes, projectsRes, profilesRes] = await Promise.all([
-        supabase.from("applicants").select("*").order("created_at", { ascending: false }),
-        supabase.from("job_postings").select("*").order("created_at", { ascending: false }),
-        supabase.from("custom_questions").select("*"),
-        supabase.from("custom_answers").select("*"),
-        supabase.from("projects").select("*"),
-        supabase.from("profiles").select("*"),
+      // Fetch all tables (fully, via pagination)
+      const [applicants, jobPostings, customQuestions, customAnswers, projects, profiles] = await Promise.all([
+        fetchAllRows("applicants", "created_at"),
+        fetchAllRows("job_postings", "created_at"),
+        fetchAllRows("custom_questions"),
+        fetchAllRows("custom_answers"),
+        fetchAllRows("projects"),
+        fetchAllRows("profiles"),
       ]);
 
       const dateStr = new Date().toISOString().split("T")[0];
@@ -29,12 +48,12 @@ const BackupSettings = () => {
       if (format === "json") {
         const backup = {
           exported_at: new Date().toISOString(),
-          applicants: applicantsRes.data || [],
-          job_postings: jobsRes.data || [],
-          custom_questions: customQRes.data || [],
-          custom_answers: customARes.data || [],
-          projects: projectsRes.data || [],
-          profiles: profilesRes.data || [],
+          applicants,
+          job_postings: jobPostings,
+          custom_questions: customQuestions,
+          custom_answers: customAnswers,
+          projects,
+          profiles,
         };
         const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
         const url = URL.createObjectURL(blob);
@@ -53,12 +72,12 @@ const BackupSettings = () => {
           }
         };
 
-        addSheet(applicantsRes.data || [], lang === "ar" ? "المتقدمين" : "Applicants");
-        addSheet(jobsRes.data || [], lang === "ar" ? "الوظائف" : "Jobs");
-        addSheet(customQRes.data || [], lang === "ar" ? "الأسئلة" : "Questions");
-        addSheet(customARes.data || [], lang === "ar" ? "الإجابات" : "Answers");
-        addSheet(projectsRes.data || [], lang === "ar" ? "المشاريع" : "Projects");
-        addSheet(profilesRes.data || [], lang === "ar" ? "المستخدمين" : "Users");
+        addSheet(applicants, lang === "ar" ? "المتقدمين" : "Applicants");
+        addSheet(jobPostings, lang === "ar" ? "الوظائف" : "Jobs");
+        addSheet(customQuestions, lang === "ar" ? "الأسئلة" : "Questions");
+        addSheet(customAnswers, lang === "ar" ? "الإجابات" : "Answers");
+        addSheet(projects, lang === "ar" ? "المشاريع" : "Projects");
+        addSheet(profiles, lang === "ar" ? "المستخدمين" : "Users");
 
         XLSX.writeFile(wb, `backup_${dateStr}.xlsx`);
       }

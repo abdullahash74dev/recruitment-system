@@ -33,10 +33,25 @@ export default function JobCategoriesManager() {
 
   const load = async () => {
     setLoading(true);
-    const [catsRes, mapRes, appsRes, recRes] = await Promise.all([
+    // Applicants is paginated: a flat .limit() would only scan a fraction of
+    // desired_position values once the table exceeds the page size, leaving
+    // most job titles undiscovered for categorization.
+    const fetchAllDesiredPositions = async () => {
+      const PAGE_SIZE = 1000;
+      const rows: { desired_position: string | null }[] = [];
+      for (let from = 0; ; from += PAGE_SIZE) {
+        const { data, error } = await supabase.from("applicants").select("desired_position").range(from, from + PAGE_SIZE - 1);
+        if (error) throw error;
+        rows.push(...(data || []));
+        if (!data || data.length < PAGE_SIZE) break;
+      }
+      return rows;
+    };
+
+    const [catsRes, mapRes, appsRows, recRes] = await Promise.all([
       supabase.from("job_categories").select("*").order("sort_order"),
       supabase.from("job_title_categories").select("*"),
-      supabase.from("applicants").select("desired_position").limit(10000),
+      fetchAllDesiredPositions(),
       supabase.from("recruitment_job_titles").select("title_ar"),
     ]);
     setCategories((catsRes.data || []) as Category[]);
@@ -55,7 +70,7 @@ export default function JobCategoriesManager() {
       if (cur) cur.count++;
       else agg.set(n, { display: t, count: 1 });
     };
-    (appsRes.data || []).forEach((r: any) => consume(r.desired_position));
+    appsRows.forEach((r) => consume(r.desired_position));
     (recRes.data || []).forEach((r: any) => consume(r.title_ar));
 
     const rows: TitleRow[] = Array.from(agg.entries()).map(([n, v]) => ({
