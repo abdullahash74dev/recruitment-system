@@ -95,4 +95,28 @@ describe("synonym-group-aware applicant filtering", () => {
     );
     expect(result.map((a) => a.id)).toEqual(["1"]);
   });
+
+  it("stays fast on a 62k-row dataset (regression: this used to freeze the main thread)", async () => {
+    const { applyAdvancedFilters } = await import("@/components/Dashboard/ApplicantsAdvancedFilters");
+    // Indices 0-2 belong to the "HR Specialist" canonical group; 3-6 don't.
+    const variants = ["HR Specialist", "اخصائي شؤون الموظفين", "أخصائي موارد بشرية", "HR Manager", "مدير الموارد البشرية", "محاسب", "مطور برمجيات"];
+    const applicants = Array.from({ length: 62000 }, (_, i) => ({
+      id: String(i),
+      desired_position: variants[i % variants.length],
+    }));
+    const expectedMatches = applicants.filter((a) => variants.indexOf(a.desired_position) <= 2).length;
+
+    const start = performance.now();
+    const result = applyAdvancedFilters(
+      applicants,
+      [{ field: "desired_position", value: "__canon__:اخصائي موارد بشرية" }],
+      null,
+    );
+    const elapsedMs = performance.now() - start;
+
+    expect(result.length).toBe(expectedMatches);
+    // Generous bound for CI noise — the unoptimized per-applicant lookupSynonym
+    // version of this took multiple seconds and froze a real browser tab.
+    expect(elapsedMs).toBeLessThan(1500);
+  });
 });

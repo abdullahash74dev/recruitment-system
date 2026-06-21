@@ -140,16 +140,25 @@ export default function ApplicantsAdvancedFilters({
   const synField = SYNONYM_FIELD_MAP[newField];
   const canonicalGroups = useMemo(() => {
     if (!synField) return [];
-    return synonymRows
-      .filter((r) => r.field_name === synField)
+    const fieldRows = synonymRows.filter((r) => r.field_name === synField);
+    if (fieldRows.length === 0) return [];
+    // Resolve each *distinct* value once (not once per applicant — distinctValues
+    // is already a tiny aggregate of the full dataset) and weight by its count,
+    // since calling lookupSynonym per applicant on 60k+ rows blocks the main thread.
+    const countByCanon = new Map<string, number>();
+    for (const { value, count } of distinctValues) {
+      const canon = lookupSynonym(synField, value, "ar");
+      if (canon) countByCanon.set(canon, (countByCanon.get(canon) || 0) + count);
+    }
+    return fieldRows
       .map((r) => ({
         canonical_ar: r.canonical_ar,
         canonical_en: r.canonical_en,
         synonymCount: (r.synonyms || []).length + 1,
-        count: applicants.reduce((n, a) => n + (lookupSynonym(synField, a[newField], "ar") === r.canonical_ar ? 1 : 0), 0),
+        count: countByCanon.get(r.canonical_ar) || 0,
       }))
       .sort((a, b) => b.count - a.count);
-  }, [synonymRows, synField, applicants, newField]);
+  }, [synonymRows, synField, distinctValues]);
 
   const filteredCanonicalGroups = useMemo(() => {
     const q = valueSearch.trim().toLowerCase();
