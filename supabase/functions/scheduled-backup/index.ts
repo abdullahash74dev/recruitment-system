@@ -42,16 +42,31 @@ const BACKUP_TABLES = [
 const RETENTION_DAYS = 30;
 const BACKUP_FOLDER = "auto";
 
+// Fetch every row of a table (paginated): a flat .select("*") is silently
+// capped at the platform's default row limit, which would make a backup
+// report "success" while only capturing a fraction of large tables like
+// applicants (up to ~67k rows).
+async function fetchAllRows(table: string): Promise<Record<string, unknown>[]> {
+  const PAGE_SIZE = 1000;
+  const rows: Record<string, unknown>[] = [];
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await admin.from(table).select("*").range(from, from + PAGE_SIZE - 1);
+    if (error) throw new Error(`${table}: ${error.message}`);
+    rows.push(...(data || []));
+    if (!data || data.length < PAGE_SIZE) break;
+  }
+  return rows;
+}
+
 async function runBackup(triggeredBy: "cron" | "manual", triggeredByUser: string | null) {
   const snapshot: Record<string, unknown> = { exported_at: new Date().toISOString() };
   const summary: Record<string, number> = {};
 
-  for (const table of BACKUP_TABLES) {
-    const { data, error } = await admin.from(table).select("*");
-    if (error) throw new Error(`${table}: ${error.message}`);
-    snapshot[table] = data || [];
-    summary[table] = data?.length || 0;
-  }
+  const tableRows = await Promise.all(BACKUP_TABLES.map((table) => fetchAllRows(table)));
+  BACKUP_TABLES.forEach((table, i) => {
+    snapshot[table] = tableRows[i];
+    summary[table] = tableRows[i].length;
+  });
 
   const json = JSON.stringify(snapshot, null, 2);
   const bytes = new TextEncoder().encode(json);
