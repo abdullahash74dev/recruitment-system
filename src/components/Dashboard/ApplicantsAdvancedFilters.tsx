@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,7 +8,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Sparkles, SlidersHorizontal, X, Loader2, TrendingUp, Users, MapPin, GraduationCap, Briefcase, Download, FileArchive, ChevronDown, Check } from "lucide-react";
+import { Sparkles, SlidersHorizontal, X, Loader2, TrendingUp, Users, MapPin, GraduationCap, Briefcase, Download, FileArchive, ChevronDown, Check, Save, History, Trash2 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -45,6 +45,15 @@ const FILTER_FIELDS = [
 
 export type AdvancedFilter = { field: string; value: string };
 
+type SavedFilter = {
+  id: string;
+  name: string;
+  criteria: AdvancedFilter[];
+  result_count: number | null;
+  created_by: string | null;
+  created_at: string;
+};
+
 interface Props {
   applicants: any[];
   lang: "ar" | "en";
@@ -55,11 +64,12 @@ interface Props {
   aiSummary: string;
   setAiSummary: (s: string) => void;
   locked?: boolean;
+  isAdmin?: boolean;
 }
 
 export default function ApplicantsAdvancedFilters({
   applicants, lang, filters, setFilters,
-  aiSelectedIds, setAiSelectedIds, aiSummary, setAiSummary, locked,
+  aiSelectedIds, setAiSelectedIds, aiSummary, setAiSummary, locked, isAdmin,
 }: Props) {
   const [newField, setNewField] = useState<string>("nationality");
   const [picked, setPicked] = useState<Set<string>>(new Set());
@@ -130,6 +140,68 @@ export default function ApplicantsAdvancedFilters({
     setAiSummary("");
     setAiResult(null);
     setAiPrompt("");
+  };
+
+  // Saved filters: persist named field/value combinations so work isn't lost on refresh
+  const [savedFilters, setSavedFilters] = useState<SavedFilter[]>([]);
+  const [profilesMap, setProfilesMap] = useState<Map<string, { display_name: string | null; email: string | null }>>(new Map());
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [saveName, setSaveName] = useState("");
+  const [savePopoverOpen, setSavePopoverOpen] = useState(false);
+  const [savingFilter, setSavingFilter] = useState(false);
+
+  const loadSavedFilters = async () => {
+    const { data } = await supabase.from("saved_filters").select("*").order("created_at", { ascending: false });
+    setSavedFilters((data || []) as unknown as SavedFilter[]);
+  };
+
+  useEffect(() => {
+    loadSavedFilters();
+    supabase.from("profiles").select("user_id, display_name, email").then(({ data }) => {
+      const m = new Map<string, { display_name: string | null; email: string | null }>();
+      (data || []).forEach((p: any) => m.set(p.user_id, { display_name: p.display_name, email: p.email }));
+      setProfilesMap(m);
+    });
+    supabase.auth.getUser().then(({ data }) => setCurrentUserId(data.user?.id || null));
+  }, []);
+
+  const creatorLabel = (uid: string | null) => {
+    if (!uid) return "—";
+    const p = profilesMap.get(uid);
+    return p?.display_name || p?.email || "—";
+  };
+
+  const saveCurrentFilter = async () => {
+    if (filters.length === 0) {
+      toast.error(lang === "ar" ? "لا يوجد فلتر لحفظه" : "No filter to save");
+      return;
+    }
+    const name = saveName.trim() || (lang === "ar" ? `فلتر ${new Date().toLocaleString("ar")}` : `Filter ${new Date().toLocaleString()}`);
+    setSavingFilter(true);
+    const { data: { user } } = await supabase.auth.getUser();
+    const resultCount = applyAdvancedFilters(applicants, filters, null).length;
+    const { error } = await supabase.from("saved_filters").insert({
+      name, criteria: filters as any, result_count: resultCount, created_by: user?.id,
+    });
+    setSavingFilter(false);
+    if (error) return toast.error(error.message);
+    toast.success(lang === "ar" ? "تم حفظ الفلتر" : "Filter saved");
+    setSaveName("");
+    setSavePopoverOpen(false);
+    loadSavedFilters();
+  };
+
+  const applySavedFilter = (sf: SavedFilter) => {
+    setFilters(Array.isArray(sf.criteria) ? sf.criteria : []);
+    setAiSelectedIds(null);
+    toast.success(lang === "ar" ? `تم تطبيق "${sf.name}"` : `Applied "${sf.name}"`);
+  };
+
+  const deleteSavedFilter = async (id: string) => {
+    if (!confirm(lang === "ar" ? "حذف هذا الفلتر المحفوظ؟" : "Delete this saved filter?")) return;
+    const { error } = await supabase.from("saved_filters").delete().eq("id", id);
+    if (error) return toast.error(error.message);
+    setSavedFilters((prev) => prev.filter((f) => f.id !== id));
   };
 
   const runAi = async () => {
@@ -632,6 +704,66 @@ export default function ApplicantsAdvancedFilters({
               </Button>
               <Button variant="ghost" onClick={clearAll} className="gap-1"><X className="w-4 h-4" />{lang === "ar" ? "مسح الكل" : "Clear all"}</Button>
             </>
+          )}
+        </div>
+
+        {/* Saved filters */}
+        <div className="flex flex-wrap items-center gap-2 pt-1 border-t">
+          <Popover open={savePopoverOpen} onOpenChange={setSavePopoverOpen}>
+            <PopoverTrigger asChild>
+              <Button variant="outline" size="sm" className="gap-1" disabled={filters.length === 0}>
+                <Save className="w-3.5 h-3.5" />{lang === "ar" ? "حفظ الفلتر الحالي" : "Save current filter"}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-80 p-3 space-y-2" align="start">
+              <Label className="text-xs">{lang === "ar" ? "اسم الفلتر" : "Filter name"}</Label>
+              <Input
+                autoFocus
+                placeholder={lang === "ar" ? `فلتر ${new Date().toLocaleDateString("ar")}` : `Filter ${new Date().toLocaleDateString()}`}
+                value={saveName}
+                onChange={(e) => setSaveName(e.target.value)}
+              />
+              <Button size="sm" className="w-full gap-1" onClick={saveCurrentFilter} disabled={savingFilter}>
+                {savingFilter ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                {lang === "ar" ? "حفظ" : "Save"}
+              </Button>
+            </PopoverContent>
+          </Popover>
+
+          {savedFilters.length > 0 && (
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-1">
+                  <History className="w-3.5 h-3.5" />
+                  {lang === "ar" ? `الفلاتر المحفوظة (${savedFilters.length})` : `Saved filters (${savedFilters.length})`}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[380px] p-0" align="start">
+                <ScrollArea className="max-h-[320px]">
+                  <div className="p-1">
+                    {savedFilters.map((sf) => (
+                      <div key={sf.id} className="flex items-start gap-2 px-2 py-2 rounded hover:bg-muted text-sm border-b last:border-b-0">
+                        <button type="button" className="flex-1 text-start" onClick={() => applySavedFilter(sf)}>
+                          <div className="font-medium truncate">{sf.name}</div>
+                          <div className="text-[11px] text-muted-foreground flex flex-wrap gap-x-2">
+                            <span>{new Date(sf.created_at).toLocaleString(lang === "ar" ? "ar" : "en")}</span>
+                            <span>· {creatorLabel(sf.created_by)}</span>
+                            {sf.result_count != null && (
+                              <span>· {sf.result_count} {lang === "ar" ? "نتيجة" : "results"}</span>
+                            )}
+                          </div>
+                        </button>
+                        {(sf.created_by === currentUserId || isAdmin) && (
+                          <Button size="icon" variant="ghost" className="h-6 w-6 shrink-0" onClick={() => deleteSavedFilter(sf.id)}>
+                            <Trash2 className="h-3 w-3 text-destructive" />
+                          </Button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </PopoverContent>
+            </Popover>
           )}
         </div>
 

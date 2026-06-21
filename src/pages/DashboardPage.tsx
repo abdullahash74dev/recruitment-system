@@ -978,6 +978,7 @@ const DashboardPage = () => {
               aiSummary={aiSummary}
               setAiSummary={setAiSummary}
               locked={dataStreaming}
+              isAdmin={isAdmin}
             />
             <Card>
               <CardHeader className="pb-4">

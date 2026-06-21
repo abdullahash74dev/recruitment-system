@@ -1556,6 +1556,33 @@ export type Database = {
         }
         Relationships: []
       }
+      saved_filters: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          criteria: Json
+          id: string
+          name: string
+          result_count: number | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          criteria?: Json
+          id?: string
+          name: string
+          result_count?: number | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          criteria?: Json
+          id?: string
+          name?: string
+          result_count?: number | null
+        }
+        Relationships: []
+      }
       scheduled_reports: {
         Row: {
           created_at: string
