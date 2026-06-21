@@ -428,7 +428,7 @@ const DashboardPage = () => {
   };
 
   const exportExcel = () => {
-    const rows = applicants.map(a => ({
+    const rows = filtered.map(a => ({
       [t("dash.name")]: a.full_name,
       [t("field.email")]: a.email,
       [t("field.phone")]: a.phone,
@@ -476,6 +476,7 @@ const DashboardPage = () => {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, t("dash.applicants"));
     XLSX.writeFile(wb, `applicants_${new Date().toISOString().split("T")[0]}.xlsx`);
+    toast.success(lang === "ar" ? `تم تصدير ${rows.length} متقدم` : `Exported ${rows.length} applicants`);
   };
 
   // Job CRUD
