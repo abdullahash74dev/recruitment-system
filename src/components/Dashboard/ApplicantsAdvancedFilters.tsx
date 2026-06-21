@@ -8,13 +8,14 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Sparkles, SlidersHorizontal, X, Loader2, TrendingUp, Users, MapPin, GraduationCap, Briefcase, Download, FileArchive, ChevronDown, Check, Save, History, Trash2 } from "lucide-react";
+import { Sparkles, SlidersHorizontal, X, Loader2, TrendingUp, Users, MapPin, GraduationCap, Briefcase, Download, FileArchive, ChevronDown, Check, Save, History, Trash2, Link2 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import JSZip from "jszip";
 import AiFilterBuilder from "./AiFilterBuilder";
+import { useValueSynonyms, lookupSynonym } from "@/hooks/useValueSynonyms";
 
 type AiMatch = { id: string; score: number; reason: string };
 type AiStats = { by_nationality: { key: string; count: number }[]; by_education: { key: string; count: number }[]; by_city: { key: string; count: number }[]; by_position: { key: string; count: number }[] };
@@ -42,6 +43,33 @@ const FILTER_FIELDS = [
   { key: "source", ar: "المصدر (direct/external)", en: "Source (direct/external)" },
   { key: "source_company", ar: "اسم الشركة المصدر", en: "Source Company" },
 ] as const;
+
+// Maps a filterable applicant column to its value_synonyms.field_name, for fields
+// where an admin can define canonical bilingual groups (see SynonymsManager.tsx).
+// "current_city" is the odd one out: the column is current_city but the synonym
+// group is shared with preferred_city under field_name "city".
+const SYNONYM_FIELD_MAP: Record<string, string> = {
+  nationality: "nationality",
+  desired_position: "desired_position",
+  preferred_city: "preferred_city",
+  current_city: "city",
+  gender: "gender",
+  marital_status: "marital_status",
+  education_level: "education_level",
+  major: "major",
+  university: "university",
+  job_type: "job_type",
+  current_title: "current_title",
+  currently_employed: "currently_employed",
+  has_transport: "has_transport",
+  arabic_level: "arabic_level",
+  english_level: "english_level",
+  hear_about: "hear_about",
+};
+
+// Filter values for a canonical synonym group are encoded with this prefix so
+// matching can use lookupSynonym() instead of a literal substring comparison.
+const CANON_PREFIX = "__canon__:";
 
 export type AdvancedFilter = { field: string; value: string };
 
@@ -104,6 +132,30 @@ export default function ApplicantsAdvancedFilters({
     if (!q) return distinctValues;
     return distinctValues.filter((d) => d.value.toLowerCase().includes(q));
   }, [distinctValues, valueSearch]);
+
+  // Canonical bilingual-synonym groups for the selected field (e.g. all the
+  // ways "اخصائي موارد بشرية" can appear), so picking one group matches every
+  // registered variant instead of a single literal value.
+  const { rows: synonymRows } = useValueSynonyms();
+  const synField = SYNONYM_FIELD_MAP[newField];
+  const canonicalGroups = useMemo(() => {
+    if (!synField) return [];
+    return synonymRows
+      .filter((r) => r.field_name === synField)
+      .map((r) => ({
+        canonical_ar: r.canonical_ar,
+        canonical_en: r.canonical_en,
+        synonymCount: (r.synonyms || []).length + 1,
+        count: applicants.reduce((n, a) => n + (lookupSynonym(synField, a[newField], "ar") === r.canonical_ar ? 1 : 0), 0),
+      }))
+      .sort((a, b) => b.count - a.count);
+  }, [synonymRows, synField, applicants, newField]);
+
+  const filteredCanonicalGroups = useMemo(() => {
+    const q = valueSearch.trim().toLowerCase();
+    if (!q) return canonicalGroups;
+    return canonicalGroups.filter((g) => g.canonical_ar.toLowerCase().includes(q) || (g.canonical_en || "").toLowerCase().includes(q));
+  }, [canonicalGroups, valueSearch]);
 
   const togglePicked = (v: string) => {
     setPicked((prev) => {
@@ -465,6 +517,24 @@ export default function ApplicantsAdvancedFilters({
 
   const hasResults = filters.length > 0 || aiSelectedIds;
 
+  // Live narrowing count so progressively adding filters (nationality → education → major...)
+  // visibly shrinks toward the exact matching candidates, instead of only showing a final total.
+  const matchCount = useMemo(
+    () => (hasResults ? applyAdvancedFilters(applicants, filters, aiSelectedIds).length : applicants.length),
+    [applicants, filters, aiSelectedIds, hasResults],
+  );
+
+  const filterValueLabel = (f: AdvancedFilter) => {
+    if (!f.value.startsWith(CANON_PREFIX)) return f.value;
+    const canon = f.value.slice(CANON_PREFIX.length);
+    if (lang === "en") {
+      const synF = SYNONYM_FIELD_MAP[f.field];
+      const row = synF ? synonymRows.find((r) => r.field_name === synF && r.canonical_ar === canon) : null;
+      if (row?.canonical_en) return row.canonical_en;
+    }
+    return canon;
+  };
+
 
   return (
     <Card className="mb-3 relative overflow-hidden">
@@ -520,7 +590,10 @@ export default function ApplicantsAdvancedFilters({
                     <button
                       type="button"
                       className="text-accent hover:underline"
-                      onClick={() => setPicked(new Set(filteredDistinct.map((d) => d.value)))}
+                      onClick={() => setPicked(new Set([
+                        ...filteredCanonicalGroups.map((g) => CANON_PREFIX + g.canonical_ar),
+                        ...filteredDistinct.map((d) => d.value),
+                      ]))}
                     >
                       {lang === "ar" ? "تحديد الكل المعروض" : "Select all shown"}
                     </button>
@@ -534,8 +607,44 @@ export default function ApplicantsAdvancedFilters({
                   </div>
                 </div>
                 <ScrollArea className="max-h-[280px]">
+                  {filteredCanonicalGroups.length > 0 && (
+                    <div className="border-b">
+                      <div className="px-2 pt-2 pb-1 text-[11px] font-semibold text-muted-foreground flex items-center gap-1">
+                        <Link2 className="w-3 h-3" />
+                        {lang === "ar" ? "مجموعات موحّدة (مرادفات)" : "Unified groups (synonyms)"}
+                      </div>
+                      <div className="p-1 pb-2">
+                        {filteredCanonicalGroups.map((g) => {
+                          const key = CANON_PREFIX + g.canonical_ar;
+                          const checked = picked.has(key);
+                          const label = lang === "ar" ? g.canonical_ar : (g.canonical_en || g.canonical_ar);
+                          return (
+                            <button
+                              key={key}
+                              type="button"
+                              onClick={() => togglePicked(key)}
+                              className="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted text-start text-sm"
+                            >
+                              <Checkbox checked={checked} className="pointer-events-none" />
+                              <span className="flex-1 truncate font-medium">{label}</span>
+                              <Badge variant="outline" className="text-[10px] h-5">
+                                {g.synonymCount} {lang === "ar" ? "مرادف" : "terms"}
+                              </Badge>
+                              <Badge variant="secondary" className="text-[10px] h-5">{g.count}</Badge>
+                              {checked && <Check className="w-3.5 h-3.5 text-accent" />}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
                   <div className="p-1">
-                    {filteredDistinct.length === 0 ? (
+                    {filteredCanonicalGroups.length > 0 && filteredDistinct.length > 0 && (
+                      <div className="px-2 pt-1 pb-1 text-[11px] font-semibold text-muted-foreground">
+                        {lang === "ar" ? "قيم فردية" : "Individual values"}
+                      </div>
+                    )}
+                    {filteredDistinct.length === 0 && filteredCanonicalGroups.length === 0 ? (
                       <div className="text-xs text-muted-foreground text-center py-6">
                         {lang === "ar" ? "لا توجد قيم" : "No values"}
                       </div>
@@ -769,10 +878,14 @@ export default function ApplicantsAdvancedFilters({
 
         {/* Active filters */}
         {(filters.length > 0 || aiSelectedIds) && (
-          <div className="flex flex-wrap gap-2 pt-1 border-t">
+          <div className="flex flex-wrap items-center gap-2 pt-1 border-t">
+            <Badge variant="outline" className="gap-1 font-semibold">
+              {lang === "ar" ? `${matchCount} من ${applicants.length} مطابق` : `${matchCount} of ${applicants.length} matching`}
+            </Badge>
             {filters.map((f, i) => (
               <Badge key={i} variant="secondary" className="gap-1 pe-1">
-                <span>{fieldLabel(f.field)}: {f.value}</span>
+                {f.value.startsWith(CANON_PREFIX) && <Link2 className="w-3 h-3" />}
+                <span>{fieldLabel(f.field)}: {filterValueLabel(f)}</span>
                 <button onClick={() => removeFilter(i)} className="hover:bg-destructive/20 rounded p-0.5"><X className="w-3 h-3" /></button>
               </Badge>
             ))}
@@ -800,15 +913,21 @@ export function applyAdvancedFilters<T extends Record<string, any>>(
     const byField = new Map<string, string[]>();
     filters.forEach((f) => {
       const arr = byField.get(f.field) || [];
-      arr.push(f.value.toLowerCase());
+      arr.push(f.value);
       byField.set(f.field, arr);
     });
     out = out.filter((a) =>
       Array.from(byField.entries()).every(([field, values]) => {
         const v = a[field];
         if (v == null) return false;
+        const synField = SYNONYM_FIELD_MAP[field];
         const s = String(v).toLowerCase();
-        return values.some((val) => s.includes(val));
+        return values.some((val) => {
+          if (val.startsWith(CANON_PREFIX)) {
+            return !!synField && lookupSynonym(synField, String(v), "ar") === val.slice(CANON_PREFIX.length);
+          }
+          return s.includes(val.toLowerCase());
+        });
       }),
     );
   }
