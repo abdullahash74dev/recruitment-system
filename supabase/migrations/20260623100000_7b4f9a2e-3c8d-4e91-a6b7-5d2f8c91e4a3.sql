@@ -21,6 +21,12 @@
 --    the function returns. Every table name is validated against
 --    get_backup_table_names() first and applied via format('%I', ...) to
 --    rule out SQL injection through a crafted snapshot payload.
+--
+--    Append-only audit/log tables (audit_log, backup_runs, restore_runs,
+--    restore_approvals) are force-downgraded to 'merge' regardless of the
+--    requested mode, so a 'replace' restore can never be scoped to just
+--    those tables to quietly erase recent audit history - a full-system
+--    replace still proceeds normally for every other table.
 
 CREATE OR REPLACE FUNCTION public.get_backup_table_names()
 RETURNS text[]
@@ -45,7 +51,9 @@ SET search_path = public
 AS $$
 DECLARE
   _valid_tables text[];
+  _protected_tables CONSTANT text[] := ARRAY['audit_log', 'backup_runs', 'restore_runs', 'restore_approvals'];
   _tbl text;
+  _effective_mode text;
   _pk_cols text[];
   _set_clause text;
   _row_count integer;
@@ -69,7 +77,9 @@ BEGIN
   LOOP
     EXECUTE format('ALTER TABLE public.%I DISABLE TRIGGER ALL', _tbl);
 
-    IF _mode = 'replace' THEN
+    _effective_mode := CASE WHEN _tbl = ANY(_protected_tables) THEN 'merge' ELSE _mode END;
+
+    IF _effective_mode = 'replace' THEN
       EXECUTE format('DELETE FROM public.%I', _tbl);
       EXECUTE format(
         'INSERT INTO public.%I SELECT * FROM jsonb_populate_recordset(null::public.%I, $1)',
@@ -136,12 +146,17 @@ REVOKE ALL ON FUNCTION public.restore_from_backup(jsonb, text) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.restore_from_backup(jsonb, text) TO service_role;
 
 -- backup_runs: track the file-backup side (storage buckets) alongside the
--- existing table row-backup side, and the snapshot's storage folder so a
--- restore can locate both the data JSON and the copied files together.
+-- existing table row-backup side, the snapshot's storage folder so a
+-- restore can locate both the data JSON and the copied files together,
+-- a checksum-mismatch count (file copies whose source/destination etag or
+-- size differ, meaning the copy is suspect even though no error was
+-- thrown), and the outcome of replicating this run to an offsite project.
 ALTER TABLE public.backup_runs
   ADD COLUMN IF NOT EXISTS buckets_summary jsonb,
   ADD COLUMN IF NOT EXISTS backup_folder text,
-  ADD COLUMN IF NOT EXISTS integrity_ok boolean;
+  ADD COLUMN IF NOT EXISTS integrity_ok boolean,
+  ADD COLUMN IF NOT EXISTS checksum_issues integer NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS offsite_status text;
 
 -- restore_runs: audit trail of every restore attempt (mirrors backup_runs).
 CREATE TABLE IF NOT EXISTS public.restore_runs (
@@ -165,5 +180,38 @@ CREATE POLICY "Admin insert restore_runs" ON public.restore_runs
   FOR INSERT TO authenticated WITH CHECK (has_role(auth.uid(), 'admin'::app_role));
 
 CREATE INDEX IF NOT EXISTS idx_restore_runs_created ON public.restore_runs (created_at DESC);
+
+-- restore_approvals: a destructive 'replace' restore is never executed on
+-- the requesting admin's say alone - it sits as 'pending' until a SECOND,
+-- different admin approves it (or rejects it / it expires after 24h). All
+-- writes (insert on request, update on approve/reject) happen from the
+-- restore-backup edge function via the service-role key, which is also
+-- the only place that re-validates requested_by <> decided_by - this RLS
+-- only needs to expose read access so admins can see what's pending.
+CREATE TABLE IF NOT EXISTS public.restore_approvals (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  backup_folder text NOT NULL,
+  tables text[],
+  include_files boolean NOT NULL DEFAULT true,
+  status text NOT NULL DEFAULT 'pending',
+  requested_by uuid NOT NULL,
+  requested_by_email text,
+  decided_by uuid,
+  decided_by_email text,
+  decided_at timestamptz,
+  restore_run_id uuid REFERENCES public.restore_runs(id) ON DELETE SET NULL,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  expires_at timestamptz NOT NULL DEFAULT (now() + interval '24 hours')
+);
+
+ALTER TABLE public.restore_approvals ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Admin view restore_approvals" ON public.restore_approvals
+  FOR SELECT TO authenticated USING (has_role(auth.uid(), 'admin'::app_role));
+
+CREATE INDEX IF NOT EXISTS idx_restore_approvals_status ON public.restore_approvals (status, created_at DESC);
+
+ALTER TABLE public.restore_runs
+  ADD COLUMN IF NOT EXISTS approval_id uuid REFERENCES public.restore_approvals(id) ON DELETE SET NULL;
 
 NOTIFY pgrst, 'reload schema';

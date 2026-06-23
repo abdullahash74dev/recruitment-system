@@ -4,6 +4,17 @@
 // confirmation, and - before any destructive "replace" restore - takes a
 // fresh safety backup of the CURRENT state first, so a bad restore is
 // itself always recoverable.
+//
+// A destructive "replace" restore additionally requires dual admin
+// approval: the requesting admin's call only creates a pending row in
+// restore_approvals (no restore runs yet); a SECOND, different admin must
+// then call back with { approval_id, action: "approve" } before the actual
+// restore executes - using the parameters stored on the approval row
+// itself, not whatever the approving admin's request body says, so a
+// "confused approver" can't redirect the restore. "merge" restores remain
+// immediate/single-admin, since they can only add/update rows, never erase
+// data. Failures here also POST to an admin-configured alert webhook, if
+// configured, in addition to the in-app notification.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const corsHeaders = {
@@ -16,6 +27,28 @@ const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const admin = createClient(url, serviceKey);
 
 const CONFIRM_TOKEN = "RESTORE";
+
+async function getSecret(key: string): Promise<string | null> {
+  const { data } = await admin.from("app_secrets").select("value").eq("key", key).maybeSingle();
+  return data?.value ?? null;
+}
+
+// Best-effort POST to an admin-configured webhook (Slack/Discord compatible
+// JSON body); no-op if unconfigured, never throws.
+async function sendAlert(severity: "warning" | "critical", title: string, body: string) {
+  try {
+    const webhookUrl = await getSecret("alert_webhook_url");
+    if (!webhookUrl) return;
+    const text = `[${severity.toUpperCase()}] ${title}\n${body}`;
+    await fetch(webhookUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text, content: text }),
+    });
+  } catch (e) {
+    console.error("restore-backup: failed to send alert", e);
+  }
+}
 
 async function mapWithConcurrency<T, R>(items: T[], concurrency: number, fn: (item: T) => Promise<R>): Promise<R[]> {
   const results: R[] = new Array(items.length);
@@ -127,7 +160,7 @@ async function runRestore(opts: {
 
   const filesRestored = includeFiles ? await restoreFiles(backupFolder, mode) : 0;
 
-  await admin.from("restore_runs").insert({
+  const { data: restoreRun, error: insErr } = await admin.from("restore_runs").insert({
     status: "success",
     source_backup_path: backupFolder,
     mode,
@@ -135,7 +168,8 @@ async function runRestore(opts: {
     files_restored: filesRestored,
     pre_restore_safety_backup_path: preRestoreSafetyBackupPath,
     triggered_by_user: triggeredByUser,
-  });
+  }).select().single();
+  if (insErr) console.error("restore-backup: failed to record restore_runs row", insErr);
 
   await admin.rpc("notify_admins", {
     _type: "restore_complete",
@@ -146,7 +180,7 @@ async function runRestore(opts: {
     _metadata: { backup_folder: backupFolder, mode, tablesRestored, filesRestored, preRestoreSafetyBackupPath },
   });
 
-  return { tablesRestored, filesRestored, preRestoreSafetyBackupPath };
+  return { tablesRestored, filesRestored, preRestoreSafetyBackupPath, restoreRunId: restoreRun?.id ?? null };
 }
 
 async function recordFailure(triggeredByUser: string | null, mode: string, backupFolder: string, message: string) {
@@ -166,8 +200,90 @@ async function recordFailure(triggeredByUser: string | null, mode: string, backu
       _severity: "critical",
       _metadata: { backup_folder: backupFolder },
     });
+    await sendAlert("critical", "Restore failed", message);
   } catch (e) {
     console.error("restore-backup: failed to record failure", e);
+  }
+}
+
+// A destructive "replace" restore was requested by one admin and must be
+// approved (or rejected) by a SECOND, different admin before it executes.
+// The approval row, not this request's body, is the source of truth for
+// what gets restored - an approving admin can only ever approve exactly
+// what was originally requested.
+async function handleApprovalDecision(
+  body: Record<string, unknown>,
+  user: { id: string; email?: string | null },
+  jsonHeaders: Record<string, string>
+): Promise<Response> {
+  const approvalId = body.approval_id as string;
+  const action = body.action as string;
+  if (action !== "approve" && action !== "reject") {
+    return new Response(JSON.stringify({ error: "action must be 'approve' or 'reject'" }), { status: 400, headers: jsonHeaders });
+  }
+
+  const { data: approval, error: fetchErr } = await admin.from("restore_approvals").select("*").eq("id", approvalId).maybeSingle();
+  if (fetchErr || !approval) {
+    return new Response(JSON.stringify({ error: "Approval request not found" }), { status: 404, headers: jsonHeaders });
+  }
+  if (approval.status !== "pending") {
+    return new Response(JSON.stringify({ error: `Approval request already ${approval.status}` }), { status: 400, headers: jsonHeaders });
+  }
+  if (new Date(approval.expires_at).getTime() < Date.now()) {
+    await admin.from("restore_approvals").update({ status: "expired" }).eq("id", approvalId);
+    return new Response(JSON.stringify({ error: "Approval request has expired" }), { status: 400, headers: jsonHeaders });
+  }
+  if (approval.requested_by === user.id) {
+    return new Response(JSON.stringify({ error: "A different admin must approve this request" }), { status: 403, headers: jsonHeaders });
+  }
+
+  if (action === "reject") {
+    await admin.from("restore_approvals").update({
+      status: "rejected",
+      decided_by: user.id,
+      decided_by_email: user.email ?? null,
+      decided_at: new Date().toISOString(),
+    }).eq("id", approvalId);
+
+    await admin.rpc("notify_admins", {
+      _type: "restore_approval_rejected",
+      _title: "تم رفض طلب الاسترداد الكامل",
+      _body: `رفض ${user.email ?? "مسؤول"} طلب الاسترداد من ${approval.backup_folder}`,
+      _link: "/admin?tab=backup",
+      _severity: "warning",
+      _metadata: { approval_id: approvalId },
+    });
+
+    return new Response(JSON.stringify({ ok: true, rejected: true }), { headers: jsonHeaders });
+  }
+
+  await admin.from("restore_approvals").update({
+    status: "approved",
+    decided_by: user.id,
+    decided_by_email: user.email ?? null,
+    decided_at: new Date().toISOString(),
+  }).eq("id", approvalId);
+
+  try {
+    const result = await runRestore({
+      backupFolder: approval.backup_folder,
+      mode: "replace",
+      tables: approval.tables,
+      includeFiles: approval.include_files,
+      triggeredByUser: approval.requested_by,
+    });
+
+    if (result.restoreRunId) {
+      await admin.from("restore_runs").update({ approval_id: approvalId }).eq("id", result.restoreRunId);
+    }
+    await admin.from("restore_approvals").update({ restore_run_id: result.restoreRunId ?? null }).eq("id", approvalId);
+
+    return new Response(JSON.stringify({ ok: true, ...result }), { headers: jsonHeaders });
+  } catch (e) {
+    console.error("restore-backup approval error:", e);
+    const message = e instanceof Error ? e.message : String(e);
+    await recordFailure(approval.requested_by, "replace", approval.backup_folder, message);
+    return new Response(JSON.stringify({ error: message }), { status: 500, headers: jsonHeaders });
   }
 }
 
@@ -188,6 +304,12 @@ Deno.serve(async (req) => {
   if (roleError) return new Response(JSON.stringify({ error: "Role check failed", details: roleError.message }), { status: 500, headers: jsonHeaders });
   if (!isAdmin) return new Response(JSON.stringify({ error: "Forbidden" }), { status: 403, headers: jsonHeaders });
 
+  // Approving/rejecting a pending replace-restore request, rather than
+  // submitting a new one.
+  if (body.approval_id) {
+    return await handleApprovalDecision(body, user, jsonHeaders);
+  }
+
   const backupFolder: string = body.backup_folder;
   const mode: string = body.mode;
   const tables: string[] | null = Array.isArray(body.tables) && body.tables.length > 0 ? body.tables : null;
@@ -197,6 +319,31 @@ Deno.serve(async (req) => {
   if (!backupFolder) return new Response(JSON.stringify({ error: "backup_folder is required" }), { status: 400, headers: jsonHeaders });
   if (mode !== "merge" && mode !== "replace") return new Response(JSON.stringify({ error: "mode must be 'merge' or 'replace'" }), { status: 400, headers: jsonHeaders });
   if (confirm !== CONFIRM_TOKEN) return new Response(JSON.stringify({ error: `Type "${CONFIRM_TOKEN}" to confirm this operation` }), { status: 400, headers: jsonHeaders });
+
+  if (mode === "replace") {
+    // Destructive restores need a second, different admin's sign-off - this
+    // call only files the request; the restore itself runs from
+    // handleApprovalDecision once another admin approves it.
+    const { data: approval, error: insErr } = await admin.from("restore_approvals").insert({
+      backup_folder: backupFolder,
+      tables,
+      include_files: includeFiles,
+      requested_by: user.id,
+      requested_by_email: user.email ?? null,
+    }).select().single();
+    if (insErr) return new Response(JSON.stringify({ error: `Could not create approval request: ${insErr.message}` }), { status: 500, headers: jsonHeaders });
+
+    await admin.rpc("notify_admins", {
+      _type: "restore_approval_requested",
+      _title: "طلب استرداد كامل يحتاج موافقة مسؤول آخر",
+      _body: `طلب ${user.email ?? "مسؤول"} استرداد كامل (استبدال) من ${backupFolder} - يتطلب موافقة مسؤول مختلف`,
+      _link: "/admin?tab=backup",
+      _severity: "warning",
+      _metadata: { approval_id: approval.id, backup_folder: backupFolder, tables, includeFiles },
+    });
+
+    return new Response(JSON.stringify({ ok: true, pending: true, approval_id: approval.id }), { headers: jsonHeaders });
+  }
 
   try {
     const result = await runRestore({ backupFolder, mode, tables, includeFiles, triggeredByUser: user.id });

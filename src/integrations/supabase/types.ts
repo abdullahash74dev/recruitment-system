@@ -517,33 +517,48 @@ export type Database = {
       }
       backup_runs: {
         Row: {
+          backup_folder: string | null
+          buckets_summary: Json | null
+          checksum_issues: number
           created_at: string
           error_message: string | null
           file_path: string | null
           file_size: number | null
           id: string
+          integrity_ok: boolean | null
+          offsite_status: string | null
           status: string
           tables_summary: Json | null
           triggered_by: string
           triggered_by_user: string | null
         }
         Insert: {
+          backup_folder?: string | null
+          buckets_summary?: Json | null
+          checksum_issues?: number
           created_at?: string
           error_message?: string | null
           file_path?: string | null
           file_size?: number | null
           id?: string
+          integrity_ok?: boolean | null
+          offsite_status?: string | null
           status?: string
           tables_summary?: Json | null
           triggered_by?: string
           triggered_by_user?: string | null
         }
         Update: {
+          backup_folder?: string | null
+          buckets_summary?: Json | null
+          checksum_issues?: number
           created_at?: string
           error_message?: string | null
           file_path?: string | null
           file_size?: number | null
           id?: string
+          integrity_ok?: boolean | null
+          offsite_status?: string | null
           status?: string
           tables_summary?: Json | null
           triggered_by?: string
@@ -1553,6 +1568,54 @@ export type Database = {
           name?: string
           scope?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      restore_approvals: {
+        Row: {
+          backup_folder: string
+          created_at: string
+          decided_at: string | null
+          decided_by: string | null
+          decided_by_email: string | null
+          expires_at: string
+          id: string
+          include_files: boolean
+          requested_by: string
+          requested_by_email: string | null
+          restore_run_id: string | null
+          status: string
+          tables: string[] | null
+        }
+        Insert: {
+          backup_folder: string
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          decided_by_email?: string | null
+          expires_at?: string
+          id?: string
+          include_files?: boolean
+          requested_by: string
+          requested_by_email?: string | null
+          restore_run_id?: string | null
+          status?: string
+          tables?: string[] | null
+        }
+        Update: {
+          backup_folder?: string
+          created_at?: string
+          decided_at?: string | null
+          decided_by?: string | null
+          decided_by_email?: string | null
+          expires_at?: string
+          id?: string
+          include_files?: boolean
+          requested_by?: string
+          requested_by_email?: string | null
+          restore_run_id?: string | null
+          status?: string
+          tables?: string[] | null
         }
         Relationships: []
       }

@@ -4,11 +4,15 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
-import { Database, Download, Play, Loader2, RotateCcw, AlertTriangle } from "lucide-react";
+import {
+  Database, Download, Play, Loader2, RotateCcw, AlertTriangle,
+  ShieldCheck, ShieldAlert, Check, X, Cloud, Webhook, Settings2,
+} from "lucide-react";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 import { ar as arLocale, enUS } from "date-fns/locale";
@@ -17,6 +21,7 @@ import { useDeletePin } from "@/components/DeletePinDialog";
 interface BucketSummary {
   count: number;
   failed: number;
+  checksumMismatches?: number;
 }
 
 interface BackupRun {
@@ -30,7 +35,28 @@ interface BackupRun {
   triggered_by: string;
   error_message: string | null;
   created_at: string;
+  checksum_issues: number;
+  offsite_status: string | null;
 }
+
+interface RestoreApproval {
+  id: string;
+  backup_folder: string;
+  tables: string[] | null;
+  include_files: boolean;
+  status: string;
+  requested_by: string;
+  requested_by_email: string | null;
+  created_at: string;
+  expires_at: string;
+}
+
+const SECRET_KEYS = {
+  webhook: "alert_webhook_url",
+  offsiteUrl: "offsite_supabase_url",
+  offsiteKey: "offsite_supabase_service_key",
+  offsiteIncludeFiles: "offsite_include_files",
+} as const;
 
 const formatSize = (bytes: number | null) => {
   if (!bytes) return "—";
@@ -54,12 +80,43 @@ const ScheduledBackups = () => {
   const [includeFiles, setIncludeFiles] = useState(true);
   const [restoring, setRestoring] = useState(false);
 
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [approvals, setApprovals] = useState<RestoreApproval[]>([]);
+  const [decidingId, setDecidingId] = useState<string | null>(null);
+
+  const [configured, setConfigured] = useState<Record<string, boolean>>({});
+  const [webhookUrl, setWebhookUrl] = useState("");
+  const [offsiteUrl, setOffsiteUrl] = useState("");
+  const [offsiteKey, setOffsiteKey] = useState("");
+  const [offsiteIncludeFiles, setOffsiteIncludeFiles] = useState(false);
+  const [savingSettings, setSavingSettings] = useState(false);
+
   const load = async () => {
     const { data } = await supabase.from("backup_runs").select("*").order("created_at", { ascending: false }).limit(10);
     setRuns((data as BackupRun[]) || []);
   };
 
-  useEffect(() => { load(); }, []);
+  const loadApprovals = async () => {
+    const { data } = await supabase.from("restore_approvals").select("*").eq("status", "pending").order("created_at", { ascending: false });
+    setApprovals((data as RestoreApproval[]) || []);
+  };
+
+  const loadSettings = async () => {
+    const { data } = await supabase.from("app_secrets").select("key, value").in("key", Object.values(SECRET_KEYS));
+    const present: Record<string, boolean> = {};
+    (data || []).forEach((row) => {
+      if (row.key === SECRET_KEYS.offsiteIncludeFiles) setOffsiteIncludeFiles(row.value === "true");
+      else present[row.key] = true;
+    });
+    setConfigured(present);
+  };
+
+  useEffect(() => {
+    load();
+    loadApprovals();
+    loadSettings();
+    supabase.auth.getUser().then(({ data }) => setCurrentUserId(data.user?.id ?? null));
+  }, []);
 
   const runNow = async () => {
     setRunning(true);
@@ -105,9 +162,16 @@ const ScheduledBackups = () => {
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
-      toast.success(lang === "ar" ? "تم استرداد البيانات بنجاح" : "Data restored successfully");
+      if (data?.pending) {
+        toast.success(lang === "ar"
+          ? "تم إرسال طلب الاسترداد، يحتاج موافقة مسؤول آخر قبل التنفيذ"
+          : "Restore request submitted — needs approval from another admin before it runs");
+        loadApprovals();
+      } else {
+        toast.success(lang === "ar" ? "تم استرداد البيانات بنجاح" : "Data restored successfully");
+        load();
+      }
       setRestoreTarget(null);
-      load();
     } catch (e: any) {
       toast.error(e.message || (lang === "ar" ? "فشل الاسترداد" : "Restore failed"));
     } finally {
@@ -119,8 +183,8 @@ const ScheduledBackups = () => {
     if (restoreMode === "replace") {
       requestDelete({
         message: lang === "ar"
-          ? "سيتم استبدال كل البيانات الحالية بمحتوى هذه النسخة الاحتياطية بالضبط، ولن يبقى أي تعديل جرى بعد تاريخها. سيُؤخذ تلقائياً نسخة احتياطية فورية من الوضع الحالي قبل البدء يمكن الاسترجاع منها إن احتجت التراجع."
-          : "All current data will be replaced with exactly what's in this backup; anything changed since then will be gone. A safety backup of the current state is taken automatically first, so you can undo this if needed.",
+          ? "سيتم تقديم طلب استبدال كامل للبيانات الحالية بمحتوى هذه النسخة الاحتياطية. لن يُنفَّذ فوراً - يجب أن يوافق عليه مسؤول آخر غيرك أولاً. عند التنفيذ، سيُؤخذ تلقائياً نسخة احتياطية فورية من الوضع الحالي قبل البدء يمكن الاسترجاع منها إن احتجت التراجع."
+          : "This will file a request to fully replace current data with this backup. It will NOT run immediately - a different admin must approve it first. Once it runs, a safety backup of the current state is taken automatically first, so you can undo this if needed.",
         onConfirm: doRestore,
       });
     } else {
@@ -128,9 +192,65 @@ const ScheduledBackups = () => {
     }
   };
 
+  const decide = async (approval: RestoreApproval, action: "approve" | "reject") => {
+    setDecidingId(approval.id);
+    try {
+      const { data, error } = await supabase.functions.invoke("restore-backup", {
+        body: { approval_id: approval.id, action },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast.success(
+        action === "approve"
+          ? (lang === "ar" ? "تمت الموافقة وتنفيذ الاسترداد" : "Approved — restore executed")
+          : (lang === "ar" ? "تم رفض الطلب" : "Request rejected")
+      );
+      loadApprovals();
+      load();
+    } catch (e: any) {
+      toast.error(e.message || (lang === "ar" ? "فشل تنفيذ الإجراء" : "Action failed"));
+    } finally {
+      setDecidingId(null);
+    }
+  };
+
+  const confirmApprove = (approval: RestoreApproval) => {
+    requestDelete({
+      message: lang === "ar"
+        ? "ستوافق الآن على استبدال كامل للبيانات الحالية بمحتوى النسخة الاحتياطية المطلوبة، وسيُنفَّذ فوراً بعد الموافقة."
+        : "You're about to approve a full replace of current data with the requested backup — it will execute immediately once approved.",
+      onConfirm: () => decide(approval, "approve"),
+    });
+  };
+
+  const saveSettings = async () => {
+    const updates: { key: string; value: string }[] = [
+      { key: SECRET_KEYS.offsiteIncludeFiles, value: offsiteIncludeFiles ? "true" : "false" },
+    ];
+    if (webhookUrl.trim()) updates.push({ key: SECRET_KEYS.webhook, value: webhookUrl.trim() });
+    if (offsiteUrl.trim()) updates.push({ key: SECRET_KEYS.offsiteUrl, value: offsiteUrl.trim() });
+    if (offsiteKey.trim()) updates.push({ key: SECRET_KEYS.offsiteKey, value: offsiteKey.trim() });
+
+    setSavingSettings(true);
+    try {
+      const { error } = await supabase.from("app_secrets").upsert(updates, { onConflict: "key" });
+      if (error) throw error;
+      toast.success(lang === "ar" ? "تم حفظ إعدادات الحماية" : "Protection settings saved");
+      setWebhookUrl("");
+      setOffsiteUrl("");
+      setOffsiteKey("");
+      loadSettings();
+    } catch (e: any) {
+      toast.error(e.message || (lang === "ar" ? "فشل الحفظ" : "Save failed"));
+    } finally {
+      setSavingSettings(false);
+    }
+  };
+
   const locale = lang === "ar" ? arLocale : enUS;
 
   return (
+    <div className="space-y-4">
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-2">
         <div>
@@ -150,6 +270,53 @@ const ScheduledBackups = () => {
         </Button>
       </CardHeader>
       <CardContent>
+        {approvals.length > 0 && (
+          <div className="mb-4 rounded-md border border-amber-300 dark:border-amber-700 bg-amber-500/10 p-3 space-y-3">
+            <div className="flex items-center gap-2 text-sm font-medium text-amber-700 dark:text-amber-400">
+              <ShieldAlert className="w-4 h-4" />
+              {lang === "ar" ? "طلبات استرداد كامل تنتظر موافقة مسؤول آخر" : "Full-replace restores awaiting another admin's approval"}
+            </div>
+            <ul className="space-y-2">
+              {approvals.map((a) => {
+                const isOwnRequest = a.requested_by === currentUserId;
+                return (
+                  <li key={a.id} className="flex items-center justify-between gap-2 bg-background rounded-md border p-2">
+                    <div className="min-w-0 text-xs">
+                      <div className="font-medium truncate">
+                        {a.requested_by_email || (lang === "ar" ? "مسؤول" : "An admin")}
+                        {" • "}
+                        {new Date(a.created_at).toLocaleString(lang === "ar" ? "ar" : "en")}
+                      </div>
+                      <div className="text-muted-foreground">
+                        {lang === "ar" ? "النسخة" : "Backup"}: {a.backup_folder}
+                        {isOwnRequest && (lang === "ar" ? " • طلبك - يجب أن يوافق مسؤول آخر" : " • your request - a different admin must approve")}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Button
+                        size="sm" variant="outline" className="gap-1 text-destructive"
+                        disabled={decidingId === a.id}
+                        onClick={() => decide(a, "reject")}
+                      >
+                        <X className="w-3.5 h-3.5" />
+                        {lang === "ar" ? "رفض" : "Reject"}
+                      </Button>
+                      <Button
+                        size="sm" variant="default" className="gap-1"
+                        disabled={decidingId === a.id || isOwnRequest}
+                        title={isOwnRequest ? (lang === "ar" ? "لا يمكنك الموافقة على طلبك" : "You can't approve your own request") : undefined}
+                        onClick={() => confirmApprove(a)}
+                      >
+                        {decidingId === a.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                        {lang === "ar" ? "موافقة" : "Approve"}
+                      </Button>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
         {runs.length === 0 ? (
           <div className="text-center py-8 text-sm text-muted-foreground">
             {lang === "ar" ? "لم يتم إنشاء نسخ احتياطية بعد" : "No backups yet"}
@@ -169,6 +336,14 @@ const ScheduledBackups = () => {
                     {r.status !== "failed" && ` • ${formatSize(r.file_size)}`}
                     {r.status !== "failed" && r.tables_summary && ` • ${Object.keys(r.tables_summary).length} ${lang === "ar" ? "جدول" : "tables"}`}
                     {r.status !== "failed" && r.buckets_summary && ` • ${totalFiles(r.buckets_summary)} ${lang === "ar" ? "ملف" : "files"}`}
+                    {r.status !== "failed" && !!r.checksum_issues && (
+                      <span className="text-amber-600 dark:text-amber-400"> • {r.checksum_issues} {lang === "ar" ? "تعارض checksum" : "checksum mismatch(es)"}</span>
+                    )}
+                    {r.status !== "failed" && r.offsite_status && r.offsite_status !== "not_configured" && (
+                      <span className={r.offsite_status === "success" ? "" : "text-amber-600 dark:text-amber-400"}>
+                        {" • "}{lang === "ar" ? "نسخة خارجية" : "offsite"}: {r.offsite_status}
+                      </span>
+                    )}
                   </div>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
@@ -232,8 +407,8 @@ const ScheduledBackups = () => {
                     <div className="font-medium text-destructive">{lang === "ar" ? "استبدال كامل" : "Full replace"}</div>
                     <div className="text-xs text-muted-foreground">
                       {lang === "ar"
-                        ? "يعيد كل شيء طبق الأصل لحالة النسخة الاحتياطية بالضبط، ويحذف كل ما أُضيف بعدها."
-                        : "Restores everything to exactly match the backup, deleting anything added since."}
+                        ? "يعيد كل شيء طبق الأصل لحالة النسخة الاحتياطية بالضبط، ويحذف كل ما أُضيف بعدها. يتطلب موافقة مسؤول آخر قبل التنفيذ."
+                        : "Restores everything to exactly match the backup, deleting anything added since. Requires a different admin's approval before it runs."}
                     </div>
                   </Label>
                 </div>
@@ -254,12 +429,105 @@ const ScheduledBackups = () => {
             </Button>
             <Button variant={restoreMode === "replace" ? "destructive" : "default"} onClick={confirmRestore} disabled={restoring} className="gap-2">
               {restoring ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />}
-              {lang === "ar" ? "بدء الاسترداد" : "Start restore"}
+              {restoreMode === "replace"
+                ? (lang === "ar" ? "تقديم طلب الاسترداد" : "Submit restore request")
+                : (lang === "ar" ? "بدء الاسترداد" : "Start restore")}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
     </Card>
+
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Settings2 className="w-4 h-4" />
+          {lang === "ar" ? "إعدادات حماية النسخ الاحتياطي" : "Backup Protection Settings"}
+        </CardTitle>
+        <p className="text-xs text-muted-foreground mt-1">
+          {lang === "ar"
+            ? "كل حقل هنا اختياري ومستقل. القيم محفوظة كأسرار ولن تُعرض مرة أخرى بعد الحفظ - أدخل قيمة جديدة فقط للحقول التي تريد تغييرها."
+            : "Every field below is optional and independent. Values are stored as secrets and never shown again after saving — only fill in the fields you want to change."}
+        </p>
+      </CardHeader>
+      <CardContent className="space-y-5">
+        <div className="space-y-2">
+          <Label className="flex items-center gap-2">
+            <Webhook className="w-3.5 h-3.5" />
+            {lang === "ar" ? "رابط تنبيهات خارجي (Slack / Discord)" : "Alert webhook URL (Slack / Discord)"}
+            {configured[SECRET_KEYS.webhook] && (
+              <Badge variant="secondary" className="gap-1"><ShieldCheck className="w-3 h-3" />{lang === "ar" ? "مُفعّل" : "configured"}</Badge>
+            )}
+          </Label>
+          <Input
+            type="url"
+            placeholder="https://hooks.slack.com/services/..."
+            value={webhookUrl}
+            onChange={(e) => setWebhookUrl(e.target.value)}
+          />
+          <p className="text-xs text-muted-foreground">
+            {lang === "ar"
+              ? "يتم إرسال تنبيه هنا عند فشل أو تحذير النسخ الاحتياطي أو الاسترداد، بشكل مستقل عن إشعارات التطبيق."
+              : "An alert is POSTed here whenever a backup or restore fails or warns, independent of in-app notifications."}
+          </p>
+        </div>
+
+        <div className="space-y-2">
+          <Label className="flex items-center gap-2">
+            <Cloud className="w-3.5 h-3.5" />
+            {lang === "ar" ? "رابط مشروع Supabase خارجي (نسخة احتياطية بعيدة)" : "Off-site Supabase project URL"}
+            {configured[SECRET_KEYS.offsiteUrl] && (
+              <Badge variant="secondary" className="gap-1"><ShieldCheck className="w-3 h-3" />{lang === "ar" ? "مُفعّل" : "configured"}</Badge>
+            )}
+          </Label>
+          <Input
+            type="url"
+            placeholder="https://xxxxxxxx.supabase.co"
+            value={offsiteUrl}
+            onChange={(e) => setOffsiteUrl(e.target.value)}
+          />
+        </div>
+
+        <div className="space-y-2">
+          <Label className="flex items-center gap-2">
+            {lang === "ar" ? "مفتاح service_role للمشروع الخارجي" : "Off-site project service_role key"}
+            {configured[SECRET_KEYS.offsiteKey] && (
+              <Badge variant="secondary" className="gap-1"><ShieldCheck className="w-3 h-3" />{lang === "ar" ? "مُفعّل" : "configured"}</Badge>
+            )}
+          </Label>
+          <Input
+            type="password"
+            placeholder="••••••••••••••••"
+            value={offsiteKey}
+            onChange={(e) => setOffsiteKey(e.target.value)}
+          />
+          <p className="text-xs text-muted-foreground">
+            {lang === "ar"
+              ? "يجب إنشاء مشروع Supabase ثانٍ مستقل تماماً عن هذا المشروع، وإدخال رابطه ومفتاحه هنا، حتى لا تفقد نسخك الاحتياطية إذا فُقد هذا المشروع نفسه."
+              : "Create a SECOND Supabase project, fully independent of this one, and enter its URL and key here — so losing this project doesn't also destroy its own backups."}
+          </p>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Checkbox
+            id="offsite-include-files"
+            checked={offsiteIncludeFiles}
+            onCheckedChange={(c) => setOffsiteIncludeFiles(!!c)}
+          />
+          <Label htmlFor="offsite-include-files" className="font-normal cursor-pointer">
+            {lang === "ar"
+              ? "نسخ الملفات أيضاً (وليس فقط بيانات الجداول) إلى المشروع الخارجي - أبطأ وأكثر تكلفة"
+              : "Also replicate files (not just table data) to the off-site project — slower and costlier"}
+          </Label>
+        </div>
+
+        <Button onClick={saveSettings} disabled={savingSettings} className="gap-2">
+          {savingSettings ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
+          {lang === "ar" ? "حفظ الإعدادات" : "Save settings"}
+        </Button>
+      </CardContent>
+    </Card>
+    </div>
   );
 };
 

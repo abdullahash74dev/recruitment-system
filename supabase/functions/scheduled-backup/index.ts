@@ -4,6 +4,16 @@
 // "backups" bucket. Triggered nightly by pg_cron (authenticated via
 // x-cron-secret / app_secrets.cron_shared_secret) or manually by an admin
 // from the dashboard. Restored via the restore-backup function.
+//
+// Each file copy is checksum-verified afterwards (eTag + size from a
+// metadata re-list, no bytes downloaded) so a "successful" copy that's
+// actually corrupted is caught and reported as checksum_issues. If an admin
+// has configured offsite_supabase_url/offsite_supabase_service_key in
+// app_secrets, the data.json (and optionally every file) is also replicated
+// to a second, independent Supabase project so losing this project doesn't
+// destroy its own backups too. If alert_webhook_url is configured, backup
+// failures/warnings are also POSTed there (Slack/Discord compatible),
+// independent of in-app notifications.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const corsHeaders = {
@@ -54,12 +64,16 @@ async function fetchAllRows(table: string): Promise<Record<string, unknown>[]> {
   return rows;
 }
 
-// Recursively list every object path in a bucket (storage .list() only
-// returns one folder level per call; sub-folders come back as entries with
-// id === null and must be walked individually).
-async function listAllObjects(bucket: string, prefix = ""): Promise<string[]> {
+type FileEntry = { path: string; eTag: string | null; size: number | null };
+
+// Recursively list every object in a bucket along with its storage metadata
+// (eTag, size) - storage .list() only returns one folder level per call;
+// sub-folders come back as entries with id === null and must be walked
+// individually. The metadata is the basis for post-copy checksum
+// verification below, without ever downloading file bytes.
+async function listAllObjectsWithMeta(bucket: string, prefix = ""): Promise<FileEntry[]> {
   const LIMIT = 1000;
-  const paths: string[] = [];
+  const entries: FileEntry[] = [];
   for (let offset = 0; ; offset += LIMIT) {
     const { data, error } = await admin.storage.from(bucket).list(prefix, { limit: LIMIT, offset });
     if (error) throw new Error(`list ${bucket}/${prefix}: ${error.message}`);
@@ -67,38 +81,131 @@ async function listAllObjects(bucket: string, prefix = ""): Promise<string[]> {
     for (const entry of data) {
       const fullPath = prefix ? `${prefix}/${entry.name}` : entry.name;
       if (entry.id === null) {
-        paths.push(...(await listAllObjects(bucket, fullPath)));
+        entries.push(...(await listAllObjectsWithMeta(bucket, fullPath)));
       } else {
-        paths.push(fullPath);
+        entries.push({ path: fullPath, eTag: entry.metadata?.eTag ?? null, size: entry.metadata?.size ?? null });
       }
     }
     if (data.length < LIMIT) break;
   }
-  return paths;
+  return entries;
 }
 
-async function backupFiles(runFolder: string): Promise<Record<string, { count: number; failed: number }>> {
+async function listAllObjects(bucket: string, prefix = ""): Promise<string[]> {
+  return (await listAllObjectsWithMeta(bucket, prefix)).map((e) => e.path);
+}
+
+async function backupFiles(runFolder: string): Promise<{
+  summary: Record<string, { count: number; failed: number; checksumMismatches: number }>;
+  totalChecksumMismatches: number;
+}> {
   const { data: buckets, error } = await admin.storage.listBuckets();
   if (error) throw new Error(`listBuckets: ${error.message}`);
 
   const sourceBuckets = (buckets || []).map((b) => b.id || b.name).filter((id) => !EXCLUDED_BUCKETS.has(id));
-  const summary: Record<string, { count: number; failed: number }> = {};
+  const summary: Record<string, { count: number; failed: number; checksumMismatches: number }> = {};
+  let totalChecksumMismatches = 0;
 
   for (const bucket of sourceBuckets) {
-    const paths = await listAllObjects(bucket);
-    let failed = 0;
-    await mapWithConcurrency(paths, 10, async (path) => {
-      const dest = `${runFolder}/files/${bucket}/${path}`;
-      const { error: copyErr } = await admin.storage.from(bucket).copy(path, dest, { destinationBucket: "backups" });
+    const sourceEntries = await listAllObjectsWithMeta(bucket);
+    const failedPaths = new Set<string>();
+    await mapWithConcurrency(sourceEntries, 10, async (entry) => {
+      const dest = `${runFolder}/files/${bucket}/${entry.path}`;
+      const { error: copyErr } = await admin.storage.from(bucket).copy(entry.path, dest, { destinationBucket: "backups" });
       if (copyErr) {
-        failed++;
-        console.error(`scheduled-backup: failed to copy ${bucket}/${path}`, copyErr);
+        failedPaths.add(entry.path);
+        console.error(`scheduled-backup: failed to copy ${bucket}/${entry.path}`, copyErr);
       }
     });
-    summary[bucket] = { count: paths.length - failed, failed };
+
+    // Checksum verification: re-list the just-copied destination objects and
+    // compare eTag/size against the source listing taken before the copy. A
+    // mismatch (or a missing destination entry despite no copy error)
+    // means the copy is suspect even though the storage API reported success.
+    const destPrefix = `${runFolder}/files/${bucket}`;
+    const destEntries = await listAllObjectsWithMeta("backups", destPrefix);
+    const destByPath = new Map(destEntries.map((e) => [e.path.slice(destPrefix.length + 1), e]));
+    let checksumMismatches = 0;
+    for (const src of sourceEntries) {
+      if (failedPaths.has(src.path)) continue;
+      const dst = destByPath.get(src.path);
+      if (!dst || dst.eTag !== src.eTag || dst.size !== src.size) checksumMismatches++;
+    }
+
+    summary[bucket] = { count: sourceEntries.length - failedPaths.size, failed: failedPaths.size, checksumMismatches };
+    totalChecksumMismatches += checksumMismatches;
   }
 
-  return summary;
+  return { summary, totalChecksumMismatches };
+}
+
+async function getSecret(key: string): Promise<string | null> {
+  const { data } = await admin.from("app_secrets").select("value").eq("key", key).maybeSingle();
+  return data?.value ?? null;
+}
+
+// Off-site replication: best-effort copy of this run's data.json (and,
+// optionally, every backed-up file) into a SECOND, independent Supabase
+// project, so losing the primary project doesn't also destroy its backups.
+// Configured by an admin via app_secrets (offsite_supabase_url /
+// offsite_supabase_service_key / offsite_include_files); a no-op if unset.
+// Never throws - the primary backup has already succeeded by the time this
+// runs, and an off-site failure shouldn't be reported as a backup failure.
+async function replicateOffsite(runFolder: string, dataBytes: Uint8Array): Promise<string> {
+  const offsiteUrl = await getSecret("offsite_supabase_url");
+  const offsiteKey = await getSecret("offsite_supabase_service_key");
+  if (!offsiteUrl || !offsiteKey) return "not_configured";
+
+  try {
+    const offsite = createClient(offsiteUrl, offsiteKey);
+    const { error: bucketErr } = await offsite.storage.createBucket("backups", { public: false });
+    if (bucketErr && !/exists/i.test(bucketErr.message)) throw bucketErr;
+
+    const { error: upErr } = await offsite.storage.from("backups").upload(`${runFolder}/data.json`, dataBytes, {
+      contentType: "application/json",
+      upsert: true,
+    });
+    if (upErr) throw upErr;
+
+    const includeFiles = (await getSecret("offsite_include_files")) === "true";
+    if (!includeFiles) return "success";
+
+    const paths = await listAllObjects("backups", `${runFolder}/files`);
+    let failed = 0;
+    await mapWithConcurrency(paths, 5, async (path) => {
+      const { data, error: dlErr } = await admin.storage.from("backups").download(path);
+      if (dlErr || !data) {
+        failed++;
+        return;
+      }
+      const { error: ulErr } = await offsite.storage.from("backups").upload(path, await data.arrayBuffer(), { upsert: true });
+      if (ulErr) failed++;
+    });
+    return failed > 0 ? "partial" : "success";
+  } catch (e) {
+    console.error("scheduled-backup: offsite replication failed", e);
+    return "failed";
+  }
+}
+
+// External alert: best-effort POST to an admin-configured webhook URL
+// (Slack incoming-webhook and Discord webhooks both accept a JSON body with
+// a "text"/"content" key, so one payload notifies either without per-vendor
+// branching) so a backup failure is visible even if nobody is looking at the
+// app. No-op if unconfigured; never throws.
+async function sendAlert(severity: "warning" | "critical", title: string, body: string) {
+  try {
+    const webhookUrl = await getSecret("alert_webhook_url");
+    if (!webhookUrl) return;
+    const text = `[${severity.toUpperCase()}] ${title}\n${body}`;
+    await fetch(webhookUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text, content: text }),
+    });
+  } catch (e) {
+    console.error("scheduled-backup: failed to send alert", e);
+  }
 }
 
 async function runBackup(triggeredBy: "cron" | "manual", triggeredByUser: string | null) {
@@ -136,37 +243,58 @@ async function runBackup(triggeredBy: "cron" | "manual", triggeredByUser: string
   });
   if (upErr) throw upErr;
 
-  const bucketsSummary = await backupFiles(runFolder);
+  const { summary: bucketsSummary, totalChecksumMismatches } = await backupFiles(runFolder);
   const totalFiles = Object.values(bucketsSummary).reduce((sum, b) => sum + b.count, 0);
   const totalFailed = Object.values(bucketsSummary).reduce((sum, b) => sum + b.failed, 0);
 
+  const offsiteStatus = await replicateOffsite(runFolder, bytes);
+
+  const ok = integrityOk && totalFailed === 0 && totalChecksumMismatches === 0;
+  const issues = [
+    !integrityOk ? `Row count mismatch in: ${integrityIssues.join(", ")}` : null,
+    totalChecksumMismatches > 0 ? `${totalChecksumMismatches} file checksum mismatch(es)` : null,
+  ].filter((m): m is string => m !== null);
+
   await admin.from("backup_runs").insert({
-    status: integrityOk && totalFailed === 0 ? "success" : "warning",
+    status: ok ? "success" : "warning",
     file_path: dataPath,
     file_size: bytes.byteLength,
     backup_folder: runFolder,
     tables_summary: summary,
     buckets_summary: bucketsSummary,
     integrity_ok: integrityOk,
+    checksum_issues: totalChecksumMismatches,
+    offsite_status: offsiteStatus,
     triggered_by: triggeredBy,
     triggered_by_user: triggeredByUser,
-    error_message: integrityOk ? null : `Row count mismatch in: ${integrityIssues.join(", ")}`,
+    error_message: issues.length ? issues.join("; ") : null,
   });
 
   await cleanupOldBackups();
 
   await admin.rpc("notify_admins", {
-    _type: integrityOk && totalFailed === 0 ? "backup_complete" : "backup_warning",
-    _title: integrityOk && totalFailed === 0
-      ? "تمت النسخة الاحتياطية للنظام بنجاح"
-      : "تمت النسخة الاحتياطية مع تحذيرات",
-    _body: `${backupTables.length} جدول • ${totalFiles} ملف${totalFailed ? ` • فشل نسخ ${totalFailed} ملف` : ""}${!integrityOk ? ` • تعارض في: ${integrityIssues.join(", ")}` : ""}`,
+    _type: ok ? "backup_complete" : "backup_warning",
+    _title: ok ? "تمت النسخة الاحتياطية للنظام بنجاح" : "تمت النسخة الاحتياطية مع تحذيرات",
+    _body: `${backupTables.length} جدول • ${totalFiles} ملف${totalFailed ? ` • فشل نسخ ${totalFailed} ملف` : ""}${totalChecksumMismatches ? ` • ${totalChecksumMismatches} ملف به تعارض checksum` : ""}${!integrityOk ? ` • تعارض في: ${integrityIssues.join(", ")}` : ""}`,
     _link: "/admin?tab=backup",
-    _severity: integrityOk && totalFailed === 0 ? "success" : "warning",
-    _metadata: { backup_folder: runFolder, summary, bucketsSummary },
+    _severity: ok ? "success" : "warning",
+    _metadata: { backup_folder: runFolder, summary, bucketsSummary, offsiteStatus },
   });
 
-  return { file_path: dataPath, backup_folder: runFolder, file_size: bytes.byteLength, summary, bucketsSummary, integrityOk };
+  if (!ok) {
+    await sendAlert("warning", "Backup completed with warnings", issues.join("; ") || "Unknown issue");
+  }
+
+  return {
+    file_path: dataPath,
+    backup_folder: runFolder,
+    file_size: bytes.byteLength,
+    summary,
+    bucketsSummary,
+    integrityOk,
+    checksumIssues: totalChecksumMismatches,
+    offsiteStatus,
+  };
 }
 
 // Retention: remove whole run folders (data.json + copied files) older than
@@ -201,6 +329,7 @@ async function recordFailure(triggeredBy: "cron" | "manual", triggeredByUser: st
       _severity: "critical",
       _metadata: {},
     });
+    await sendAlert("critical", "Backup failed", message);
   } catch (e) {
     console.error("scheduled-backup: failed to record failure", e);
   }
