@@ -1,5 +1,7 @@
-import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { queryClient } from "@/lib/queryClient";
+import { queryKeys } from "@/lib/queryKeys";
 
 export interface SiteContent {
   hero_title1_ar: string;
@@ -133,16 +135,17 @@ const DEFAULTS: SiteContent = {
   hero_image_url: null,
 };
 
+// Shares queryKeys.siteSettings.all with useSiteSettings — both read the exact
+// same site_settings row, so mounting both on one page now costs one fetch, not two.
+async function fetchSiteSettingsRow(): Promise<Record<string, unknown> | null> {
+  const { data } = await supabase.from("site_settings").select("*").limit(1).single();
+  return data ?? null;
+}
+
 export const useSiteContent = () => {
-  const [content, setContent] = useState<SiteContent>(DEFAULTS);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    supabase.from("site_settings").select("*").limit(1).single().then(({ data }) => {
-      if (data) setContent({ ...DEFAULTS, ...data } as SiteContent);
-      setLoading(false);
-    });
-  }, []);
-
-  return { content, loading };
+  // Bound directly to the singleton queryClient (not context) so this shares
+  // the cache with useSiteSettings/SiteLogo even outside a QueryClientProvider.
+  const query = useQuery({ queryKey: queryKeys.siteSettings.all, queryFn: fetchSiteSettingsRow }, queryClient);
+  const content = query.data ? ({ ...DEFAULTS, ...query.data } as SiteContent) : DEFAULTS;
+  return { content, loading: query.isLoading };
 };

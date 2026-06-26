@@ -58,9 +58,12 @@ export const queryKeys = {
     all: ["dropdownOptions"] as const,
     list: (field?: string) => ["dropdownOptions", "list", field] as const,
   },
-  siteContent: {
-    all: ["siteContent"] as const,
-    list: () => ["siteContent", "list"] as const,
+  fieldConfig: {
+    all: ["fieldConfig"] as const,
+    list: () => ["fieldConfig", "list"] as const,
+  },
+  siteSettings: {
+    all: ["siteSettings"] as const,
   },
   dashboardPreferences: {
     all: ["dashboardPreferences"] as const,

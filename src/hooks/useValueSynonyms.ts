@@ -1,5 +1,7 @@
-import { useEffect, useState, useCallback } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { queryClient } from "@/lib/queryClient";
+import { queryKeys } from "@/lib/queryKeys";
 
 export type SynonymRow = {
   id: string;
@@ -25,45 +27,48 @@ export const normText = (s: string | null | undefined) =>
     .replace(/[\s\-_،,.()\/]+/g, " ")
     .trim();
 
-// Module-level cache so charts and pickers share the same data
-let cache: SynonymRow[] | null = null;
-const listeners = new Set<(rows: SynonymRow[]) => void>();
+const SYNONYMS_QUERY_KEY = queryKeys.valueSynonyms.all;
+
+async function fetchRowsRaw(): Promise<SynonymRow[]> {
+  const { data } = await supabase.from("value_synonyms").select("*");
+  return (data || []) as SynonymRow[];
+}
 
 // lookupSynonym() is called once per applicant in several places (filtering,
 // analytics charts) and redoes several regex passes per call — on 60k+ rows
 // that's enough to block the main thread. Memoize per field/lang/normalized
-// value (nested maps, not a concatenated string key, so no collision risk).
+// value (nested maps, not a concatenated string key, so no collision risk),
+// keyed off the cached rows array reference so a refresh invalidates it.
+let lookupCacheRows: SynonymRow[] | null = null;
 let lookupCache = new Map<string, Map<string, Map<string, string | null>>>();
 
-async function fetchRows() {
-  const { data } = await supabase.from("value_synonyms").select("*");
-  cache = (data || []) as SynonymRow[];
-  lookupCache = new Map();
-  listeners.forEach(l => l(cache!));
-  return cache;
+function getLookupCache(rows: SynonymRow[]) {
+  if (lookupCacheRows !== rows) {
+    lookupCacheRows = rows;
+    lookupCache = new Map();
+  }
+  return lookupCache;
 }
 
 export function useValueSynonyms() {
-  const [rows, setRows] = useState<SynonymRow[]>(cache || []);
-  useEffect(() => {
-    if (!cache) fetchRows();
-    else setRows(cache);
-    const l = (r: SynonymRow[]) => setRows(r);
-    listeners.add(l);
-    return () => { listeners.delete(l); };
-  }, []);
-  const refresh = useCallback(() => fetchRows(), []);
-  return { rows, refresh };
+  // Bound directly to the singleton queryClient (not context) so this shares
+  // the cache with getSynonymsCache/lookupSynonym even outside a
+  // QueryClientProvider (e.g. in tests).
+  const query = useQuery(
+    { queryKey: SYNONYMS_QUERY_KEY, queryFn: fetchRowsRaw, staleTime: Infinity },
+    queryClient,
+  );
+  const refresh = () => queryClient.fetchQuery({ queryKey: SYNONYMS_QUERY_KEY, queryFn: fetchRowsRaw, staleTime: 0 });
+  return { rows: query.data ?? [], refresh };
 }
 
 // Synchronous accessor (best-effort: uses cache; if empty, returns null and falls back)
 export function getSynonymsCache(): SynonymRow[] | null {
-  return cache;
+  return queryClient.getQueryData<SynonymRow[]>(SYNONYMS_QUERY_KEY) ?? null;
 }
 
 export async function ensureSynonymsLoaded() {
-  if (!cache) await fetchRows();
-  return cache || [];
+  return queryClient.fetchQuery({ queryKey: SYNONYMS_QUERY_KEY, queryFn: fetchRowsRaw, staleTime: Infinity });
 }
 
 /**
@@ -78,10 +83,12 @@ export function lookupSynonym(
   value: string | null | undefined,
   lang: "ar" | "en"
 ): string | null {
+  const cache = getSynonymsCache();
   if (!cache || !value) return null;
   const v = normText(value);
   if (!v) return null;
 
+  const lookupCache = getLookupCache(cache);
   let byLang = lookupCache.get(fieldName);
   if (!byLang) {
     byLang = new Map();
@@ -94,13 +101,13 @@ export function lookupSynonym(
   }
   if (byValue.has(v)) return byValue.get(v)!;
 
-  const result = resolveSynonym(fieldName, v, lang);
+  const result = resolveSynonym(cache, fieldName, v, lang);
   byValue.set(v, result);
   return result;
 }
 
-function resolveSynonym(fieldName: string, v: string, lang: "ar" | "en"): string | null {
-  const fieldRows = cache!.filter(r => r.field_name === fieldName);
+function resolveSynonym(cache: SynonymRow[], fieldName: string, v: string, lang: "ar" | "en"): string | null {
+  const fieldRows = cache.filter(r => r.field_name === fieldName);
   if (fieldRows.length === 0) return null;
 
   // Exact match first

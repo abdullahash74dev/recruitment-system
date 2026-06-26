@@ -1,5 +1,7 @@
-import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { queryClient } from "@/lib/queryClient";
+import { queryKeys } from "@/lib/queryKeys";
 import type { Lang } from "@/contexts/LanguageContext";
 import {
   getNationalities as getDefaultNationalities,
@@ -24,29 +26,29 @@ interface DropdownOption {
   options_en: string[];
 }
 
-let cachedOptions: Record<string, DropdownOption> | null = null;
-
-export const fetchAllDropdownOptions = async (): Promise<Record<string, DropdownOption>> => {
-  if (cachedOptions) return cachedOptions;
+async function fetchAllDropdownOptionsRaw(): Promise<Record<string, DropdownOption>> {
   const { data } = await supabase
     .from("dropdown_options")
     .select("field_name, options_ar, options_en")
     .eq("is_active", true);
   const map: Record<string, DropdownOption> = {};
   (data || []).forEach((d: any) => { map[d.field_name] = d; });
-  cachedOptions = map;
   return map;
-};
+}
 
-export const invalidateDropdownCache = () => { cachedOptions = null; };
+export const fetchAllDropdownOptions = (): Promise<Record<string, DropdownOption>> =>
+  queryClient.fetchQuery({ queryKey: queryKeys.dropdownOptions.all, queryFn: fetchAllDropdownOptionsRaw });
+
+export const invalidateDropdownCache = () =>
+  queryClient.invalidateQueries({ queryKey: queryKeys.dropdownOptions.all });
 
 export const useDropdownOptions = (lang: Lang) => {
-  const [options, setOptions] = useState<Record<string, DropdownOption>>({});
-  const [loaded, setLoaded] = useState(false);
-
-  useEffect(() => {
-    fetchAllDropdownOptions().then((o) => { setOptions(o); setLoaded(true); });
-  }, []);
+  // Bound directly to the singleton queryClient (not context) so this shares
+  // the cache with fetchAllDropdownOptions/invalidateDropdownCache even outside
+  // a QueryClientProvider (e.g. in tests).
+  const query = useQuery({ queryKey: queryKeys.dropdownOptions.all, queryFn: fetchAllDropdownOptionsRaw }, queryClient);
+  const options = query.data ?? {};
+  const loaded = query.isSuccess;
 
   const getOptions = (fieldName: string, fallbackAr: string[], fallbackEn: string[]): string[] => {
     const opt = options[fieldName];

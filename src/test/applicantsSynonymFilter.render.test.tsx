@@ -7,6 +7,7 @@ import { describe, it, expect, vi, beforeAll, afterEach } from "vitest";
 import { render, screen, within, cleanup } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import ApplicantsAdvancedFilters, { type AdvancedFilter } from "@/components/Dashboard/ApplicantsAdvancedFilters";
 import { ThemeProvider } from "@/contexts/ThemeContext";
 
@@ -82,25 +83,28 @@ const APPLICANTS = [
 ];
 
 function Harness() {
+  const [queryClient] = useState(() => new QueryClient({ defaultOptions: { queries: { retry: false } } }));
   const [filters, setFilters] = useState<AdvancedFilter[]>([]);
   const [aiSelectedIds, setAiSelectedIds] = useState<Set<string> | null>(null);
   const [aiSummary, setAiSummary] = useState("");
   return (
-    <MemoryRouter>
-      <ThemeProvider>
-        <ApplicantsAdvancedFilters
-          applicants={APPLICANTS}
-          lang="ar"
-          filters={filters}
-          setFilters={setFilters}
-          aiSelectedIds={aiSelectedIds}
-          setAiSelectedIds={setAiSelectedIds}
-          aiSummary={aiSummary}
-          setAiSummary={setAiSummary}
-          isAdmin
-        />
-      </ThemeProvider>
-    </MemoryRouter>
+    <QueryClientProvider client={queryClient}>
+      <MemoryRouter>
+        <ThemeProvider>
+          <ApplicantsAdvancedFilters
+            applicants={APPLICANTS}
+            lang="ar"
+            filters={filters}
+            setFilters={setFilters}
+            aiSelectedIds={aiSelectedIds}
+            setAiSelectedIds={setAiSelectedIds}
+            aiSummary={aiSummary}
+            setAiSummary={setAiSummary}
+            isAdmin
+          />
+        </ThemeProvider>
+      </MemoryRouter>
+    </QueryClientProvider>
   );
 }
 

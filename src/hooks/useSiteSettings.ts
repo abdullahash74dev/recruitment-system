@@ -1,5 +1,7 @@
-import { useState, useEffect, createContext, useContext } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { queryClient } from "@/lib/queryClient";
+import { queryKeys } from "@/lib/queryKeys";
 
 export interface SiteSettings {
   id: string;
@@ -25,40 +27,31 @@ const DEFAULT_SETTINGS: SiteSettings = {
   public_theme_palette: "custom",
 };
 
-let cachedSettings: SiteSettings | null = null;
-
-export const fetchSiteSettings = async (): Promise<SiteSettings> => {
-  if (cachedSettings) return cachedSettings;
+async function fetchSiteSettingsRaw(): Promise<SiteSettings> {
   const { data } = await supabase
     .from("site_settings")
     .select("*")
     .limit(1)
     .single();
-  if (data) {
-    cachedSettings = data as SiteSettings;
-    return cachedSettings;
-  }
-  return DEFAULT_SETTINGS;
-};
+  return data ? (data as SiteSettings) : DEFAULT_SETTINGS;
+}
 
-export const invalidateSiteSettingsCache = () => { cachedSettings = null; };
+export const fetchSiteSettings = (): Promise<SiteSettings> =>
+  queryClient.fetchQuery({ queryKey: queryKeys.siteSettings.all, queryFn: fetchSiteSettingsRaw });
+
+export const invalidateSiteSettingsCache = () =>
+  queryClient.invalidateQueries({ queryKey: queryKeys.siteSettings.all });
 
 export const useSiteSettings = () => {
-  const [settings, setSettings] = useState<SiteSettings>(DEFAULT_SETTINGS);
-  const [loading, setLoading] = useState(true);
+  // Bound directly to the singleton queryClient (not context) so this stays in
+  // sync with fetchSiteSettings/invalidateSiteSettingsCache even when rendered
+  // outside a QueryClientProvider (e.g. in tests).
+  const query = useQuery({ queryKey: queryKeys.siteSettings.all, queryFn: fetchSiteSettingsRaw }, queryClient);
 
   const refresh = async () => {
-    invalidateSiteSettingsCache();
-    const s = await fetchSiteSettings();
-    setSettings(s);
+    await invalidateSiteSettingsCache();
+    await query.refetch();
   };
 
-  useEffect(() => {
-    fetchSiteSettings().then((s) => {
-      setSettings(s);
-      setLoading(false);
-    });
-  }, []);
-
-  return { settings, loading, refresh };
+  return { settings: query.data ?? DEFAULT_SETTINGS, loading: query.isLoading, refresh };
 };
