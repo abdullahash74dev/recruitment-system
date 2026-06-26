@@ -1,5 +1,6 @@
 import { useRef, useState, useMemo, useEffect } from "react";
 import * as XLSX from "xlsx";
+import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Switch } from "@/components/ui/switch";
@@ -8,6 +9,13 @@ import { Upload, FileSpreadsheet, Loader2, CheckCircle2, AlertTriangle, Download
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { dupKeys, richness } from "@/lib/applicantDuplicates";
+import { queryKeys } from "@/lib/queryKeys";
+import {
+  useApplicantImportTemplatesQuery,
+  useUpsertApplicantImportTemplateMutation,
+  useDeleteApplicantImportTemplateMutation,
+} from "@/hooks/queries/useApplicantImportTemplates";
+import { useApplicantImportJobsQuery, useStaleImportJobQuery } from "@/hooks/queries/useApplicantImportJobs";
 
 // Target fields with Arabic labels (subset of applicants table)
 const TARGETS: { key: string; label: string; required?: boolean }[] = [
@@ -638,54 +646,36 @@ const ApplicantsMappedImport = ({ onChanged, onImportComplete }: Props) => {
   // Import history: every import run is recorded in applicant_import_jobs (DB-backed, not
   // just React state) so it survives a closed tab, a crashed browser, or a phone that went
   // to sleep mid-import — the user can always come back and see exactly what happened.
-  const [jobHistory, setJobHistory] = useState<any[]>([]);
   const [showHistory, setShowHistory] = useState(false);
-  const [loadingHistory, setLoadingHistory] = useState(false);
-  const [staleJob, setStaleJob] = useState<any | null>(null);
   const STALE_AFTER_MS = 2 * 60 * 1000;
+  const queryClient = useQueryClient();
+  const { data: jobHistory = [], isLoading: loadingHistory } = useApplicantImportJobsQuery(showHistory);
+  const { data: staleJob = null } = useStaleImportJobQuery(open);
 
   // Saved mapping templates: a named, reusable snapshot of the mapping/source settings,
   // independent of any single job or file. Lets a recurring source (e.g. the same external
   // data-bank export every time) be re-imported with the exact same column mapping instead of
   // redoing it by hand — including for old/failed jobs that predate per-job resume support and
   // have no stored file or snapshot to resume from at all.
-  const [templates, setTemplates] = useState<any[]>([]);
+  const { data: templates = [] } = useApplicantImportTemplatesQuery(open);
   const [templateName, setTemplateName] = useState("");
-  const [savingTemplate, setSavingTemplate] = useState(false);
   const [selectedTemplateId, setSelectedTemplateId] = useState("");
-
-  const loadTemplates = async () => {
-    const { data, error } = await supabase
-      .from("applicant_import_templates")
-      .select("*")
-      .order("updated_at", { ascending: false });
-    if (!error) setTemplates(data || []);
-  };
-
-  useEffect(() => {
-    if (open) loadTemplates();
-  }, [open]);
+  const upsertTemplateMutation = useUpsertApplicantImportTemplateMutation();
+  const deleteTemplateMutation = useDeleteApplicantImportTemplateMutation();
+  const savingTemplate = upsertTemplateMutation.isPending;
 
   const saveAsTemplate = async () => {
     const name = templateName.trim() || sourceCompany.trim();
     if (!name) { toast.error("اكتب اسماً للقالب (أو حدد اسم شركة المصدر أولاً)"); return; }
-    setSavingTemplate(true);
     try {
-      const { data: userData } = await supabase.auth.getUser();
-      const { error } = await supabase.from("applicant_import_templates").upsert({
+      await upsertTemplateMutation.mutateAsync({
         name,
         mapping_snapshot: { mapping, enabled, customFields, importSource, sourceCompany },
-        created_by: userData.user?.id || null,
-        created_by_email: userData.user?.email || null,
-      }, { onConflict: "name" });
-      if (error) throw error;
+      });
       toast.success(`تم حفظ القالب "${name}" — يمكنك تطبيقه على أي ملف قادم بنفس التركيب`);
       setTemplateName("");
-      loadTemplates();
-    } catch (e: any) {
-      toast.error(e.message || "تعذّر حفظ القالب");
-    } finally {
-      setSavingTemplate(false);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "تعذّر حفظ القالب");
     }
   };
 
@@ -706,47 +696,16 @@ const ApplicantsMappedImport = ({ onChanged, onImportComplete }: Props) => {
     toast.success(`تم تطبيق قالب "${tpl.name}" — راجع الربط ثم اضغط "حفظ"`);
   };
 
-  const deleteTemplate = async (id: string, name: string) => {
+  const deleteTemplate = (id: string, name: string) => {
     if (!confirm(`حذف قالب "${name}"؟`)) return;
-    const { error } = await supabase.from("applicant_import_templates").delete().eq("id", id);
-    if (error) { toast.error(error.message); return; }
-    if (selectedTemplateId === id) setSelectedTemplateId("");
-    toast.success("تم حذف القالب");
-    loadTemplates();
+    deleteTemplateMutation.mutate(id, {
+      onSuccess: () => {
+        if (selectedTemplateId === id) setSelectedTemplateId("");
+        toast.success("تم حذف القالب");
+      },
+      onError: (e) => toast.error(e instanceof Error ? e.message : "تعذّر حذف القالب"),
+    });
   };
-
-  const loadJobHistory = async () => {
-    setLoadingHistory(true);
-    try {
-      const { data, error } = await supabase
-        .from("applicant_import_jobs")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(20);
-      if (error) throw error;
-      setJobHistory(data || []);
-    } catch (e: any) {
-      toast.error(e.message || "تعذّر تحميل سجل الاستيراد");
-    } finally {
-      setLoadingHistory(false);
-    }
-  };
-
-  // When the tool is opened, check whether a previous import was left "running" — i.e. the
-  // tab/browser died before it could mark itself completed/failed/cancelled — and surface it.
-  useEffect(() => {
-    if (!open) return;
-    (async () => {
-      const { data } = await supabase
-        .from("applicant_import_jobs")
-        .select("*")
-        .eq("status", "running")
-        .order("created_at", { ascending: false })
-        .limit(1);
-      const job = data?.[0];
-      setStaleJob(job && Date.now() - new Date(job.updated_at).getTime() > STALE_AFTER_MS ? job : null);
-    })();
-  }, [open]);
 
   const downloadJobErrors = (job: any) => {
     if (!job?.errors?.length) return;
@@ -1032,6 +991,7 @@ const ApplicantsMappedImport = ({ onChanged, onImportComplete }: Props) => {
       setLoading(false);
       setCurrentName("");
       cancelRef.current = false;
+      if (jobId) queryClient.invalidateQueries({ queryKey: queryKeys.applicantImportJobs.all });
     }
   };
 
@@ -1091,7 +1051,7 @@ const ApplicantsMappedImport = ({ onChanged, onImportComplete }: Props) => {
                       استكمال
                     </Button>
                   )}
-                  <Button size="sm" variant="outline" onClick={() => { setShowHistory(true); loadJobHistory(); }}>عرض السجل</Button>
+                  <Button size="sm" variant="outline" onClick={() => setShowHistory(true)}>عرض السجل</Button>
                 </div>
               </div>
             )}
@@ -1100,7 +1060,7 @@ const ApplicantsMappedImport = ({ onChanged, onImportComplete }: Props) => {
                 <Upload className="w-4 h-4" /> اختر ملف Excel / CSV
               </Button>
               <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" onChange={handleFile} className="hidden" />
-              <Button size="sm" variant="outline" className="gap-1" onClick={() => { setShowHistory(true); loadJobHistory(); }}>
+              <Button size="sm" variant="outline" className="gap-1" onClick={() => setShowHistory(true)}>
                 <History className="w-3.5 h-3.5" /> سجل عمليات الاستيراد
               </Button>
               {headers.length > 0 && (

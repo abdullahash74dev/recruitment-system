@@ -136,6 +136,18 @@ export const queryKeys = {
   executiveReport: {
     detail: (token?: string) => ["executiveReport", token] as const,
   },
+  applicantImportTemplates: {
+    all: ["applicantImportTemplates"] as const,
+    list: () => ["applicantImportTemplates", "list"] as const,
+  },
+  applicantImportJobs: {
+    all: ["applicantImportJobs"] as const,
+    list: () => ["applicantImportJobs", "list"] as const,
+    // Separate filtered read (status="running", limit 1) used to detect a job
+    // left mid-run by a crashed/closed tab — same table, nested under the same
+    // prefix so one invalidation after submit() refreshes both.
+    staleCheck: () => ["applicantImportJobs", "staleCheck"] as const,
+  },
   storage: {
     // Signed URL for a private storage object — keyed by path so the same
     // file shown in multiple places (list + detail view) costs one fetch.
