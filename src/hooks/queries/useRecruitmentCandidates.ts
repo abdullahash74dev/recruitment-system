@@ -78,6 +78,24 @@ export function useUpdateCandidateMutation() {
 }
 
 /**
+ * Bulk-inserts applicants as new recruitment candidates.
+ * Mirrors the original TransferToRecruitmentDialog `handleTransfer()` insert.
+ */
+export function useTransferApplicantsToRecruitmentMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (rows: Record<string, unknown>[]) => {
+      const { error } = await supabase.from("recruitment_candidates").insert(rows);
+      if (error) throw error;
+      return rows.length;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.recruitmentCandidates.all });
+    },
+  });
+}
+
+/**
  * Marks a candidate as rejected with a reason/note.
  * Mirrors the original confirmReject() update call.
  */

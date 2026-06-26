@@ -1,5 +1,4 @@
-import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useMemo, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -7,6 +6,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useRecruitmentProjectsQuery } from "@/hooks/queries/useRecruitmentProjects";
+import { useRecruitmentJobTitlesQuery } from "@/hooks/queries/useRecruitmentJobTitles";
+import { useTransferApplicantsToRecruitmentMutation } from "@/hooks/queries/useRecruitmentCandidates";
 
 interface Props {
   applicants: { id: string; full_name: string; email?: string|null; phone?: string|null; nationality?: string|null; resume_url?: string|null }[];
@@ -17,29 +19,19 @@ interface Props {
 export default function TransferToRecruitmentDialog({ applicants, onClose, onTransferred }: Props) {
   const { lang } = useLanguage();
   const ar = lang === "ar";
-  const [projects, setProjects] = useState<any[]>([]);
-  const [jobs, setJobs] = useState<any[]>([]);
+  const { data: allProjects = [] } = useRecruitmentProjectsQuery();
+  const { data: allJobs = [] } = useRecruitmentJobTitlesQuery();
+  const projects = useMemo(() => allProjects.filter((p) => p.is_active), [allProjects]);
+  const jobs = useMemo(() => allJobs.filter((j) => j.is_active), [allJobs]);
+  const transferMutation = useTransferApplicantsToRecruitmentMutation();
   const [projectId, setProjectId] = useState("");
   const [jobId, setJobId] = useState("");
   const [batchLabel, setBatchLabel] = useState("");
-  const [busy, setBusy] = useState(false);
-
-  useEffect(() => {
-    (async () => {
-      const [p, j] = await Promise.all([
-        supabase.from("recruitment_projects").select("id,code,name_ar,name_en").eq("is_active", true),
-        supabase.from("recruitment_job_titles").select("id,project_id,title_ar,title_en").eq("is_active", true),
-      ]);
-      if (p.data) setProjects(p.data);
-      if (j.data) setJobs(j.data);
-    })();
-  }, []);
 
   const filteredJobs = jobs.filter(j => !projectId || j.project_id === projectId);
 
   const handleTransfer = async () => {
     if (!projectId || !jobId) { toast.error(ar ? "اختر المشروع والوظيفة" : "Select project & job"); return; }
-    setBusy(true);
     const rows = applicants.map(a => ({
       project_id: projectId,
       job_title_id: jobId,
@@ -51,12 +43,14 @@ export default function TransferToRecruitmentDialog({ applicants, onClose, onTra
       batch_label: batchLabel.trim() || null,
       status: "new" as const,
     }));
-    const { error } = await supabase.from("recruitment_candidates").insert(rows);
-    setBusy(false);
-    if (error) return toast.error(error.message);
-    toast.success(ar ? `تم نقل ${rows.length} متقدم` : `Transferred ${rows.length}`);
-    onTransferred();
-    onClose();
+    try {
+      const count = await transferMutation.mutateAsync(rows);
+      toast.success(ar ? `تم نقل ${count} متقدم` : `Transferred ${count}`);
+      onTransferred();
+      onClose();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : String(error));
+    }
   };
 
   return (
@@ -100,8 +94,8 @@ export default function TransferToRecruitmentDialog({ applicants, onClose, onTra
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>{ar ? "إلغاء" : "Cancel"}</Button>
-          <Button onClick={handleTransfer} disabled={busy || !projectId || !jobId}>
-            {busy ? (ar ? "جاري النقل..." : "Transferring...") : (ar ? "نقل" : "Transfer")}
+          <Button onClick={handleTransfer} disabled={transferMutation.isPending || !projectId || !jobId}>
+            {transferMutation.isPending ? (ar ? "جاري النقل..." : "Transferring...") : (ar ? "نقل" : "Transfer")}
           </Button>
         </DialogFooter>
       </DialogContent>
