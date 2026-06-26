@@ -74,79 +74,19 @@ import { Mail, Activity, Bot, UserCog, Target, Globe, Menu, Palette, ListChecks 
 import DashboardSidebar, { type DashboardNavGroup } from "@/components/Dashboard/DashboardSidebar";
 import DashboardSidebarFuturistic from "@/components/Dashboard/DashboardSidebarFuturistic";
 import { useTheme } from "@/contexts/ThemeContext";
-
-type ApplicantStatus = "new" | "reviewing" | "phone_interview" | "in_person_interview" | "accepted" | "hired" | "rejected" | "withdrawn";
-
-interface Applicant {
-  id: string;
-  full_name: string;
-  email: string | null;
-  phone: string | null;
-  desired_position: string | null;
-  preferred_city: string | null;
-  status: ApplicantStatus;
-  notes: string | null;
-  created_at: string;
-  gender: string | null;
-  nationality: string | null;
-  education_level: string | null;
-  years_experience: string | null;
-  current_salary: string | null;
-  expected_salary: string | null;
-  job_type: string | null;
-  major: string | null;
-  university: string | null;
-  current_title: string | null;
-  linkedin: string | null;
-  arabic_level: string | null;
-  english_level: string | null;
-  available_date: string | null;
-  birth_date: string | null;
-  marital_status: string | null;
-  has_transport: string | null;
-  current_city: string | null;
-  dependents: number | null;
-  gpa: string | null;
-  graduation_year: string | null;
-  self_summary: string | null;
-  current_tasks: string | null;
-  other_experience: string | null;
-  other_language: string | null;
-  hear_about: string | null;
-  currently_employed: string | null;
-  currently_studying: string | null;
-  current_study: string | null;
-  resume_url: string | null;
-  degree_url: string | null;
-  experience_cert_url: string | null;
-  training_certs_url: string | null;
-  other_docs_url: string | null;
-  is_archived: boolean;
-  archived_at: string | null;
-  source?: string | null;
-  source_company?: string | null;
-}
-
-interface JobPosting {
-  id: string;
-  title_ar: string;
-  title_en: string | null;
-  description_ar: string | null;
-  description_en: string | null;
-  location: string;
-  location_en: string | null;
-  job_type: string;
-  job_type_en: string | null;
-  department: string | null;
-  department_en: string | null;
-  requirements_ar: string | null;
-  requirements_en: string | null;
-  is_active: boolean;
-  nationality_required: string | null;
-  nationality_required_en: string | null;
-  vacancy_count: number;
-  created_at: string;
-}
+import { useQueryClient } from "@tanstack/react-query";
+import {
+  type Applicant, type ApplicantStatus,
+  useApplicantsQuery, useUpdateApplicantStatusMutation, useUpdateApplicantNotesMutation,
+  useArchiveApplicantMutation, useRestoreApplicantMutation,
+} from "@/hooks/queries/useApplicants";
+import {
+  type JobPosting,
+  useJobPostingsQuery, useSaveJobPostingMutation, useDeleteJobPostingMutation, useToggleJobPostingActiveMutation,
+} from "@/hooks/queries/useJobPostings";
+import { useProjectsQuery, useSaveProjectMutation, useDeleteProjectMutation, useToggleProjectActiveMutation } from "@/hooks/queries/useProjects";
+import { useProfilesQuery, useUserRolesQuery, invalidateUsersAndRoles } from "@/hooks/queries/useUsersAndRoles";
+import { queryKeys } from "@/lib/queryKeys";
 
 const STATUSES: ApplicantStatus[] = ["new", "reviewing", "phone_interview", "in_person_interview", "accepted", "hired", "rejected", "withdrawn"];
 const ROLES = ["admin", "hr_manager", "recruitment_coordinator", "project_manager"] as const;
@@ -191,11 +131,17 @@ const DashboardPage = () => {
   const { navStyle } = useTheme();
   const { permissions, hasPermission, role: currentUserRole, loading: permsLoading } = useUserPermissions();
   const { requestDelete } = useDeletePin();
+  const queryClient = useQueryClient();
   const [dupCleanupOpen, setDupCleanupOpen] = useState(false);
-  const [applicants, setApplicants] = useState<Applicant[]>([]);
-  const [applicantsLoading, setApplicantsLoading] = useState(true);
-  const [applicantsLoadProgress, setApplicantsLoadProgress] = useState({ loaded: 0, total: 0 });
-  const [jobs, setJobs] = useState<JobPosting[]>([]);
+  const { applicants, isLoading: applicantsLoading, loadProgress: applicantsLoadProgress, refetch: refetchApplicants } = useApplicantsQuery(lang);
+  const updateApplicantStatusMutation = useUpdateApplicantStatusMutation();
+  const updateApplicantNotesMutation = useUpdateApplicantNotesMutation();
+  const archiveApplicantMutation = useArchiveApplicantMutation();
+  const restoreApplicantMutation = useRestoreApplicantMutation();
+  const { data: jobs = [] } = useJobPostingsQuery();
+  const saveJobPostingMutation = useSaveJobPostingMutation();
+  const deleteJobPostingMutation = useDeleteJobPostingMutation();
+  const toggleJobPostingActiveMutation = useToggleJobPostingActiveMutation();
   const [searchTerm, setSearchTerm] = useState("");
   const [searchTermDebounced, setSearchTermDebounced] = useState("");
   const [filterStatus, setFilterStatus] = useState<string>("all");
@@ -251,8 +197,8 @@ const DashboardPage = () => {
   const [newUserPassword, setNewUserPassword] = useState("");
   const [newUserName, setNewUserName] = useState("");
   const [newUserRole, setNewUserRole] = useState<string>("recruitment_coordinator");
-  const [users, setUsers] = useState<any[]>([]);
-  const [userRoles, setUserRoles] = useState<any[]>([]);
+  const { data: users = [] } = useProfilesQuery();
+  const { data: userRoles = [] } = useUserRolesQuery();
 
   // Permissions dialog state
   const [permDialogUser, setPermDialogUser] = useState<{ id: string; name: string; role: string } | null>(null);
@@ -268,7 +214,10 @@ const DashboardPage = () => {
     logo_bg_color: "" as string, logo_shadow: false, logo_border: false,
   };
   const [projectForm, setProjectForm] = useState(emptyProjectForm);
-  const [projects, setProjects] = useState<any[]>([]);
+  const { data: projects = [] } = useProjectsQuery();
+  const saveProjectMutation = useSaveProjectMutation();
+  const deleteProjectMutation = useDeleteProjectMutation();
+  const toggleProjectActiveMutation = useToggleProjectActiveMutation();
 
   // حوار إيميل المرشح (تأكيد + معاينة)
   const [emailDialog, setEmailDialog] = useState<{ applicantId: string; status: ApplicantEmailStatus } | null>(null);
@@ -277,111 +226,13 @@ const DashboardPage = () => {
   const [showSourceCorrectionDialog, setShowSourceCorrectionDialog] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
 
-  useEffect(() => {
-    fetchApplicants();
-    fetchJobs();
-    fetchProjects();
-    fetchUsers();
-  }, []);
-
-  const fetchApplicants = async () => {
-    setApplicantsLoading(true);
-    setApplicantsLoadProgress({ loaded: 0, total: 0 });
-    try {
-      const FIRST_BATCH = 200; // small enough to land almost instantly, regardless of table size
-      const PAGE_SIZE = 1000;
-      const CONCURRENCY = 4; // fetch several pages at once, but not so many that a slow/mobile link gets saturated
-      const PAGE_TIMEOUT_MS = 20000; // a single stalled request on a flaky connection must not freeze the whole load forever
-      const MAX_RETRIES = 2;
-
-      // First paint: grab just enough rows for page 1 of the table + rough stats, with an exact total count.
-      const { data: firstData, error: firstError, count } = await supabase
-        .from("applicants")
-        .select("*", { count: "exact" })
-        .order("created_at", { ascending: false })
-        .range(0, FIRST_BATCH - 1);
-      if (firstError) { toast.error(firstError.message); return; }
-      const total = count || 0;
-      const first = (firstData || []) as Applicant[];
-      setApplicants(first);
-      setApplicantsLoadProgress({ loaded: first.length, total });
-      setApplicantsLoading(false);
-      if (total <= first.length) return; // already have everything
-
-      // Background: stream in the rest in parallel batches, merging as each batch lands.
-      // Each page gets its own timeout + a couple of retries so one bad request (common on
-      // mobile data) can't hang the whole background load indefinitely.
-      const fetchPage = async (from: number, to: number): Promise<Applicant[]> => {
-        for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-          try {
-            const result = await Promise.race([
-              supabase.from("applicants").select("*").order("created_at", { ascending: false }).range(from, to),
-              new Promise<never>((_, reject) => setTimeout(() => reject(new Error("timeout")), PAGE_TIMEOUT_MS)),
-            ]);
-            if (result.error) throw result.error;
-            return (result.data || []) as Applicant[];
-          } catch (e) {
-            if (attempt === MAX_RETRIES) {
-              console.error(`Failed to load applicants range ${from}-${to} after ${MAX_RETRIES + 1} attempts`, e);
-              return [];
-            }
-            await new Promise((r) => setTimeout(r, 1000 * (attempt + 1))); // backoff before retrying
-          }
-        }
-        return [];
-      };
-
-      const remainingStart = first.length;
-      const pageCount = Math.ceil((total - remainingStart) / PAGE_SIZE);
-      const pages: Applicant[][] = new Array(pageCount);
-      let loaded = first.length;
-      let failedPages = 0;
-      for (let start = 0; start < pageCount; start += CONCURRENCY) {
-        const batch = Array.from({ length: Math.min(CONCURRENCY, pageCount - start) }, (_, i) => start + i);
-        const results = await Promise.all(batch.map(p => {
-          const from = remainingStart + p * PAGE_SIZE;
-          return fetchPage(from, from + PAGE_SIZE - 1);
-        }));
-        for (let i = 0; i < results.length; i++) {
-          pages[batch[i]] = results[i];
-          loaded += results[i].length;
-          if (results[i].length === 0) failedPages++;
-        }
-        setApplicants([...first, ...pages.flat()]);
-        setApplicantsLoadProgress({ loaded, total });
-      }
-      if (failedPages > 0) {
-        setApplicantsLoadProgress({ loaded: total, total }); // stop showing "still loading" — we're done retrying
-        toast.error(
-          lang === "ar"
-            ? `تعذّر تحميل بعض البيانات (${failedPages} صفحة) بسبب ضعف الاتصال — أعد تحميل الصفحة للمحاولة مجدداً`
-            : `Some data (${failedPages} page${failedPages > 1 ? "s" : ""}) failed to load due to a weak connection — refresh to retry`
-        );
-      }
-    } finally {
-      setApplicantsLoading(false);
-    }
-  };
-
-  const fetchJobs = async () => {
-    const { data, error } = await supabase
-      .from("job_postings")
-      .select("*")
-      .order("created_at", { ascending: false });
-    if (!error && data) setJobs(data as JobPosting[]);
-  };
-
-  const fetchProjects = async () => {
-    const { data } = await supabase.from("projects").select("*").order("created_at", { ascending: false });
-    if (data) setProjects(data);
-  };
-
-  const fetchUsers = async () => {
-    const { data: profilesData } = await supabase.from("profiles").select("*").order("created_at", { ascending: false });
-    const { data: rolesData } = await supabase.from("user_roles").select("*");
-    if (profilesData) setUsers(profilesData);
-    if (rolesData) setUserRoles(rolesData);
-  };
+  // Thin aliases so the many existing call sites below (refetch-after-write,
+  // "onChanged" props, etc.) don't need to change — the actual fetching now
+  // lives in the React Query hooks above.
+  const fetchApplicants = refetchApplicants;
+  const fetchJobs = () => queryClient.invalidateQueries({ queryKey: queryKeys.jobPostings.all });
+  const fetchProjects = () => queryClient.invalidateQueries({ queryKey: queryKeys.projects.all });
+  const fetchUsers = () => invalidateUsersAndRoles(queryClient);
 
   const handleLogout = async () => {
     const { logAudit } = await import("@/lib/audit");
@@ -390,28 +241,26 @@ const DashboardPage = () => {
     window.location.href = "/admin/login";
   };
 
-  const updateStatus = async (id: string, status: ApplicantStatus) => {
-    const { error } = await supabase.from("applicants").update({ status }).eq("id", id);
-    if (!error) {
-      setApplicants(prev => prev.map(a => a.id === id ? { ...a, status } : a));
-      if (selectedApplicant?.id === id) setSelectedApplicant(prev => prev ? { ...prev, status } : null);
-      toast.success(t("dash.updateStatus"));
-      // إذا كانت الحالة تستدعي إيميل، افتح حوار التأكيد تلقائياً
-      if ((STATUSES_WITH_EMAIL as string[]).includes(status)) {
-        const a = applicants.find(x => x.id === id);
-        if (a?.email) {
-          setEmailDialog({ applicantId: id, status: status as ApplicantEmailStatus });
+  const updateStatus = (id: string, status: ApplicantStatus) => {
+    updateApplicantStatusMutation.mutate({ id, status }, {
+      onSuccess: () => {
+        if (selectedApplicant?.id === id) setSelectedApplicant(prev => prev ? { ...prev, status } : null);
+        toast.success(t("dash.updateStatus"));
+        // إذا كانت الحالة تستدعي إيميل، افتح حوار التأكيد تلقائياً
+        if ((STATUSES_WITH_EMAIL as string[]).includes(status)) {
+          const a = applicants.find(x => x.id === id);
+          if (a?.email) {
+            setEmailDialog({ applicantId: id, status: status as ApplicantEmailStatus });
+          }
         }
-      }
-    }
+      },
+    });
   };
 
-  const saveNotes = async (id: string) => {
-    const { error } = await supabase.from("applicants").update({ notes: editNotes }).eq("id", id);
-    if (!error) {
-      setApplicants(prev => prev.map(a => a.id === id ? { ...a, notes: editNotes } : a));
-      toast.success(t("dash.saveNotes"));
-    }
+  const saveNotes = (id: string) => {
+    updateApplicantNotesMutation.mutate({ id, notes: editNotes }, {
+      onSuccess: () => toast.success(t("dash.saveNotes")),
+    });
   };
 
   const getFileUrl = (path: string | null) => {
@@ -573,7 +422,7 @@ const DashboardPage = () => {
     setShowJobForm(true);
   };
 
-  const saveJob = async () => {
+  const saveJob = () => {
     if (!jobForm.title_ar) { toast.error(t("validation.required")); return; }
     const payload = {
       title_ar: jobForm.title_ar,
@@ -600,29 +449,27 @@ const DashboardPage = () => {
       additional_details_en: jobForm.additional_details_en || null,
     };
 
-    if (editingJob) {
-      const { error } = await supabase.from("job_postings").update(payload).eq("id", editingJob.id);
-      if (!error) { toast.success(t("dash.saved")); fetchJobs(); setShowJobForm(false); }
-    } else {
-      const { error } = await supabase.from("job_postings").insert(payload);
-      if (!error) { toast.success(t("dash.saved")); fetchJobs(); setShowJobForm(false); }
-    }
+    saveJobPostingMutation.mutate({ id: editingJob?.id, payload }, {
+      onSuccess: () => { toast.success(t("dash.saved")); setShowJobForm(false); },
+    });
   };
 
   const deleteJob = (id: string) => {
     requestDelete({
       message: lang === "ar" ? "سيتم حذف هذه الوظيفة نهائياً." : "This job will be permanently deleted.",
       onConfirm: async () => {
-        const { error } = await supabase.from("job_postings").delete().eq("id", id);
-        if (!error) { toast.success(t("dash.deleted")); fetchJobs(); }
-        else toast.error(error.message);
+        deleteJobPostingMutation.mutate(id, {
+          onSuccess: () => toast.success(t("dash.deleted")),
+          onError: (error: Error) => toast.error(error.message),
+        });
       },
     });
   };
 
-  const toggleJobActive = async (id: string, active: boolean) => {
-    const { error } = await supabase.from("job_postings").update({ is_active: active }).eq("id", id);
-    if (!error) { fetchJobs(); toast.success(t("dash.saved")); }
+  const toggleJobActive = (id: string, active: boolean) => {
+    toggleJobPostingActiveMutation.mutate({ id, active }, {
+      onSuccess: () => toast.success(t("dash.saved")),
+    });
   };
 
   const callManageUser = async (body: any) => {
@@ -694,7 +541,7 @@ const DashboardPage = () => {
   };
 
   // Project management
-  const saveProject = async () => {
+  const saveProject = () => {
     if (!projectForm.name_ar) { toast.error(t("validation.required")); return; }
     const payload = {
       name_ar: projectForm.name_ar,
@@ -712,20 +559,16 @@ const DashboardPage = () => {
       logo_shadow: projectForm.logo_shadow,
       logo_border: projectForm.logo_border,
     };
-    const { error } = editingProjectId
-      ? await supabase.from("projects").update(payload).eq("id", editingProjectId)
-      : await supabase.from("projects").insert(payload);
 
-    if (error) {
-      toast.error(error.message);
-      return;
-    }
-
-    toast.success(t("dash.saved"));
-    fetchProjects();
-    setShowProjectForm(false);
-    setEditingProjectId(null);
-    setProjectForm(emptyProjectForm);
+    saveProjectMutation.mutate({ id: editingProjectId, payload }, {
+      onSuccess: () => {
+        toast.success(t("dash.saved"));
+        setShowProjectForm(false);
+        setEditingProjectId(null);
+        setProjectForm(emptyProjectForm);
+      },
+      onError: (error: Error) => toast.error(error.message),
+    });
   };
 
   const activeApplicants = useMemo(() => applicants.filter(a => !a.is_archived), [applicants]);
@@ -776,22 +619,20 @@ const DashboardPage = () => {
     if (archivePage > maxPage) setArchivePage(maxPage);
   }, [filteredArchived.length, archivePage]);
 
-  const archiveApplicant = async (id: string) => {
+  const archiveApplicant = (id: string) => {
     if (!confirm(lang === "ar" ? "هل تريد أرشفة هذا المتقدم؟" : "Archive this applicant?")) return;
-    const { error } = await supabase.from("applicants").update({ is_archived: true, archived_at: new Date().toISOString() }).eq("id", id);
-    if (!error) {
-      setApplicants(prev => prev.map(a => a.id === id ? { ...a, is_archived: true, archived_at: new Date().toISOString() } : a));
-      setSelectedApplicant(null);
-      toast.success(lang === "ar" ? "تم الأرشفة بنجاح" : "Archived successfully");
-    }
+    archiveApplicantMutation.mutate(id, {
+      onSuccess: () => {
+        setSelectedApplicant(null);
+        toast.success(lang === "ar" ? "تم الأرشفة بنجاح" : "Archived successfully");
+      },
+    });
   };
 
-  const restoreApplicant = async (id: string) => {
-    const { error } = await supabase.from("applicants").update({ is_archived: false, archived_at: null }).eq("id", id);
-    if (!error) {
-      setApplicants(prev => prev.map(a => a.id === id ? { ...a, is_archived: false, archived_at: null } : a));
-      toast.success(lang === "ar" ? "تمت الاستعادة بنجاح" : "Restored successfully");
-    }
+  const restoreApplicant = (id: string) => {
+    restoreApplicantMutation.mutate(id, {
+      onSuccess: () => toast.success(lang === "ar" ? "تمت الاستعادة بنجاح" : "Restored successfully"),
+    });
   };
 
   // Chart data — recomputed only when the underlying applicants actually change, not on every render.
@@ -1437,9 +1278,8 @@ const DashboardPage = () => {
                               }}>
                                 <Pencil className="w-3.5 h-3.5" />
                               </Button>
-                              <Button size="icon" variant="ghost" className="h-7 w-7" onClick={async () => {
-                                await supabase.from("projects").update({ is_active: !p.is_active }).eq("id", p.id);
-                                fetchProjects();
+                              <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => {
+                                toggleProjectActiveMutation.mutate({ id: p.id, active: !p.is_active });
                               }}>
                                 <Eye className="w-3.5 h-3.5" />
                               </Button>
@@ -1447,10 +1287,10 @@ const DashboardPage = () => {
                                 requestDelete({
                                   message: lang === "ar" ? "سيتم حذف هذا المشروع نهائياً." : "This project will be permanently deleted.",
                                   onConfirm: async () => {
-                                    const { error } = await supabase.from("projects").delete().eq("id", p.id);
-                                    if (error) { toast.error(error.message); return; }
-                                    fetchProjects();
-                                    toast.success(lang === "ar" ? "تم الحذف" : "Deleted");
+                                    deleteProjectMutation.mutate(p.id, {
+                                      onSuccess: () => toast.success(lang === "ar" ? "تم الحذف" : "Deleted"),
+                                      onError: (error: Error) => toast.error(error.message),
+                                    });
                                   },
                                 });
                               }}>
