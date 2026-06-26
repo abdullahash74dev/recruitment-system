@@ -133,6 +133,9 @@ export const queryKeys = {
   executiveKpis: {
     all: ["executiveKpis"] as const,
   },
+  executiveReport: {
+    detail: (token?: string) => ["executiveReport", token] as const,
+  },
   storage: {
     // Signed URL for a private storage object — keyed by path so the same
     // file shown in multiple places (list + detail view) costs one fetch.

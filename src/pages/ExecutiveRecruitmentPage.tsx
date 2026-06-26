@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { useExecutiveRecruitmentReportQuery } from "@/hooks/queries/useExecutiveRecruitmentReport";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -13,7 +13,6 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Printer, Target, Users, Briefcase, TrendingUp, AlertTriangle, CheckCircle2, Languages, FileSignature, Send, PlayCircle, Settings2, FileSpreadsheet, Layers, LineChart as LineIcon, Save, EyeOff } from "lucide-react";
-import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
@@ -94,9 +93,8 @@ type SectionKey = typeof SECTION_KEYS[number];
 
 export default function ExecutiveRecruitmentPage() {
   const { token } = useParams<{ token: string }>();
-  const [data, setData] = useState<any>(null);
-  const [error, setError] = useState<string>("");
-  const [loading, setLoading] = useState(true);
+  const { data, error: queryError, isLoading: loading } = useExecutiveRecruitmentReportQuery(token);
+  const error = queryError ? (queryError instanceof Error ? queryError.message : String(queryError)) : "";
   const [chartType, setChartType] = useState<ChartType>("bar");
   const [lang, setLang] = useState<Lang>("ar");
   const t = T[lang];
@@ -112,16 +110,6 @@ export default function ExecutiveRecruitmentPage() {
   const [prefsLoaded, setPrefsLoaded] = useState(false);
   const [lockedKpi, setLockedKpi] = useState<KpiKey[]>([]);
   const [lockedSec, setLockedSec] = useState<SectionKey[]>([]);
-  const [isAdmin, setIsAdmin] = useState(false);
-
-  useEffect(() => {
-    (async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { setIsAdmin(false); return; }
-      const { data } = await supabase.from("user_roles").select("role").eq("user_id", user.id).eq("role", "admin").maybeSingle();
-      setIsAdmin(!!data);
-    })();
-  }, []);
 
   useEffect(() => {
     try {
@@ -142,40 +130,22 @@ export default function ExecutiveRecruitmentPage() {
   }, [kpiVis, secVis, hiddenProjects, storeKey, prefsLoaded]);
 
   useEffect(() => {
-    (async () => {
-      if (!token) { setError("Missing token"); setLoading(false); return; }
-      const { data, error } = await supabase.rpc("get_executive_recruitment", { p_token: token });
-      if (error) setError(error.message);
-      else {
-        setData(data);
-        const dp: any = (data as any)?.default_prefs || {};
-        // Locked keys: always enforced, recipient cannot show them
-        const lk: KpiKey[] = Array.isArray(dp.lockedKpi) ? dp.lockedKpi.filter((k: any) => (KPI_KEYS as readonly string[]).includes(k)) : [];
-        const ls: SectionKey[] = Array.isArray(dp.lockedSec) ? dp.lockedSec.filter((k: any) => (SECTION_KEYS as readonly string[]).includes(k)) : [];
-        setLockedKpi(lk); setLockedSec(ls);
-        // Apply server defaults only if user has no local prefs yet
-        if (!localStorage.getItem(storeKey)) {
-          if (dp.kpiVis) setKpiVis((v) => ({ ...v, ...dp.kpiVis }));
-          if (dp.secVis) setSecVis((v) => ({ ...v, ...dp.secVis }));
-          if (Array.isArray(dp.hiddenProjects)) setHiddenProjects(dp.hiddenProjects);
-        }
-        // Force-hide locked items regardless of local prefs
-        if (lk.length) setKpiVis((v) => { const n = { ...v }; lk.forEach(k => { n[k] = false; }); return n; });
-        if (ls.length) setSecVis((v) => { const n = { ...v }; ls.forEach(k => { n[k] = false; }); return n; });
-      }
-      setLoading(false);
-    })();
-  }, [token, storeKey]);
-
-  const saveAsDefaults = async () => {
-    if (!token) return;
-    const { error } = await supabase
-      .from("executive_share_links")
-      .update({ default_prefs: { kpiVis, secVis, hiddenProjects } as any })
-      .eq("token", token);
-    if (error) toast.error(t.saveFail);
-    else toast.success(t.savedOk);
-  };
+    if (!data) return;
+    const dp: any = (data as any)?.default_prefs || {};
+    // Locked keys: always enforced, recipient cannot show them
+    const lk: KpiKey[] = Array.isArray(dp.lockedKpi) ? dp.lockedKpi.filter((k: any) => (KPI_KEYS as readonly string[]).includes(k)) : [];
+    const ls: SectionKey[] = Array.isArray(dp.lockedSec) ? dp.lockedSec.filter((k: any) => (SECTION_KEYS as readonly string[]).includes(k)) : [];
+    setLockedKpi(lk); setLockedSec(ls);
+    // Apply server defaults only if user has no local prefs yet
+    if (!localStorage.getItem(storeKey)) {
+      if (dp.kpiVis) setKpiVis((v) => ({ ...v, ...dp.kpiVis }));
+      if (dp.secVis) setSecVis((v) => ({ ...v, ...dp.secVis }));
+      if (Array.isArray(dp.hiddenProjects)) setHiddenProjects(dp.hiddenProjects);
+    }
+    // Force-hide locked items regardless of local prefs
+    if (lk.length) setKpiVis((v) => { const n = { ...v }; lk.forEach(k => { n[k] = false; }); return n; });
+    if (ls.length) setSecVis((v) => { const n = { ...v }; ls.forEach(k => { n[k] = false; }); return n; });
+  }, [data, storeKey]);
 
   const exportExcel = () => {
     if (!data) return;
