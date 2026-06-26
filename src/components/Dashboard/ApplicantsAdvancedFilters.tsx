@@ -16,6 +16,8 @@ import * as XLSX from "xlsx";
 import JSZip from "jszip";
 import AiFilterBuilder from "./AiFilterBuilder";
 import { useValueSynonyms, lookupSynonym } from "@/hooks/useValueSynonyms";
+import { useProfilesQuery } from "@/hooks/queries/useUsersAndRoles";
+import { useSavedFiltersQuery, useSaveFilterMutation, useDeleteSavedFilterMutation, type SavedFilter } from "@/hooks/queries/useSavedFilters";
 
 type AiMatch = { id: string; score: number; reason: string };
 type AiStats = { by_nationality: { key: string; count: number }[]; by_education: { key: string; count: number }[]; by_city: { key: string; count: number }[]; by_position: { key: string; count: number }[] };
@@ -72,15 +74,6 @@ const SYNONYM_FIELD_MAP: Record<string, string> = {
 const CANON_PREFIX = "__canon__:";
 
 export type AdvancedFilter = { field: string; value: string };
-
-type SavedFilter = {
-  id: string;
-  name: string;
-  criteria: AdvancedFilter[];
-  result_count: number | null;
-  created_by: string | null;
-  created_at: string;
-};
 
 interface Props {
   applicants: any[];
@@ -203,26 +196,23 @@ export default function ApplicantsAdvancedFilters({
     setAiPrompt("");
   };
 
-  // Saved filters: persist named field/value combinations so work isn't lost on refresh
-  const [savedFilters, setSavedFilters] = useState<SavedFilter[]>([]);
-  const [profilesMap, setProfilesMap] = useState<Map<string, { display_name: string | null; email: string | null }>>(new Map());
+  // Saved filters: persist named field/value combinations so work isn't lost on refresh.
+  // Shared with the admin Users tab (DashboardPage) so revisiting this view
+  // within the staleTime window costs no extra profiles fetch.
+  const { data: savedFilters = [] } = useSavedFiltersQuery();
+  const { data: profiles = [] } = useProfilesQuery();
+  const profilesMap = useMemo(() => {
+    const m = new Map<string, { display_name: string | null; email: string | null }>();
+    profiles.forEach((p: any) => m.set(p.user_id, { display_name: p.display_name, email: p.email }));
+    return m;
+  }, [profiles]);
+  const saveFilterMutation = useSaveFilterMutation();
+  const deleteSavedFilterMutation = useDeleteSavedFilterMutation();
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [saveName, setSaveName] = useState("");
   const [savePopoverOpen, setSavePopoverOpen] = useState(false);
-  const [savingFilter, setSavingFilter] = useState(false);
-
-  const loadSavedFilters = async () => {
-    const { data } = await supabase.from("saved_filters").select("*").order("created_at", { ascending: false });
-    setSavedFilters((data || []) as unknown as SavedFilter[]);
-  };
 
   useEffect(() => {
-    loadSavedFilters();
-    supabase.from("profiles").select("user_id, display_name, email").then(({ data }) => {
-      const m = new Map<string, { display_name: string | null; email: string | null }>();
-      (data || []).forEach((p: any) => m.set(p.user_id, { display_name: p.display_name, email: p.email }));
-      setProfilesMap(m);
-    });
     supabase.auth.getUser().then(({ data }) => setCurrentUserId(data.user?.id || null));
   }, []);
 
@@ -238,18 +228,17 @@ export default function ApplicantsAdvancedFilters({
       return;
     }
     const name = saveName.trim() || (lang === "ar" ? `فلتر ${new Date().toLocaleString("ar")}` : `Filter ${new Date().toLocaleString()}`);
-    setSavingFilter(true);
     const { data: { user } } = await supabase.auth.getUser();
     const resultCount = applyAdvancedFilters(applicants, filters, null).length;
-    const { error } = await supabase.from("saved_filters").insert({
-      name, criteria: filters as any, result_count: resultCount, created_by: user?.id,
-    });
-    setSavingFilter(false);
-    if (error) return toast.error(error.message);
+    try {
+      await saveFilterMutation.mutateAsync({ name, criteria: filters, result_count: resultCount, created_by: user?.id });
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e));
+      return;
+    }
     toast.success(lang === "ar" ? "تم حفظ الفلتر" : "Filter saved");
     setSaveName("");
     setSavePopoverOpen(false);
-    loadSavedFilters();
   };
 
   const applySavedFilter = (sf: SavedFilter) => {
@@ -260,9 +249,11 @@ export default function ApplicantsAdvancedFilters({
 
   const deleteSavedFilter = async (id: string) => {
     if (!confirm(lang === "ar" ? "حذف هذا الفلتر المحفوظ؟" : "Delete this saved filter?")) return;
-    const { error } = await supabase.from("saved_filters").delete().eq("id", id);
-    if (error) return toast.error(error.message);
-    setSavedFilters((prev) => prev.filter((f) => f.id !== id));
+    try {
+      await deleteSavedFilterMutation.mutateAsync(id);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : String(e));
+    }
   };
 
   const runAi = async () => {
@@ -841,8 +832,8 @@ export default function ApplicantsAdvancedFilters({
                 value={saveName}
                 onChange={(e) => setSaveName(e.target.value)}
               />
-              <Button size="sm" className="w-full gap-1" onClick={saveCurrentFilter} disabled={savingFilter}>
-                {savingFilter ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+              <Button size="sm" className="w-full gap-1" onClick={saveCurrentFilter} disabled={saveFilterMutation.isPending}>
+                {saveFilterMutation.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
                 {lang === "ar" ? "حفظ" : "Save"}
               </Button>
             </PopoverContent>

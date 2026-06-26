@@ -58,6 +58,10 @@ export const queryKeys = {
     all: ["valueSynonyms"] as const,
     list: () => ["valueSynonyms", "list"] as const,
   },
+  savedFilters: {
+    all: ["savedFilters"] as const,
+    list: () => ["savedFilters", "list"] as const,
+  },
   dropdownOptions: {
     all: ["dropdownOptions"] as const,
     list: (field?: string) => ["dropdownOptions", "list", field] as const,
