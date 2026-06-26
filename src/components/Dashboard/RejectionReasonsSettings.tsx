@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,60 +7,54 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Trash2, Plus } from "lucide-react";
 import { toast } from "sonner";
-
-interface Reason {
-  id: string;
-  reason_ar: string;
-  reason_en: string | null;
-  is_active: boolean;
-  sort_order: number;
-}
+import {
+  RejectionReason,
+  useRejectionReasonsQuery,
+  useAddRejectionReasonMutation,
+  useUpdateRejectionReasonMutation,
+  useDeleteRejectionReasonMutation,
+} from "@/hooks/queries/useRejectionReasons";
 
 export default function RejectionReasonsSettings() {
   const { lang } = useLanguage();
   const isAr = lang === "ar";
-  const [items, setItems] = useState<Reason[]>([]);
+  const { data } = useRejectionReasonsQuery();
+  const [items, setItems] = useState<RejectionReason[]>([]);
   const [newAr, setNewAr] = useState("");
   const [newEn, setNewEn] = useState("");
-  const [loading, setLoading] = useState(false);
+  const addMutation = useAddRejectionReasonMutation();
+  const updateMutation = useUpdateRejectionReasonMutation();
+  const deleteMutation = useDeleteRejectionReasonMutation();
 
-  const load = async () => {
-    const { data } = await (supabase as any)
-      .from("rejection_reasons")
-      .select("*")
-      .order("sort_order");
-    setItems(data || []);
-  };
-
-  useEffect(() => { load(); }, []);
+  useEffect(() => { if (data) setItems(data); }, [data]);
 
   const add = async () => {
     if (!newAr.trim()) return toast.error(isAr ? "أدخل السبب بالعربية" : "Enter the reason in Arabic");
-    setLoading(true);
-    const { error } = await (supabase as any).from("rejection_reasons").insert({
-      reason_ar: newAr.trim(),
-      reason_en: newEn.trim() || null,
-      sort_order: items.length + 1,
+    try {
+      await addMutation.mutateAsync({
+        reason_ar: newAr.trim(),
+        reason_en: newEn.trim() || null,
+        sort_order: items.length + 1,
+      });
+      setNewAr(""); setNewEn("");
+      toast.success(isAr ? "تمت الإضافة" : "Added successfully");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : String(error));
+    }
+  };
+
+  const update = (id: string, patch: Partial<RejectionReason>) => {
+    updateMutation.mutate({ id, patch }, {
+      onError: (error) => toast.error(error instanceof Error ? error.message : String(error)),
     });
-    setLoading(false);
-    if (error) return toast.error(error.message);
-    setNewAr(""); setNewEn("");
-    toast.success(isAr ? "تمت الإضافة" : "Added successfully");
-    load();
   };
 
-  const update = async (id: string, patch: Partial<Reason>) => {
-    const { error } = await (supabase as any).from("rejection_reasons").update(patch).eq("id", id);
-    if (error) return toast.error(error.message);
-    load();
-  };
-
-  const remove = async (id: string) => {
+  const remove = (id: string) => {
     if (!confirm(isAr ? "حذف هذا السبب؟" : "Delete this reason?")) return;
-    const { error } = await (supabase as any).from("rejection_reasons").delete().eq("id", id);
-    if (error) return toast.error(error.message);
-    toast.success(isAr ? "تم الحذف" : "Deleted successfully");
-    load();
+    deleteMutation.mutate(id, {
+      onSuccess: () => toast.success(isAr ? "تم الحذف" : "Deleted successfully"),
+      onError: (error) => toast.error(error instanceof Error ? error.message : String(error)),
+    });
   };
 
   return (
@@ -79,7 +72,7 @@ export default function RejectionReasonsSettings() {
             <Label>{isAr ? "السبب (إنجليزي)" : "Reason (English)"}</Label>
             <Input value={newEn} onChange={(e) => setNewEn(e.target.value)} />
           </div>
-          <Button onClick={add} disabled={loading}>
+          <Button onClick={add} disabled={addMutation.isPending}>
             <Plus className="w-4 h-4 me-1" /> {isAr ? "إضافة" : "Add"}
           </Button>
         </div>
