@@ -59,7 +59,7 @@ export function useValueSynonyms() {
     queryClient,
   );
   const refresh = () => queryClient.fetchQuery({ queryKey: SYNONYMS_QUERY_KEY, queryFn: fetchRowsRaw, staleTime: 0 });
-  return { rows: query.data ?? [], refresh };
+  return { rows: query.data ?? [], isLoading: query.isLoading, refresh };
 }
 
 // Synchronous accessor (best-effort: uses cache; if empty, returns null and falls back)

@@ -1,6 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { supabase } from "@/integrations/supabase/client";
+import { queryClient } from "@/lib/queryClient";
+import { queryKeys } from "@/lib/queryKeys";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -47,10 +50,24 @@ const FIELD_CONFIGS = [
   { key: "facility_mgmt", labelAr: "خبرة إدارة المرافق", labelEn: "Facility Management Experience", descAr: "", descEn: "", getDefaultAr: () => getFacilityMgmtOptions("ar"), getDefaultEn: () => getFacilityMgmtOptions("en") },
 ];
 
+async function fetchAdminDropdownOptions(): Promise<Record<string, DropdownOption>> {
+  const { data } = await supabase.from("dropdown_options").select("*");
+  const map: Record<string, DropdownOption> = {};
+  (data || []).forEach((d: any) => { map[d.field_name] = d; });
+  return map;
+}
+
 const DropdownOptionsSettings = () => {
   const { t, lang, dir } = useLanguage();
   const { requestDelete } = useDeletePin();
-  const [dbOptions, setDbOptions] = useState<Record<string, DropdownOption>>({});
+  // Bound to the singleton queryClient so revisiting this settings tab within
+  // the staleTime window costs no extra fetch. Distinct query key from the
+  // public-facing useDropdownOptions cache since the row shape differs
+  // (includes id + inactive rows, needed for the editor's update-vs-insert logic).
+  const { data: dbOptions = {} } = useQuery(
+    { queryKey: queryKeys.dropdownOptions.adminAll, queryFn: fetchAdminDropdownOptions },
+    queryClient,
+  );
   const [showEditor, setShowEditor] = useState(false);
   const [editingField, setEditingField] = useState<typeof FIELD_CONFIGS[0] | null>(null);
   const [items, setItems] = useState<EditableOption[]>([]);
@@ -60,15 +77,6 @@ const DropdownOptionsSettings = () => {
   const [searchQuery, setSearchQuery] = useState("");
 
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }));
-
-  useEffect(() => { fetchOptions(); }, []);
-
-  const fetchOptions = async () => {
-    const { data } = await supabase.from("dropdown_options").select("*");
-    const map: Record<string, DropdownOption> = {};
-    (data || []).forEach((d: any) => { map[d.field_name] = d; });
-    setDbOptions(map);
-  };
 
   const openEditor = (field: typeof FIELD_CONFIGS[0]) => {
     setEditingField(field);
@@ -148,8 +156,8 @@ const DropdownOptionsSettings = () => {
     }
 
     invalidateDropdownCache();
+    queryClient.invalidateQueries({ queryKey: queryKeys.dropdownOptions.adminAll });
     toast.success(t("dash.saved"));
-    fetchOptions();
     setShowEditor(false);
   };
 

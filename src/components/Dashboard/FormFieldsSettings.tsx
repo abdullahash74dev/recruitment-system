@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { Pencil, Eye, EyeOff, GripVertical, FormInput, Lock, LockOpen } from "lucide-react";
-import { invalidateFieldConfigCache, type FieldConfig } from "@/hooks/useFieldConfig";
+import { useFieldConfig, invalidateFieldConfigCache, type FieldConfig } from "@/hooks/useFieldConfig";
+import { queryClient } from "@/lib/queryClient";
+import { queryKeys } from "@/lib/queryKeys";
 import {
   DndContext,
   closestCenter,
@@ -111,7 +113,11 @@ const SortableField = ({ field: f, lang, onToggleVisible, onToggleRequired, onEd
 
 const FormFieldsSettings = () => {
   const { t, lang, dir } = useLanguage();
-  const [fields, setFields] = useState<FieldConfig[]>([]);
+  // Shared with useFieldConfig's other consumers (ApplicationForm steps) so
+  // revisiting this settings tab within the staleTime window costs no extra
+  // fetch. Local toggles/reorders patch the shared cache directly for instant
+  // feedback instead of local-only state.
+  const { fields } = useFieldConfig();
   const [activeStep, setActiveStep] = useState("1");
   const [editField, setEditField] = useState<FieldConfig | null>(null);
   const [editForm, setEditForm] = useState({ label_ar: "", label_en: "", sort_order: 0 });
@@ -122,28 +128,20 @@ const FormFieldsSettings = () => {
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
 
-  useEffect(() => { fetchFields(); }, []);
-
-  const fetchFields = async () => {
-    const { data } = await supabase
-      .from("form_field_config")
-      .select("*")
-      .order("step_number", { ascending: true })
-      .order("sort_order", { ascending: true });
-    if (data) setFields(data as FieldConfig[]);
-  };
+  const patchFields = (updater: (prev: FieldConfig[]) => FieldConfig[]) =>
+    queryClient.setQueryData<FieldConfig[]>(queryKeys.fieldConfig.all, (prev) => updater(prev ?? []));
 
   const toggleVisible = async (id: string, visible: boolean) => {
     await supabase.from("form_field_config").update({ is_visible: visible }).eq("id", id);
+    patchFields(prev => prev.map(f => f.id === id ? { ...f, is_visible: visible } : f));
     invalidateFieldConfigCache();
-    setFields(prev => prev.map(f => f.id === id ? { ...f, is_visible: visible } : f));
     toast.success(t("dash.saved"));
   };
 
   const toggleRequired = async (id: string, required: boolean) => {
     await supabase.from("form_field_config").update({ is_required: required }).eq("id", id);
+    patchFields(prev => prev.map(f => f.id === id ? { ...f, is_required: required } : f));
     invalidateFieldConfigCache();
-    setFields(prev => prev.map(f => f.id === id ? { ...f, is_required: required } : f));
     toast.success(t("dash.saved"));
   };
 
@@ -159,8 +157,10 @@ const FormFieldsSettings = () => {
       label_en: editForm.label_en || null,
       sort_order: editForm.sort_order,
     }).eq("id", editField.id);
+    patchFields(prev => prev.map(f => f.id === editField.id
+      ? { ...f, label_ar: editForm.label_ar || null, label_en: editForm.label_en || null, sort_order: editForm.sort_order }
+      : f));
     invalidateFieldConfigCache();
-    fetchFields();
     setEditField(null);
     toast.success(t("dash.saved"));
   };
@@ -177,10 +177,12 @@ const FormFieldsSettings = () => {
 
     const reordered = arrayMove(stepFields, oldIndex, newIndex);
 
-    // Update local state immediately
-    const otherFields = fields.filter(f => f.step_number !== stepNum);
+    // Update the shared cache immediately (optimistic)
     const updatedReordered = reordered.map((f, i) => ({ ...f, sort_order: i }));
-    setFields([...otherFields, ...updatedReordered].sort((a, b) => a.step_number - b.step_number || a.sort_order - b.sort_order));
+    patchFields(prev => {
+      const otherFields = prev.filter(f => f.step_number !== stepNum);
+      return [...otherFields, ...updatedReordered].sort((a, b) => a.step_number - b.step_number || a.sort_order - b.sort_order);
+    });
 
     // Persist to DB
     const updates = updatedReordered.map(f =>

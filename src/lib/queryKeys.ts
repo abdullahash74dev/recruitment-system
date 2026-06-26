@@ -57,6 +57,9 @@ export const queryKeys = {
   dropdownOptions: {
     all: ["dropdownOptions"] as const,
     list: (field?: string) => ["dropdownOptions", "list", field] as const,
+    // Unfiltered (incl. inactive rows + id) shape used by the admin editor —
+    // distinct from `all` (active-only, no id) used by the public form fields.
+    adminAll: ["dropdownOptions", "adminAll"] as const,
   },
   fieldConfig: {
     all: ["fieldConfig"] as const,
