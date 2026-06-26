@@ -54,6 +54,25 @@ export const queryKeys = {
     all: ["recruitmentCandidates"] as const,
     list: (projectId?: string) => ["recruitmentCandidates", "list", projectId] as const,
   },
+  recruitmentProjects: {
+    all: ["recruitmentProjects"] as const,
+    list: () => ["recruitmentProjects", "list"] as const,
+  },
+  recruitmentJobTitles: {
+    all: ["recruitmentJobTitles"] as const,
+    list: () => ["recruitmentJobTitles", "list"] as const,
+    // recruitment_job_title_stats is a DB view derived from this table —
+    // nested under the same key prefix so one invalidation covers both.
+    stats: () => ["recruitmentJobTitles", "stats"] as const,
+  },
+  rejectionReasons: {
+    all: ["rejectionReasons"] as const,
+    list: () => ["rejectionReasons", "list"] as const,
+  },
+  executiveShareLinks: {
+    all: ["executiveShareLinks"] as const,
+    list: () => ["executiveShareLinks", "list"] as const,
+  },
   valueSynonyms: {
     all: ["valueSynonyms"] as const,
     list: () => ["valueSynonyms", "list"] as const,
