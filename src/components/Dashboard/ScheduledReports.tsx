@@ -1,5 +1,3 @@
-import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,40 +6,24 @@ import { FileSpreadsheet, Download, Play, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 import { ar as arLocale, enUS } from "date-fns/locale";
-
-interface ReportRun {
-  id: string;
-  status: string;
-  file_url: string | null;
-  file_name: string | null;
-  run_at: string;
-}
+import { useScheduledReportRunsQuery, useRunScheduledReportMutation } from "@/hooks/queries/useScheduledReports";
 
 const ScheduledReports = () => {
   const { lang } = useLanguage();
-  const [runs, setRuns] = useState<ReportRun[]>([]);
-  const [running, setRunning] = useState(false);
-
-  const load = async () => {
-    const { data } = await supabase.from("report_runs").select("*").order("run_at", { ascending: false }).limit(10);
-    setRuns((data as ReportRun[]) || []);
-  };
-
-  useEffect(() => { load(); }, []);
+  const { data: runs = [] } = useScheduledReportRunsQuery();
+  const runMutation = useRunScheduledReportMutation();
+  const running = runMutation.isPending;
 
   const runNow = async () => {
-    setRunning(true);
-    try {
-      const { data, error } = await supabase.functions.invoke("run-recruitment-report", { body: { format: "excel" } });
-      if (error) throw error;
-      toast.success(lang === "ar" ? "تم توليد التقرير" : "Report generated");
-      if (data?.file_url) window.open(data.file_url, "_blank");
-      load();
-    } catch (e: any) {
-      toast.error(e.message || (lang === "ar" ? "فشل توليد التقرير" : "Failed"));
-    } finally {
-      setRunning(false);
-    }
+    runMutation.mutate(undefined, {
+      onSuccess: (data: any) => {
+        toast.success(lang === "ar" ? "تم توليد التقرير" : "Report generated");
+        if (data?.file_url) window.open(data.file_url, "_blank");
+      },
+      onError: (e: any) => {
+        toast.error(e.message || (lang === "ar" ? "فشل توليد التقرير" : "Failed"));
+      },
+    });
   };
 
   const locale = lang === "ar" ? arLocale : enUS;

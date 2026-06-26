@@ -1,47 +1,20 @@
-import { useState } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
 import { Download, Database, FileSpreadsheet, FileJson } from "lucide-react";
 import * as XLSX from "xlsx";
-
-type BackupTable = "applicants" | "job_postings" | "custom_questions" | "custom_answers" | "projects" | "profiles";
-
-// Paginated fetch: a flat .select("*") is silently capped at the platform's
-// default row limit, which would make a backup report "success" while only
-// capturing a fraction of large tables like applicants.
-const fetchAllRows = async (table: BackupTable, orderBy?: string) => {
-  const PAGE_SIZE = 1000;
-  const rows: any[] = [];
-  for (let from = 0; ; from += PAGE_SIZE) {
-    let q = supabase.from(table).select("*");
-    if (orderBy) q = q.order(orderBy, { ascending: false });
-    const { data, error } = await q.range(from, from + PAGE_SIZE - 1);
-    if (error) throw error;
-    rows.push(...(data || []));
-    if (!data || data.length < PAGE_SIZE) break;
-  }
-  return rows;
-};
+import { useExportAllDataMutation } from "@/hooks/queries/useBackupRuns";
 
 const BackupSettings = () => {
   const { lang, t } = useLanguage();
-  const [exporting, setExporting] = useState(false);
+  const exportAllDataMutation = useExportAllDataMutation();
+  const exporting = exportAllDataMutation.isPending;
 
   const exportAllData = async (format: "xlsx" | "json") => {
-    setExporting(true);
     try {
-      // Fetch all tables (fully, via pagination)
-      const [applicants, jobPostings, customQuestions, customAnswers, projects, profiles] = await Promise.all([
-        fetchAllRows("applicants", "created_at"),
-        fetchAllRows("job_postings", "created_at"),
-        fetchAllRows("custom_questions"),
-        fetchAllRows("custom_answers"),
-        fetchAllRows("projects"),
-        fetchAllRows("profiles"),
-      ]);
+      const { applicants, job_postings: jobPostings, custom_questions: customQuestions, custom_answers: customAnswers, projects, profiles } =
+        await exportAllDataMutation.mutateAsync();
 
       const dateStr = new Date().toISOString().split("T")[0];
 
@@ -86,7 +59,6 @@ const BackupSettings = () => {
     } catch (error) {
       toast.error(lang === "ar" ? "خطأ في التصدير" : "Export error");
     }
-    setExporting(false);
   };
 
   return (

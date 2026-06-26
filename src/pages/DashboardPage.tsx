@@ -41,6 +41,7 @@ import DeletePinSettings from "@/components/Dashboard/DeletePinSettings";
 import TwoFactorSettings from "@/components/Dashboard/TwoFactorSettings";
 import JobsExcelTools from "@/components/Dashboard/JobsExcelTools";
 import SystemLog from "@/components/Dashboard/SystemLog";
+import SystemHealth from "@/components/Dashboard/SystemHealth";
 import TrashBin from "@/components/Dashboard/TrashBin";
 import UserPermissionsDialog from "@/components/Dashboard/UserPermissionsDialog";
 import ResetPasswordDialog from "@/components/Dashboard/ResetPasswordDialog";
@@ -872,6 +873,7 @@ const DashboardPage = () => {
   if (tabAllowed("tab.settings")) systemItems.push({ value: "settings", label: t("dash.tab.settings"), icon: Settings });
   if (tabAllowed("tab.backup")) systemItems.push({ value: "backup", label: lang === "ar" ? "نسخ احتياطي" : "Backup", icon: Database });
   if (tabAllowed("tab.auditlog")) systemItems.push({ value: "auditlog", label: lang === "ar" ? "سجل النظام" : "System Log", icon: Shield });
+  if (isAdmin) systemItems.push({ value: "system_health", label: lang === "ar" ? "صحة النظام" : "System Health", icon: Activity });
   if (tabAllowed("tab.trash")) systemItems.push({ value: "trash", label: lang === "ar" ? "سلة المحذوفات" : "Trash", icon: Trash2 });
   if (systemItems.length) navGroups.push({ id: "system", title: lang === "ar" ? "النظام" : "System", items: systemItems });
 
@@ -1573,6 +1575,10 @@ const DashboardPage = () => {
 
           <TabsContent value="auditlog">
             <SystemLog />
+          </TabsContent>
+
+          <TabsContent value="system_health">
+            <SystemHealth />
           </TabsContent>
 
           <TabsContent value="rejection_reasons">

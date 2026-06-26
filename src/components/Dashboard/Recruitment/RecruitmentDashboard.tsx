@@ -1,5 +1,14 @@
 import { useEffect, useMemo, useState, useRef } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { queryKeys } from "@/lib/queryKeys";
+import {
+  useRecruitmentCandidatesQuery,
+  useSaveCandidateMutation,
+  useDeleteCandidateMutation,
+  useUpdateCandidateMutation,
+  useRejectCandidateMutation,
+} from "@/hooks/queries/useRecruitmentCandidates";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -42,9 +51,9 @@ const IMPORT_COLUMNS = ["project_code","job_title_ar","candidate_name","national
 export default function RecruitmentDashboard() {
   const { lang } = useLanguage();
   const ar = lang === "ar";
+  const queryClient = useQueryClient();
   const [projects, setProjects] = useState<any[]>([]);
   const [jobTitles, setJobTitles] = useState<any[]>([]);
-  const [candidates, setCandidates] = useState<any[]>([]);
   const [stats, setStats] = useState<any[]>([]);
   const [reasons, setReasons] = useState<any[]>([]);
   const [shareLinks, setShareLinks] = useState<any[]>([]);
@@ -72,29 +81,35 @@ export default function RecruitmentDashboard() {
 
   const fetchAll = async () => {
     setLoading(true);
-    const [p, j, c, s, r, sl] = await Promise.all([
+    const [p, j, s, r, sl] = await Promise.all([
       supabase.from("recruitment_projects").select("*").order("created_at", { ascending: false }),
       supabase.from("recruitment_job_titles").select("*").order("created_at", { ascending: false }),
-      supabase.from("recruitment_candidates").select("*").order("created_at", { ascending: false }),
       supabase.from("recruitment_job_title_stats").select("*"),
       supabase.from("rejection_reasons").select("*").eq("is_active", true).order("sort_order"),
       supabase.from("executive_share_links").select("*").order("created_at", { ascending: false }),
     ]);
     if (p.data) setProjects(p.data);
     if (j.data) setJobTitles(j.data);
-    if (c.data) setCandidates(c.data);
     if (s.data) setStats(s.data);
     if (r.data) setReasons(r.data);
     if (sl.data) setShareLinks(sl.data);
     setLoading(false);
   };
 
+  // Candidates now live in react-query so they survive navigation/refresh.
+  const { data: candidates = [] } = useRecruitmentCandidatesQuery();
+  const invalidateCandidates = () => queryClient.invalidateQueries({ queryKey: queryKeys.recruitmentCandidates.all });
+  const saveCandidateMutation = useSaveCandidateMutation();
+  const deleteCandidateMutation = useDeleteCandidateMutation();
+  const updateCandidateMutation = useUpdateCandidateMutation();
+  const rejectCandidateMutation = useRejectCandidateMutation();
+
   useEffect(() => { fetchAll(); }, []);
 
   // realtime
   useEffect(() => {
     const ch = supabase.channel("recruitment-rt")
-      .on("postgres_changes", { event: "*", schema: "public", table: "recruitment_candidates" }, () => fetchAll())
+      .on("postgres_changes", { event: "*", schema: "public", table: "recruitment_candidates" }, () => invalidateCandidates())
       .on("postgres_changes", { event: "*", schema: "public", table: "recruitment_job_titles" }, () => fetchAll())
       .subscribe();
     return () => { supabase.removeChannel(ch); };
@@ -152,6 +167,7 @@ export default function RecruitmentDashboard() {
     const { error } = await supabase.from("recruitment_projects").delete().eq("id", id);
     if (error) return toast.error(error.message);
     fetchAll();
+    invalidateCandidates();
   };
 
   // ==== Job Title CRUD ====
@@ -179,6 +195,7 @@ export default function RecruitmentDashboard() {
     const { error } = await supabase.from("recruitment_job_titles").delete().eq("id", id);
     if (error) return toast.error(error.message);
     fetchAll();
+    invalidateCandidates();
   };
 
   // ==== Candidate CRUD ====
@@ -187,6 +204,7 @@ export default function RecruitmentDashboard() {
     if (!c.project_id || !c.job_title_id || !c.full_name) { toast.error(ar ? "حقول مطلوبة ناقصة" : "Required fields missing"); return; }
     if (c.status === "rejected" && !c.rejected_reason_id) { toast.error(ar ? "سبب الرفض مطلوب" : "Rejection reason required"); return; }
     const payload = {
+      id: c.id,
       project_id: c.project_id, job_title_id: c.job_title_id, full_name: c.full_name,
       nationality: c.nationality || null, phone: c.phone || null, email: c.email || null,
       cv_url: c.cv_url || null, status: c.status || "new",
@@ -198,19 +216,23 @@ export default function RecruitmentDashboard() {
       batch_label: c.batch_label || null,
       notes: c.notes || null,
     };
-    const op = c.id ? supabase.from("recruitment_candidates").update(payload).eq("id", c.id) : supabase.from("recruitment_candidates").insert(payload);
-    const { error } = await op;
-    if (error) return toast.error(error.message);
+    try {
+      await saveCandidateMutation.mutateAsync(payload);
+    } catch (error: any) {
+      toast.error(error.message);
+      return;
+    }
     toast.success(ar ? "تم الحفظ" : "Saved");
     setCandDialog(null);
-    fetchAll();
   };
 
   const deleteCandidate = async (id: string) => {
     if (!confirm(ar ? "حذف المرشح؟" : "Delete candidate?")) return;
-    const { error } = await supabase.from("recruitment_candidates").delete().eq("id", id);
-    if (error) return toast.error(error.message);
-    fetchAll();
+    try {
+      await deleteCandidateMutation.mutateAsync(id);
+    } catch (error: any) {
+      toast.error(error.message);
+    }
   };
 
   const changeStatus = async (cand: any, newStatus: RStatus) => {
@@ -225,16 +247,21 @@ export default function RecruitmentDashboard() {
     if (newStatus === "offer_signed" && !cand.offer_signed_date) updates.offer_signed_date = today;
     if (newStatus === "hired" && !cand.hire_date) updates.hire_date = today;
     if (newStatus === "started" && !cand.actual_start_date) updates.actual_start_date = today;
-    const { error } = await supabase.from("recruitment_candidates").update(updates).eq("id", cand.id);
-    if (error) return toast.error(error.message);
+    try {
+      await updateCandidateMutation.mutateAsync({ id: cand.id, updates });
+    } catch (error: any) {
+      toast.error(error.message);
+    }
   };
 
   const confirmReject = async () => {
     if (!rejectDialog?.reason_id) { toast.error(ar ? "اختر السبب" : "Select reason"); return; }
-    const { error } = await supabase.from("recruitment_candidates").update({
-      status: "rejected", rejected_reason_id: rejectDialog.reason_id, rejected_note: rejectDialog.note || null,
-    }).eq("id", rejectDialog.id);
-    if (error) return toast.error(error.message);
+    try {
+      await rejectCandidateMutation.mutateAsync({ id: rejectDialog.id, reasonId: rejectDialog.reason_id, note: rejectDialog.note || null });
+    } catch (error: any) {
+      toast.error(error.message);
+      return;
+    }
     setRejectDialog(null);
   };
 
@@ -310,6 +337,7 @@ export default function RecruitmentDashboard() {
       if (totalIns > 0) toast.success(ar ? `تم معالجة ${totalIns} سجل` : `Processed ${totalIns} records`);
       if (totalFail > 0) toast.warning(ar ? `${totalFail} مرفوض` : `${totalFail} rejected`);
       fetchAll();
+      invalidateCandidates();
     } catch (err: any) {
       toast.error(err.message);
       setImportResult({ error: err.message });
@@ -361,6 +389,7 @@ export default function RecruitmentDashboard() {
       if (ins > 0) toast.success(ar ? `تم استيراد ${ins} مرشح` : `Imported ${ins} candidates`);
       if (fail > 0) toast.warning(ar ? `${fail} مرفوض` : `${fail} rejected`);
       fetchAll();
+      invalidateCandidates();
     } catch (err:any) {
       toast.error(err.message);
       setImportResult({ error: err.message });
@@ -613,7 +642,7 @@ export default function RecruitmentDashboard() {
                 <Button variant="outline" onClick={downloadTemplate} className="gap-1"><Download className="w-4 h-4"/>{ar?"تحميل القالب":"Download template"}</Button>
                 <Button onClick={()=>fileRef.current?.click()} disabled={importing} variant="secondary" className="gap-1"><Upload className="w-4 h-4"/>{importing?(ar?"جاري...":"Importing..."):(ar?"رفع بالقالب":"Upload via template")}</Button>
                 <input ref={fileRef} type="file" accept=".xlsx,.xls" onChange={handleImport} className="hidden"/>
-                <AiImportRecruitment ar={ar} onImported={fetchAll} />
+                <AiImportRecruitment ar={ar} onImported={() => { fetchAll(); invalidateCandidates(); }} />
                 <div className="flex items-center gap-2 ms-auto rounded border px-3 py-2 bg-muted/30">
                   <Switch checked={strictExisting} onCheckedChange={setStrictExisting} id="strict-existing" />
                   <Label htmlFor="strict-existing" className="text-xs cursor-pointer">
@@ -1011,20 +1040,17 @@ function DefaultPrefsPopover({ link, ar, onSaved, autoOpen, onAutoOpened }: { li
   const [lockSec, setLockSec] = useState<Record<string,boolean>>(initLockSec);
   const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set(Array.isArray(dp.hiddenCandidateIds) ? dp.hiddenCandidateIds : []));
   const [busy, setBusy] = useState(false);
-  const [candidates, setCandidates] = useState<any[]>([]);
   const [candSearch, setCandSearch] = useState("");
   const [open, setOpen] = useState(false);
+  const { data: allCandidates = [] } = useRecruitmentCandidatesQuery();
+  const candidates = useMemo(
+    () => allCandidates.filter((c: any) =>
+      ["selected","offer_sent","offer_signed","offer_accepted","hired","started","rejected"].includes(c.status)
+    ),
+    [allCandidates]
+  );
 
   useEffect(() => { if (autoOpen) { setOpen(true); onAutoOpened?.(); } }, [autoOpen, onAutoOpened]);
-
-  useEffect(() => {
-    if (!open || candidates.length) return;
-    supabase.from("recruitment_candidates")
-      .select("id, full_name, status, nationality, batch_label")
-      .in("status", ["selected","offer_sent","offer_signed","offer_accepted","hired","started","rejected"])
-      .order("created_at", { ascending: false })
-      .then(({ data }) => setCandidates(data || []));
-  }, [open, candidates.length]);
 
   const save = async () => {
     setBusy(true);

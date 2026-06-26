@@ -2,3 +2,6 @@ project_id = "pjopugzttogtpgtcsgbo"
 
 [functions.verify-delete-pin]
 verify_jwt = true
+
+[functions.system-health]
+verify_jwt = true

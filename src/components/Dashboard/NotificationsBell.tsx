@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Bell, Check, CheckCheck, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -11,17 +12,14 @@ import { ar as arLocale, enUS } from "date-fns/locale";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
-
-interface Notification {
-  id: string;
-  type: string;
-  title: string;
-  body: string | null;
-  link: string | null;
-  severity: string;
-  is_read: boolean;
-  created_at: string;
-}
+import { queryKeys } from "@/lib/queryKeys";
+import {
+  Notification,
+  useDeleteNotificationMutation,
+  useMarkAllNotificationsReadMutation,
+  useMarkNotificationReadMutation,
+  useNotificationsQuery,
+} from "@/hooks/queries/useNotifications";
 
 const SEVERITY_COLOR: Record<string, string> = {
   info: "bg-blue-500",
@@ -33,52 +31,51 @@ const SEVERITY_COLOR: Record<string, string> = {
 const NotificationsBell = () => {
   const { lang } = useLanguage();
   const navigate = useNavigate();
-  const [items, setItems] = useState<Notification[]>([]);
+  const queryClient = useQueryClient();
   const [open, setOpen] = useState(false);
+
+  const { data } = useNotificationsQuery();
+  const items = data ?? [];
+
+  const markReadMutation = useMarkNotificationReadMutation();
+  const markAllReadMutation = useMarkAllNotificationsReadMutation();
+  const deleteMutation = useDeleteNotificationMutation();
 
   const unread = items.filter(i => !i.is_read).length;
 
-  const load = async () => {
-    const { data } = await supabase
-      .from("notifications")
-      .select("*")
-      .order("created_at", { ascending: false })
-      .limit(30);
-    setItems((data as Notification[]) || []);
-  };
-
   useEffect(() => {
-    load();
     const ch = supabase
       .channel("notifications-bell")
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "notifications" }, (payload: any) => {
-        setItems(prev => [payload.new, ...prev].slice(0, 30));
+        queryClient.setQueryData<Notification[]>(queryKeys.notifications.list(), (prev) =>
+          [payload.new, ...(prev ?? [])].slice(0, 30)
+        );
         toast.info(payload.new.title, { description: payload.new.body });
       })
       .subscribe();
     return () => { supabase.removeChannel(ch); };
-  }, []);
+  }, [queryClient]);
 
-  const markRead = async (id: string) => {
-    await supabase.from("notifications").update({ is_read: true }).eq("id", id);
-    setItems(prev => prev.map(n => n.id === id ? { ...n, is_read: true } : n));
+  const markRead = (id: string) => {
+    markReadMutation.mutate(id);
   };
 
-  const markAllRead = async () => {
+  const markAllRead = () => {
     const ids = items.filter(i => !i.is_read).map(i => i.id);
     if (!ids.length) return;
-    await supabase.from("notifications").update({ is_read: true }).in("id", ids);
-    setItems(prev => prev.map(n => ({ ...n, is_read: true })));
-    toast.success(lang === "ar" ? "تم تعليم الكل كمقروء" : "All marked as read");
+    markAllReadMutation.mutate(ids, {
+      onSuccess: () => {
+        toast.success(lang === "ar" ? "تم تعليم الكل كمقروء" : "All marked as read");
+      },
+    });
   };
 
-  const remove = async (id: string) => {
-    await supabase.from("notifications").delete().eq("id", id);
-    setItems(prev => prev.filter(n => n.id !== id));
+  const remove = (id: string) => {
+    deleteMutation.mutate(id);
   };
 
-  const onClickItem = async (n: Notification) => {
-    if (!n.is_read) await markRead(n.id);
+  const onClickItem = (n: Notification) => {
+    if (!n.is_read) markRead(n.id);
     if (n.link) { navigate(n.link); setOpen(false); }
   };
 

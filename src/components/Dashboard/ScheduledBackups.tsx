@@ -17,46 +17,20 @@ import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
 import { ar as arLocale, enUS } from "date-fns/locale";
 import { useDeletePin } from "@/components/DeletePinDialog";
-
-interface BucketSummary {
-  count: number;
-  failed: number;
-  checksumMismatches?: number;
-}
-
-interface BackupRun {
-  id: string;
-  status: string;
-  file_path: string | null;
-  file_size: number | null;
-  backup_folder: string | null;
-  tables_summary: Record<string, number> | null;
-  buckets_summary: Record<string, BucketSummary> | null;
-  triggered_by: string;
-  error_message: string | null;
-  created_at: string;
-  checksum_issues: number;
-  offsite_status: string | null;
-}
-
-interface RestoreApproval {
-  id: string;
-  backup_folder: string;
-  tables: string[] | null;
-  include_files: boolean;
-  status: string;
-  requested_by: string;
-  requested_by_email: string | null;
-  created_at: string;
-  expires_at: string;
-}
-
-const SECRET_KEYS = {
-  webhook: "alert_webhook_url",
-  offsiteUrl: "offsite_supabase_url",
-  offsiteKey: "offsite_supabase_service_key",
-  offsiteIncludeFiles: "offsite_include_files",
-} as const;
+import {
+  BACKUP_SECRET_KEYS as SECRET_KEYS,
+  type BackupRun,
+  type BucketUsage as BucketSummary,
+  type RestoreApproval,
+  useBackupRunsQuery,
+  useBackupSecretsSettingsQuery,
+  useDecideRestoreApprovalMutation,
+  useDownloadBackupMutation,
+  useRestoreApprovalsQuery,
+  useRestoreBackupMutation,
+  useSaveBackupSecretsMutation,
+  useTriggerBackupMutation,
+} from "@/hooks/queries/useBackupRuns";
 
 const formatSize = (bytes: number | null) => {
   if (!bytes) return "—";
@@ -71,65 +45,48 @@ const totalFiles = (buckets: Record<string, BucketSummary> | null) =>
 const ScheduledBackups = () => {
   const { lang } = useLanguage();
   const { requestDelete } = useDeletePin();
-  const [runs, setRuns] = useState<BackupRun[]>([]);
-  const [running, setRunning] = useState(false);
+
+  const { data: runs = [] } = useBackupRunsQuery();
+  const triggerBackupMutation = useTriggerBackupMutation();
+  const downloadBackupMutation = useDownloadBackupMutation();
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
   const [restoreTarget, setRestoreTarget] = useState<BackupRun | null>(null);
   const [restoreMode, setRestoreMode] = useState<"merge" | "replace">("merge");
   const [includeFiles, setIncludeFiles] = useState(true);
-  const [restoring, setRestoring] = useState(false);
+  const restoreBackupMutation = useRestoreBackupMutation();
 
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-  const [approvals, setApprovals] = useState<RestoreApproval[]>([]);
+  const { data: approvals = [] } = useRestoreApprovalsQuery();
+  const decideRestoreApprovalMutation = useDecideRestoreApprovalMutation();
   const [decidingId, setDecidingId] = useState<string | null>(null);
 
-  const [configured, setConfigured] = useState<Record<string, boolean>>({});
+  const { data: secretsSettings } = useBackupSecretsSettingsQuery();
+  const configured = secretsSettings?.configured ?? {};
   const [webhookUrl, setWebhookUrl] = useState("");
   const [offsiteUrl, setOffsiteUrl] = useState("");
   const [offsiteKey, setOffsiteKey] = useState("");
   const [offsiteIncludeFiles, setOffsiteIncludeFiles] = useState(false);
-  const [savingSettings, setSavingSettings] = useState(false);
+  const saveBackupSecretsMutation = useSaveBackupSecretsMutation();
 
-  const load = async () => {
-    const { data } = await supabase.from("backup_runs").select("*").order("created_at", { ascending: false }).limit(10);
-    setRuns((data as BackupRun[]) || []);
-  };
-
-  const loadApprovals = async () => {
-    const { data } = await supabase.from("restore_approvals").select("*").eq("status", "pending").order("created_at", { ascending: false });
-    setApprovals((data as RestoreApproval[]) || []);
-  };
-
-  const loadSettings = async () => {
-    const { data } = await supabase.from("app_secrets").select("key, value").in("key", Object.values(SECRET_KEYS));
-    const present: Record<string, boolean> = {};
-    (data || []).forEach((row) => {
-      if (row.key === SECRET_KEYS.offsiteIncludeFiles) setOffsiteIncludeFiles(row.value === "true");
-      else present[row.key] = true;
-    });
-    setConfigured(present);
-  };
+  const running = triggerBackupMutation.isPending;
+  const restoring = restoreBackupMutation.isPending;
+  const savingSettings = saveBackupSecretsMutation.isPending;
 
   useEffect(() => {
-    load();
-    loadApprovals();
-    loadSettings();
+    if (secretsSettings) setOffsiteIncludeFiles(secretsSettings.offsiteIncludeFiles);
+  }, [secretsSettings]);
+
+  useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setCurrentUserId(data.user?.id ?? null));
   }, []);
 
   const runNow = async () => {
-    setRunning(true);
     try {
-      const { data, error } = await supabase.functions.invoke("scheduled-backup", { body: {} });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
+      await triggerBackupMutation.mutateAsync();
       toast.success(lang === "ar" ? "تم إنشاء نسخة احتياطية" : "Backup created");
-      load();
     } catch (e: any) {
       toast.error(e.message || (lang === "ar" ? "فشل إنشاء النسخة الاحتياطية" : "Backup failed"));
-    } finally {
-      setRunning(false);
     }
   };
 
@@ -137,9 +94,8 @@ const ScheduledBackups = () => {
     if (!run.file_path) return;
     setDownloadingId(run.id);
     try {
-      const { data, error } = await supabase.storage.from("backups").createSignedUrl(run.file_path, 60);
-      if (error) throw error;
-      if (data?.signedUrl) window.open(data.signedUrl, "_blank");
+      const signedUrl = await downloadBackupMutation.mutateAsync(run);
+      if (signedUrl) window.open(signedUrl, "_blank");
     } catch (e: any) {
       toast.error(e.message || (lang === "ar" ? "فشل التحميل" : "Download failed"));
     } finally {
@@ -155,27 +111,22 @@ const ScheduledBackups = () => {
 
   const doRestore = async () => {
     if (!restoreTarget?.backup_folder) return;
-    setRestoring(true);
     try {
-      const { data, error } = await supabase.functions.invoke("restore-backup", {
-        body: { backup_folder: restoreTarget.backup_folder, mode: restoreMode, includeFiles, confirm: "RESTORE" },
+      const data = await restoreBackupMutation.mutateAsync({
+        backup_folder: restoreTarget.backup_folder,
+        mode: restoreMode,
+        includeFiles,
       });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
       if (data?.pending) {
         toast.success(lang === "ar"
           ? "تم إرسال طلب الاسترداد، يحتاج موافقة مسؤول آخر قبل التنفيذ"
           : "Restore request submitted — needs approval from another admin before it runs");
-        loadApprovals();
       } else {
         toast.success(lang === "ar" ? "تم استرداد البيانات بنجاح" : "Data restored successfully");
-        load();
       }
       setRestoreTarget(null);
     } catch (e: any) {
       toast.error(e.message || (lang === "ar" ? "فشل الاسترداد" : "Restore failed"));
-    } finally {
-      setRestoring(false);
     }
   };
 
@@ -195,18 +146,12 @@ const ScheduledBackups = () => {
   const decide = async (approval: RestoreApproval, action: "approve" | "reject") => {
     setDecidingId(approval.id);
     try {
-      const { data, error } = await supabase.functions.invoke("restore-backup", {
-        body: { approval_id: approval.id, action },
-      });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
+      await decideRestoreApprovalMutation.mutateAsync({ approval_id: approval.id, action });
       toast.success(
         action === "approve"
           ? (lang === "ar" ? "تمت الموافقة وتنفيذ الاسترداد" : "Approved — restore executed")
           : (lang === "ar" ? "تم رفض الطلب" : "Request rejected")
       );
-      loadApprovals();
-      load();
     } catch (e: any) {
       toast.error(e.message || (lang === "ar" ? "فشل تنفيذ الإجراء" : "Action failed"));
     } finally {
@@ -231,19 +176,14 @@ const ScheduledBackups = () => {
     if (offsiteUrl.trim()) updates.push({ key: SECRET_KEYS.offsiteUrl, value: offsiteUrl.trim() });
     if (offsiteKey.trim()) updates.push({ key: SECRET_KEYS.offsiteKey, value: offsiteKey.trim() });
 
-    setSavingSettings(true);
     try {
-      const { error } = await supabase.from("app_secrets").upsert(updates, { onConflict: "key" });
-      if (error) throw error;
+      await saveBackupSecretsMutation.mutateAsync(updates);
       toast.success(lang === "ar" ? "تم حفظ إعدادات الحماية" : "Protection settings saved");
       setWebhookUrl("");
       setOffsiteUrl("");
       setOffsiteKey("");
-      loadSettings();
     } catch (e: any) {
       toast.error(e.message || (lang === "ar" ? "فشل الحفظ" : "Save failed"));
-    } finally {
-      setSavingSettings(false);
     }
   };
 

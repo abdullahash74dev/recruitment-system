@@ -1,5 +1,5 @@
 // JobCategoriesManager — manage categories + categorize all unique job titles in the system
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,20 +9,30 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { Loader2, Sparkles, Plus, Trash2, FolderTree, ArrowDownAZ, Save, Edit3 } from "lucide-react";
-
-type Category = { id: string; name_ar: string; name_en: string | null; color: string | null; sort_order: number };
-type TitleRow = { title_normalized: string; title_display: string; count: number; category_id: string | null };
-
-const normTitle = (s: string) =>
-  String(s || "").trim().toLowerCase()
-    .replace(/[\u064B-\u0652\u0670]/g, "")
-    .replace(/[إأآا]/g, "ا").replace(/ى/g, "ي").replace(/ة/g, "ه")
-    .replace(/\s+/g, " ").trim();
+import {
+  useJobCategoriesQuery,
+  useJobTitleCategoriesQuery,
+  useSaveTitleCategoriesMutation,
+  useAddCategoryMutation,
+  useDeleteCategoryMutation,
+  useUpdateCategoryMutation,
+  normTitle,
+  type Category,
+  type TitleRow,
+} from "@/hooks/queries/useJobCategories";
 
 export default function JobCategoriesManager() {
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [titles, setTitles] = useState<TitleRow[]>([]);
-  const [loading, setLoading] = useState(true);
+  const categoriesQuery = useJobCategoriesQuery();
+  const titlesQuery = useJobTitleCategoriesQuery();
+  const categories = categoriesQuery.data ?? [];
+  const titles = titlesQuery.data ?? [];
+  const loading = categoriesQuery.isLoading || titlesQuery.isLoading;
+
+  const saveTitleCategoriesMutation = useSaveTitleCategoriesMutation();
+  const addCategoryMutation = useAddCategoryMutation();
+  const deleteCategoryMutation = useDeleteCategoryMutation();
+  const updateCategoryMutation = useUpdateCategoryMutation();
+
   const [aiBusy, setAiBusy] = useState(false);
   const [search, setSearch] = useState("");
   const [filterCat, setFilterCat] = useState<string>("__all__");
@@ -30,62 +40,6 @@ export default function JobCategoriesManager() {
   const [newCatEn, setNewCatEn] = useState("");
   const [pendingChanges, setPendingChanges] = useState<Map<string, string | null>>(new Map());
   const [groupByCategory, setGroupByCategory] = useState(false);
-
-  const load = async () => {
-    setLoading(true);
-    // Applicants is paginated: a flat .limit() would only scan a fraction of
-    // desired_position values once the table exceeds the page size, leaving
-    // most job titles undiscovered for categorization.
-    const fetchAllDesiredPositions = async () => {
-      const PAGE_SIZE = 1000;
-      const rows: { desired_position: string | null }[] = [];
-      for (let from = 0; ; from += PAGE_SIZE) {
-        const { data, error } = await supabase.from("applicants").select("desired_position").range(from, from + PAGE_SIZE - 1);
-        if (error) throw error;
-        rows.push(...(data || []));
-        if (!data || data.length < PAGE_SIZE) break;
-      }
-      return rows;
-    };
-
-    const [catsRes, mapRes, appsRows, recRes] = await Promise.all([
-      supabase.from("job_categories").select("*").order("sort_order"),
-      supabase.from("job_title_categories").select("*"),
-      fetchAllDesiredPositions(),
-      supabase.from("recruitment_job_titles").select("title_ar"),
-    ]);
-    setCategories((catsRes.data || []) as Category[]);
-    const mapByNorm = new Map<string, string | null>();
-    (mapRes.data || []).forEach((m: any) => mapByNorm.set(m.title_normalized, m.category_id));
-
-    // Aggregate titles from applicants + recruitment_job_titles
-    const agg = new Map<string, { display: string; count: number }>();
-    const consume = (raw: string | null | undefined) => {
-      if (!raw) return;
-      const t = String(raw).trim();
-      if (!t) return;
-      const n = normTitle(t);
-      if (!n) return;
-      const cur = agg.get(n);
-      if (cur) cur.count++;
-      else agg.set(n, { display: t, count: 1 });
-    };
-    appsRows.forEach((r) => consume(r.desired_position));
-    (recRes.data || []).forEach((r: any) => consume(r.title_ar));
-
-    const rows: TitleRow[] = Array.from(agg.entries()).map(([n, v]) => ({
-      title_normalized: n,
-      title_display: v.display,
-      count: v.count,
-      category_id: mapByNorm.get(n) ?? null,
-    }));
-    rows.sort((a, b) => a.title_display.localeCompare(b.title_display, "ar"));
-    setTitles(rows);
-    setPendingChanges(new Map());
-    setLoading(false);
-  };
-
-  useEffect(() => { load(); }, []);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -118,38 +72,56 @@ export default function JobCategoriesManager() {
         category_id: catId,
       };
     });
-    const { error } = await supabase.from("job_title_categories").upsert(upserts, { onConflict: "title_normalized" });
-    if (error) return toast.error(error.message);
-    toast.success(`حُفظت ${upserts.length} تصنيف`);
-    load();
+    saveTitleCategoriesMutation.mutate(upserts, {
+      onSuccess: () => {
+        toast.success(`حُفظت ${upserts.length} تصنيف`);
+        setPendingChanges(new Map());
+      },
+      onError: (error: Error) => toast.error(error.message),
+    });
   };
 
   const addCategory = async () => {
     if (!newCatAr.trim()) return;
     const maxOrder = Math.max(0, ...categories.map(c => c.sort_order || 0));
-    const { error } = await supabase.from("job_categories").insert({
-      name_ar: newCatAr.trim(),
-      name_en: newCatEn.trim() || null,
-      sort_order: maxOrder + 1,
-    });
-    if (error) return toast.error(error.message);
-    setNewCatAr(""); setNewCatEn("");
-    toast.success("أُضيفت الفئة");
-    load();
+    addCategoryMutation.mutate(
+      {
+        name_ar: newCatAr.trim(),
+        name_en: newCatEn.trim() || null,
+        sort_order: maxOrder + 1,
+      },
+      {
+        onSuccess: () => {
+          setNewCatAr(""); setNewCatEn("");
+          toast.success("أُضيفت الفئة");
+          setPendingChanges(new Map());
+        },
+        onError: (error: Error) => toast.error(error.message),
+      }
+    );
   };
 
   const deleteCategory = async (id: string) => {
     if (!confirm("حذف الفئة؟ سيتم إلغاء تصنيف الوظائف المرتبطة بها.")) return;
-    const { error } = await supabase.from("job_categories").delete().eq("id", id);
-    if (error) return toast.error(error.message);
-    toast.success("حُذفت الفئة");
-    load();
+    deleteCategoryMutation.mutate(id, {
+      onSuccess: () => {
+        toast.success("حُذفت الفئة");
+        setPendingChanges(new Map());
+      },
+      onError: (error: Error) => toast.error(error.message),
+    });
   };
 
   const updateCategory = async (id: string, patch: Partial<Category>) => {
-    const { error } = await supabase.from("job_categories").update(patch).eq("id", id);
-    if (error) return toast.error(error.message);
-    load();
+    updateCategoryMutation.mutate(
+      { id, patch },
+      {
+        onSuccess: () => {
+          setPendingChanges(new Map());
+        },
+        onError: (error: Error) => toast.error(error.message),
+      }
+    );
   };
 
   const aiCategorize = async () => {

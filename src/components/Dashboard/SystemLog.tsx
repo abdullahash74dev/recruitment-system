@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,20 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { ScrollText, Search, RefreshCw, Eye, Download } from "lucide-react";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
-
-interface AuditRow {
-  id: string;
-  occurred_at: string;
-  user_email: string | null;
-  action: string;
-  table_name: string | null;
-  record_id: string | null;
-  summary: string | null;
-  old_data: any;
-  new_data: any;
-  ip_address: string | null;
-  user_agent: string | null;
-}
+import { useAuditLogQuery, AuditRow } from "@/hooks/queries/useAuditLog";
 
 const ACTION_COLOR: Record<string, string> = {
   INSERT: "bg-emerald-500/15 text-emerald-700 dark:text-emerald-400",
@@ -41,23 +27,18 @@ const ACTION_COLOR: Record<string, string> = {
 
 const SystemLog = () => {
   const { lang } = useLanguage();
-  const [rows, setRows] = useState<AuditRow[]>([]);
-  const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [actionFilter, setActionFilter] = useState<string>("all");
   const [tableFilter, setTableFilter] = useState<string>("all");
   const [selected, setSelected] = useState<AuditRow | null>(null);
 
-  const fetchLog = async () => {
-    setLoading(true);
-    const { data, error } = await (supabase as any).from("audit_log")
-      .select("*").order("occurred_at", { ascending: false }).limit(500);
-    setLoading(false);
-    if (error) { toast.error(error.message); return; }
-    setRows(data || []);
-  };
+  const { data, isFetching, refetch, error } = useAuditLogQuery();
+  const rows = data ?? [];
+  const loading = isFetching;
 
-  useEffect(() => { fetchLog(); }, []);
+  useEffect(() => {
+    if (error) toast.error((error as Error).message);
+  }, [error]);
 
   const filtered = rows.filter(r => {
     if (actionFilter !== "all" && r.action !== actionFilter) return false;
@@ -95,7 +76,7 @@ const SystemLog = () => {
         <div className="flex flex-wrap items-center justify-between gap-2">
           <CardTitle className="flex items-center gap-2"><ScrollText className="w-5 h-5" />{lang === "ar" ? "سجل النظام" : "System Log"}</CardTitle>
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" onClick={fetchLog} disabled={loading} className="gap-1">
+            <Button variant="outline" size="sm" onClick={() => refetch()} disabled={loading} className="gap-1">
               <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
               {lang === "ar" ? "تحديث" : "Refresh"}
             </Button>
