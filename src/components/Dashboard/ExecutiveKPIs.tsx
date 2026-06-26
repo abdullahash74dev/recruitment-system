@@ -1,5 +1,7 @@
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { queryClient } from "@/lib/queryClient";
+import { queryKeys } from "@/lib/queryKeys";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -18,15 +20,7 @@ interface KPIs {
   monthlyHires: { month: string; hires: number }[];
 }
 
-const ExecutiveKPIs = () => {
-  const { lang } = useLanguage();
-  const [kpis, setKpis] = useState<KPIs | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => { load(); }, []);
-
-  const load = async () => {
-    setLoading(true);
+async function fetchExecutiveKPIs(): Promise<KPIs> {
     const now = new Date();
     const d30 = new Date(now.getTime() - 30 * 86400000).toISOString();
     const d60 = new Date(now.getTime() - 60 * 86400000).toISOString();
@@ -74,7 +68,7 @@ const ExecutiveKPIs = () => {
     });
     const monthlyHires = Object.entries(monthBuckets).map(([month, hires]) => ({ month, hires }));
 
-    setKpis({
+    return {
       totalLast30,
       totalPrev30,
       hired,
@@ -84,9 +78,15 @@ const ExecutiveKPIs = () => {
       hireRate,
       rejectionRate,
       monthlyHires,
-    });
-    setLoading(false);
-  };
+    };
+}
+
+const ExecutiveKPIs = () => {
+  const { lang } = useLanguage();
+  const { data: kpis, isLoading: loading } = useQuery(
+    { queryKey: queryKeys.executiveKpis.all, queryFn: fetchExecutiveKPIs },
+    queryClient,
+  );
 
   if (loading || !kpis) {
     return (

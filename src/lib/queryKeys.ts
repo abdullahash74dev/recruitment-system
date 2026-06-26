@@ -33,6 +33,10 @@ export const queryKeys = {
     all: ["userRoles"] as const,
     list: () => ["userRoles", "list"] as const,
     permissions: (userId?: string) => ["userRoles", "permissions", userId] as const,
+    // Raw permission_key/granted override rows for a target user (admin edit
+    // dialog) — distinct shape from `permissions()`, which returns the merged
+    // effective permission set for the CURRENT session user only.
+    permissionOverrides: (userId: string) => ["userRoles", "permissionOverrides", userId] as const,
   },
   auditLog: {
     all: ["auditLog"] as const,
@@ -65,6 +69,9 @@ export const queryKeys = {
     all: ["fieldConfig"] as const,
     list: () => ["fieldConfig", "list"] as const,
   },
+  customQuestions: {
+    all: ["customQuestions"] as const,
+  },
   siteSettings: {
     all: ["siteSettings"] as const,
   },
@@ -95,5 +102,17 @@ export const queryKeys = {
   },
   systemHealth: {
     usage: () => ["systemHealth", "usage"] as const,
+  },
+  systemDoctor: {
+    all: ["systemDoctor"] as const,
+    history: () => ["systemDoctor", "history"] as const,
+  },
+  executiveKpis: {
+    all: ["executiveKpis"] as const,
+  },
+  storage: {
+    // Signed URL for a private storage object — keyed by path so the same
+    // file shown in multiple places (list + detail view) costs one fetch.
+    signedUrl: (path: string) => ["storage", "signedUrl", path] as const,
   },
 } as const;

@@ -1,11 +1,12 @@
-import { useState, useEffect } from "react";
+import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { ArrowLeft, ArrowRight, Users, Briefcase, Building2, Search, Star, Globe, Shield, Zap, Calendar, FolderOpen, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import TopBar from "@/components/TopBar";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useSiteContent } from "@/hooks/useSiteContent";
-import { supabase } from "@/integrations/supabase/client";
+import { useProjectsQuery } from "@/hooks/queries/useProjects";
+import { useJobPostingsQuery } from "@/hooks/queries/useJobPostings";
 import StorageImage from "@/components/StorageImage";
 import ProjectLogo from "@/components/ProjectLogo";
 import SiteLogo from "@/components/SiteLogo";
@@ -15,6 +16,7 @@ import heroBg from "@/assets/hero-bg.jpg";
 
 interface Project {
   id: string;
+  created_at: string;
   name_ar: string;
   name_en: string | null;
   description_ar: string | null;
@@ -36,26 +38,18 @@ const Index = () => {
   const { t, dir, lang } = useLanguage();
   const { content, loading } = useSiteContent();
   const Arrow = lang === "ar" ? ArrowLeft : ArrowRight;
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [jobCount, setJobCount] = useState(0);
-
-  useEffect(() => {
-    supabase
-      .from("projects")
-      .select("id,name_ar,name_en,description_ar,description_en,logo_url,is_active,logo_height,logo_width,logo_fit,logo_radius,logo_rotation,logo_padding,logo_bg_color,logo_shadow,logo_border")
-      .eq("is_active", true)
-      .order("created_at", { ascending: true })
-      .then(({ data, error }) => {
-        if (error) {
-          console.error("[projects] fetch error:", error);
-          return;
-        }
-        if (data) setProjects(data as Project[]);
-      });
-    supabase.from("job_postings").select("id", { count: "exact", head: true }).eq("is_active", true).then(({ count }) => {
-      setJobCount(count || 0);
-    });
-  }, []);
+  // Shared with the admin Projects/Jobs tabs (DashboardPage) so revisiting
+  // this page within the staleTime window costs no extra fetch.
+  const { data: allProjects = [] } = useProjectsQuery();
+  const { data: allJobPostings = [] } = useJobPostingsQuery();
+  const projects = useMemo(
+    () =>
+      (allProjects as Project[])
+        .filter((p) => p.is_active)
+        .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()),
+    [allProjects],
+  );
+  const jobCount = useMemo(() => allJobPostings.filter((j) => j.is_active).length, [allJobPostings]);
 
   const bi = (ar: string, en: string) => lang === "ar" ? ar : en;
 
