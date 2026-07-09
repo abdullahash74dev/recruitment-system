@@ -16,12 +16,8 @@ import {
   type ApplicantEmailStatus,
   type TemplateContext,
 } from "@/lib/applicantEmailTemplates";
-
-interface RejectionReason {
-  id: string;
-  reason_ar: string;
-  reason_en: string | null;
-}
+import { useRejectionReasonsQuery } from "@/hooks/queries/useRejectionReasons";
+import { useSiteContent } from "@/hooks/useSiteContent";
 
 interface Props {
   open: boolean;
@@ -50,39 +46,23 @@ export default function ApplicantEmailDialog({
   onConfirmed,
 }: Props) {
   const [language, setLanguage] = useState<"ar" | "en">(applicantLanguage);
-  const [reasons, setReasons] = useState<RejectionReason[]>([]);
   const [reasonId, setReasonId] = useState<string>("");
   const [note, setNote] = useState<string>("");
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [sending, setSending] = useState(false);
-  const [companyAr, setCompanyAr] = useState("منصة التوظيف الذكية");
-  const [companyEn, setCompanyEn] = useState("NexHire AI");
+  const { content } = useSiteContent();
+  const companyAr = content.site_name_ar;
+  const companyEn = content.site_name_en;
+  const { data: allReasons = [] } = useRejectionReasonsQuery();
+  const reasons = useMemo(() => allReasons.filter((r) => r.is_active), [allReasons]);
 
   useEffect(() => {
     if (!open) return;
     setLanguage(applicantLanguage);
     setReasonId("");
     setNote("");
-    (async () => {
-      const { data: settings } = await supabase
-        .from("site_settings")
-        .select("site_name_ar, site_name_en")
-        .maybeSingle();
-      if (settings) {
-        setCompanyAr(settings.site_name_ar || "منصة التوظيف الذكية");
-        setCompanyEn(settings.site_name_en || "NexHire AI");
-      }
-      if (status === "rejected") {
-        const { data } = await (supabase as any)
-          .from("rejection_reasons")
-          .select("id, reason_ar, reason_en")
-          .eq("is_active", true)
-          .order("sort_order");
-        setReasons(data || []);
-      }
-    })();
-  }, [open, status, applicantLanguage]);
+  }, [open, applicantLanguage]);
 
   const selectedReason = useMemo(
     () => reasons.find((r) => r.id === reasonId),

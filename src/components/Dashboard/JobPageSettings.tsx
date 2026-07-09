@@ -10,23 +10,26 @@ import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { toast } from "sonner";
 import { Save, Upload, Image as ImageIcon, Type, Palette, Briefcase } from "lucide-react";
-import { invalidateSiteSettingsCache } from "@/hooks/useSiteSettings";
+import { invalidateSiteSettingsCache, useSiteSettings } from "@/hooks/useSiteSettings";
 import { MAX_INLINE_IMAGE_SIZE, readImageAsDataUrl } from "@/lib/imageUpload";
 import ProjectLogo from "@/components/ProjectLogo";
 
 const JobPageSettings = () => {
   const { lang } = useLanguage();
   const ar = lang === "ar";
+  // Seeded once from the shared site_settings cache (shared with BrandingSettings/
+  // SiteContentSettings/SiteLogo) so revisiting this tab within the staleTime
+  // window costs no extra fetch.
+  const { settings: cachedSettings, loading: settingsLoading } = useSiteSettings();
   const [s, setS] = useState<Record<string, any> | null>(null);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    supabase.from("site_settings").select("*").limit(1).single().then(({ data }) => {
-      if (data) setS(data);
-    });
-  }, []);
+    if (settingsLoading || s) return;
+    setS(cachedSettings as any);
+  }, [settingsLoading, cachedSettings, s]);
 
   const set = (k: string, v: any) => setS((p: any) => ({ ...p, [k]: v }));
 

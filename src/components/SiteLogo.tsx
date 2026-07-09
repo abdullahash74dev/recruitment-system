@@ -1,5 +1,8 @@
 import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { queryClient } from "@/lib/queryClient";
+import { queryKeys } from "@/lib/queryKeys";
 import BrandMark from "@/components/BrandMark";
 
 interface LogoData {
@@ -26,19 +29,15 @@ interface LogoData {
   site_name_en: string | null;
 }
 
-let cache: LogoData | null = null;
-const listeners = new Set<(d: LogoData) => void>();
-
-const fetchLogo = async () => {
+// Shares queryKeys.siteSettings.all with useSiteSettings/useSiteContent — all
+// three read the exact same site_settings row, so every <SiteLogo/> on a page
+// (header, sidebar, footer...) plus those hooks now cost one fetch, not N.
+async function fetchLogoRow(): Promise<LogoData | null> {
   const { data } = await supabase.from("site_settings").select("*").limit(1).single();
-  if (data) {
-    cache = data as any;
-    listeners.forEach((cb) => cb(cache!));
-  }
-  return cache;
-};
+  return data ? (data as any) : null;
+}
 
-export const refreshSiteLogo = () => { cache = null; fetchLogo(); };
+export const refreshSiteLogo = () => queryClient.invalidateQueries({ queryKey: queryKeys.siteSettings.all });
 
 interface Props {
   alt?: string;
@@ -48,19 +47,17 @@ interface Props {
 }
 
 export const SiteLogo = ({ alt = "Logo", className = "", heightOverride }: Props) => {
-  const [data, setData] = useState<LogoData | null>(cache);
+  // Bound directly to the singleton queryClient (not context) so this shares
+  // the cache with useSiteSettings/useSiteContent even outside a
+  // QueryClientProvider (e.g. in tests).
+  const { data: queryData } = useQuery({ queryKey: queryKeys.siteSettings.all, queryFn: fetchLogoRow }, queryClient);
+  const data = queryData ?? null;
   const [isMobile, setIsMobile] = useState(typeof window !== "undefined" ? window.innerWidth < 768 : false);
 
   useEffect(() => {
-    if (!cache) fetchLogo().then((d) => d && setData(d));
-    const cb = (d: LogoData) => setData(d);
-    listeners.add(cb);
     const onResize = () => setIsMobile(window.innerWidth < 768);
     window.addEventListener("resize", onResize);
-    return () => {
-      listeners.delete(cb);
-      window.removeEventListener("resize", onResize);
-    };
+    return () => window.removeEventListener("resize", onResize);
   }, []);
 
   const url = data?.logo_url || null;

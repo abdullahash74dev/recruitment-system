@@ -1,6 +1,9 @@
 import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { supabase } from "@/integrations/supabase/client";
+import { queryClient } from "@/lib/queryClient";
+import { queryKeys } from "@/lib/queryKeys";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -21,22 +24,29 @@ interface Props {
   userRole: string;
 }
 
+async function fetchCustomPerms(userId: string): Promise<Record<string, boolean | null>> {
+  const { data } = await supabase.from("user_permissions").select("permission_key, granted").eq("user_id", userId);
+  const result: Record<string, boolean | null> = {};
+  data?.forEach((p: any) => { result[p.permission_key] = p.granted; });
+  return result;
+}
+
 const UserPermissionsDialog = ({ open, onOpenChange, userId, userName, userRole }: Props) => {
   const { lang } = useLanguage();
+  // Bound to the singleton queryClient; the local `perms` draft below is
+  // re-seeded from this every time the dialog opens (matching the prior
+  // always-refetch-on-open behavior), then edited locally until Save.
+  const { data: savedPerms } = useQuery(
+    { queryKey: queryKeys.userRoles.permissionOverrides(userId), queryFn: () => fetchCustomPerms(userId), enabled: open },
+    queryClient,
+  );
   const [perms, setPerms] = useState<Record<string, boolean | null>>({});
   const [saving, setSaving] = useState(false);
   const [q, setQ] = useState("");
 
   const defaults = getDefaultPermissions(userRole);
 
-  useEffect(() => { if (open) loadCustomPerms(); }, [open, userId]);
-
-  const loadCustomPerms = async () => {
-    const { data } = await supabase.from("user_permissions").select("permission_key, granted").eq("user_id", userId);
-    const result: Record<string, boolean | null> = {};
-    data?.forEach((p: any) => { result[p.permission_key] = p.granted; });
-    setPerms(result);
-  };
+  useEffect(() => { if (open && savedPerms) setPerms(savedPerms); }, [open, userId, savedPerms]);
 
   const getEffective = (key: PermissionKey): boolean => {
     if (perms[key] !== null && perms[key] !== undefined) return perms[key]!;
@@ -61,6 +71,10 @@ const UserPermissionsDialog = ({ open, onOpenChange, userId, userName, userRole 
       const { error } = await supabase.from("user_permissions").insert(inserts);
       if (error) { toast.error(error.message); setSaving(false); return; }
     }
+    // Broad invalidate (matches useUsersAndRoles' role-change mutations) so
+    // both this user's raw overrides and, if they're the current session
+    // user, their merged effective permissions refresh.
+    queryClient.invalidateQueries({ queryKey: queryKeys.userRoles.all });
     toast.success(lang === "ar" ? "تم حفظ الصلاحيات" : "Permissions saved");
     setSaving(false);
     onOpenChange(false);

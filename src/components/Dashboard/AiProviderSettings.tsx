@@ -1,54 +1,21 @@
-import { useEffect, useState } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { Bot, CheckCircle2, XCircle, RefreshCw, KeyRound, Sparkles } from "lucide-react";
-
-interface ProviderStatus {
-  gemini_configured: boolean;
-  anthropic_configured: boolean;
-}
+import { useAiProviderSettingsQuery, useUpdateAiProviderMutation } from "@/hooks/queries/useAiUsage";
 
 const AiProviderSettings = () => {
   const { lang } = useLanguage();
   const isAr = lang === "ar";
-  const [provider, setProvider] = useState<"gemini" | "claude">("gemini");
-  const [settingsId, setSettingsId] = useState<string | null>(null);
-  const [status, setStatus] = useState<ProviderStatus | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [checkingStatus, setCheckingStatus] = useState(false);
-
-  const loadSettings = async () => {
-    const { data } = await supabase.from("ai_settings").select("id, provider").limit(1).maybeSingle();
-    if (data) {
-      setSettingsId(data.id);
-      setProvider((data.provider as "gemini" | "claude") || "gemini");
-    }
-  };
-
-  const loadStatus = async () => {
-    setCheckingStatus(true);
-    try {
-      const { data, error } = await supabase.functions.invoke("ai-provider-status");
-      if (error) throw error;
-      setStatus(data as ProviderStatus);
-    } catch {
-      setStatus(null);
-    }
-    setCheckingStatus(false);
-  };
-
-  useEffect(() => {
-    (async () => {
-      await Promise.all([loadSettings(), loadStatus()]);
-      setLoading(false);
-    })();
-  }, []);
+  const { data, isLoading: loading, isFetching: checkingStatus, refetch } = useAiProviderSettingsQuery();
+  const provider = data?.provider ?? "gemini";
+  const settingsId = data?.settingsId ?? null;
+  const status = data?.status ?? null;
+  const updateProviderMutation = useUpdateAiProviderMutation();
+  const saving = updateProviderMutation.isPending;
 
   const handleChange = async (value: string) => {
     const next = value as "gemini" | "claude";
@@ -61,20 +28,12 @@ const AiProviderSettings = () => {
       );
       return;
     }
-    setSaving(true);
-    const { data: { user } } = await supabase.auth.getUser();
-    const payload = { provider: next, updated_by: user?.id || null, updated_at: new Date().toISOString() };
-    const { error } = settingsId
-      ? await supabase.from("ai_settings").update(payload).eq("id", settingsId)
-      : await supabase.from("ai_settings").insert(payload);
-    setSaving(false);
-    if (error) {
+    try {
+      await updateProviderMutation.mutateAsync({ settingsId, provider: next });
+      toast.success(isAr ? "تم تحديث مزود الذكاء الاصطناعي" : "AI provider updated");
+    } catch {
       toast.error(isAr ? "تعذر حفظ الإعداد" : "Failed to save setting");
-      return;
     }
-    setProvider(next);
-    toast.success(isAr ? "تم تحديث مزود الذكاء الاصطناعي" : "AI provider updated");
-    loadSettings();
   };
 
   const StatusBadge = ({ ok }: { ok: boolean | undefined }) => (
@@ -103,7 +62,7 @@ const AiProviderSettings = () => {
             <KeyRound className="w-4 h-4" />
             {isAr ? "حالة مفاتيح الربط" : "API Key Status"}
           </CardTitle>
-          <Button variant="ghost" size="sm" onClick={loadStatus} disabled={checkingStatus} className="gap-1">
+          <Button variant="ghost" size="sm" onClick={() => refetch()} disabled={checkingStatus} className="gap-1">
             <RefreshCw className={`w-3 h-3 ${checkingStatus ? "animate-spin" : ""}`} />
             {isAr ? "تحديث" : "Refresh"}
           </Button>

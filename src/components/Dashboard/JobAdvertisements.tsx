@@ -21,6 +21,13 @@ import {
 import { toPng, toJpeg } from "html-to-image";
 import BrandMark from "@/components/BrandMark";
 import { useSiteContent } from "@/hooks/useSiteContent";
+import {
+  useJobAdvertisementsQuery,
+  useCreateJobAdvertisement,
+  useUpdateJobAdvertisement,
+  useDeleteJobAdvertisement,
+  type JobAdvertisementPayload,
+} from "@/hooks/queries/useJobAdvertisements";
 
 interface JobPosting {
   id: string;
@@ -124,9 +131,12 @@ const JobAdvertisements = () => {
   const companyAr = siteContent.site_name_ar;
   const companyEn = siteContent.site_name_en;
 
-  const [jobs, setJobs] = useState<JobPosting[]>([]);
-  const [ads, setAds] = useState<Advertisement[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: listData, isLoading: loading } = useJobAdvertisementsQuery();
+  const jobs = (listData?.jobs ?? []) as JobPosting[];
+  const ads = (listData?.ads ?? []) as Advertisement[];
+  const createAdMutation = useCreateJobAdvertisement();
+  const updateAdMutation = useUpdateJobAdvertisement();
+  const deleteAdMutation = useDeleteJobAdvertisement();
 
   // Editor state
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -221,8 +231,6 @@ const JobAdvertisements = () => {
   const [newJobLocation, setNewJobLocation] = useState("");
   
 
-  useEffect(() => { loadAll(); }, []);
-
   useEffect(() => {
     // Default QR url to the project's apply page
     if (!qrUrl) {
@@ -230,17 +238,6 @@ const JobAdvertisements = () => {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const loadAll = async () => {
-    setLoading(true);
-    const [jobsRes, adsRes] = await Promise.all([
-      supabase.from("job_postings").select("*").eq("is_active", true).order("created_at", { ascending: false }),
-      supabase.from("job_advertisements").select("*").order("created_at", { ascending: false }),
-    ]);
-    if (jobsRes.data) setJobs(jobsRes.data as any);
-    if (adsRes.data) setAds(adsRes.data as any);
-    setLoading(false);
-  };
 
   const resetEditor = () => {
     setEditingId(null);
@@ -386,7 +383,7 @@ const JobAdvertisements = () => {
     }
 
     const { data: { user } } = await supabase.auth.getUser();
-    const payload = {
+    const payload: JobAdvertisementPayload = {
       title_ar: titleAr,
       title_en: titleEn || null,
       subtitle_ar: subtitleAr || null,
@@ -461,25 +458,39 @@ const JobAdvertisements = () => {
     };
 
     if (editingId) {
-      const { error } = await supabase.from("job_advertisements").update(payload).eq("id", editingId);
-      if (error) { toast.error(error.message); return; }
-      toast.success(ar ? "تم تحديث الإعلان" : "Advertisement updated");
+      updateAdMutation.mutate({ id: editingId, payload }, {
+        onSuccess: () => {
+          toast.success(ar ? "تم تحديث الإعلان" : "Advertisement updated");
+          resetEditor();
+        },
+        onError: (error: any) => {
+          toast.error(error.message);
+        },
+      });
     } else {
-      const { error } = await supabase.from("job_advertisements").insert(payload);
-      if (error) { toast.error(error.message); return; }
-      toast.success(ar ? "تم حفظ الإعلان" : "Advertisement saved");
+      createAdMutation.mutate(payload, {
+        onSuccess: () => {
+          toast.success(ar ? "تم حفظ الإعلان" : "Advertisement saved");
+          resetEditor();
+        },
+        onError: (error: any) => {
+          toast.error(error.message);
+        },
+      });
     }
-    resetEditor();
-    loadAll();
   };
 
   const handleDelete = async (id: string) => {
     if (!confirm(ar ? "هل تريد حذف هذا الإعلان؟" : "Delete this advertisement?")) return;
-    const { error } = await supabase.from("job_advertisements").delete().eq("id", id);
-    if (error) { toast.error(error.message); return; }
-    toast.success(ar ? "تم الحذف" : "Deleted");
-    if (editingId === id) resetEditor();
-    loadAll();
+    deleteAdMutation.mutate(id, {
+      onSuccess: () => {
+        toast.success(ar ? "تم الحذف" : "Deleted");
+        if (editingId === id) resetEditor();
+      },
+      onError: (error: any) => {
+        toast.error(error.message);
+      },
+    });
   };
 
   const handlePrint = () => window.print();

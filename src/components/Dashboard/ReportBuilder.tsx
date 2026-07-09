@@ -1,5 +1,4 @@
-import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,6 +12,13 @@ import { Loader2, Save, Play, FileText, Trash2, Sparkles } from "lucide-react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { getFunctionErrorMessage } from "@/lib/functionError";
+import {
+  useReportTemplatesQuery,
+  useSaveReportTemplateMutation,
+  useDeleteReportTemplateMutation,
+  useRunReportTemplateMutation,
+  type ReportTemplate,
+} from "@/hooks/queries/useReportTemplates";
 
 type Scope = "applicants" | "recruitment" | "jobs";
 
@@ -50,16 +56,12 @@ const SCOPE_FIELDS: Record<Scope, { value: string; label: string }[]> = {
   ],
 };
 
-interface Template {
-  id: string;
-  name: string;
-  description: string | null;
-  scope: Scope;
-  config: any;
-}
-
 export default function ReportBuilder() {
-  const [templates, setTemplates] = useState<Template[]>([]);
+  const { data: templates = [] } = useReportTemplatesQuery();
+  const saveTemplateMutation = useSaveReportTemplateMutation();
+  const deleteTemplateMutation = useDeleteReportTemplateMutation();
+  const runReportMutation = useRunReportTemplateMutation();
+
   const [name, setName] = useState("تقرير جديد");
   const [description, setDescription] = useState("");
   const [scope, setScope] = useState<Scope>("applicants");
@@ -69,15 +71,10 @@ export default function ReportBuilder() {
   const [filterValue, setFilterValue] = useState("");
   const [lang, setLang] = useState<"ar" | "en">("ar");
   const [aiInsights, setAiInsights] = useState(true);
-  const [running, setRunning] = useState(false);
   const [lastResult, setLastResult] = useState<any>(null);
-  const [saving, setSaving] = useState(false);
 
-  const loadTemplates = async () => {
-    const { data } = await supabase.from("report_templates").select("*").order("created_at", { ascending: false });
-    setTemplates((data || []) as Template[]);
-  };
-  useEffect(() => { loadTemplates(); }, []);
+  const running = runReportMutation.isPending;
+  const saving = saveTemplateMutation.isPending;
 
   const availableFields = SCOPE_FIELDS[scope];
 
@@ -93,31 +90,30 @@ export default function ReportBuilder() {
 
   const runNow = async () => {
     if (!fields.length) return toast.error("اختر حقلاً واحداً على الأقل");
-    setRunning(true);
     setLastResult(null);
-    const { data, error } = await supabase.functions.invoke("run-recruitment-report", {
-      body: { config: buildConfig() },
+    runReportMutation.mutate(buildConfig(), {
+      onError: async (error) => {
+        toast.error(await getFunctionErrorMessage(error, "فشل إنشاء التقرير"));
+      },
+      onSuccess: (data: any) => {
+        if (data?.error) return toast.error(data.error);
+        setLastResult(data);
+        toast.success("تم إنشاء التقرير");
+      },
     });
-    setRunning(false);
-    if (error) return toast.error(await getFunctionErrorMessage(error, "فشل إنشاء التقرير"));
-    if (data?.error) return toast.error(data.error);
-    setLastResult(data);
-    toast.success("تم إنشاء التقرير");
   };
 
   const saveTemplate = async () => {
-    setSaving(true);
-    const { data: { user } } = await supabase.auth.getUser();
-    const { error } = await supabase.from("report_templates").insert({
-      name, description: description || null, scope, config: buildConfig(), created_by: user?.id,
-    });
-    setSaving(false);
-    if (error) return toast.error(error.message);
-    toast.success("تم حفظ القالب");
-    loadTemplates();
+    saveTemplateMutation.mutate(
+      { name, description: description || null, scope, config: buildConfig() },
+      {
+        onError: (error: any) => toast.error(error.message),
+        onSuccess: () => toast.success("تم حفظ القالب"),
+      }
+    );
   };
 
-  const loadTemplate = (t: Template) => {
+  const loadTemplate = (t: ReportTemplate) => {
     setName(t.name);
     setDescription(t.description || "");
     setScope(t.scope);
@@ -131,9 +127,9 @@ export default function ReportBuilder() {
 
   const deleteTemplate = async (id: string) => {
     if (!confirm("حذف هذا القالب؟")) return;
-    const { error } = await supabase.from("report_templates").delete().eq("id", id);
-    if (error) return toast.error(error.message);
-    loadTemplates();
+    deleteTemplateMutation.mutate(id, {
+      onError: (error: any) => toast.error(error.message),
+    });
   };
 
   const exportPdf = () => {

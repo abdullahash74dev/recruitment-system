@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -12,19 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Plus, Pencil, Trash2, GripVertical, Settings } from "lucide-react";
 import { useDeletePin } from "@/components/DeletePinDialog";
-
-interface CustomQuestion {
-  id: string;
-  question_ar: string;
-  question_en: string | null;
-  type: string;
-  options_ar: string[];
-  options_en: string[];
-  is_required: boolean;
-  step_number: number;
-  sort_order: number;
-  is_active: boolean;
-}
+import { useCustomQuestions, invalidateCustomQuestionsCache, type CustomQuestion } from "@/hooks/useCustomQuestions";
 
 const STEP_LABELS_AR = ["البيانات الأساسية", "التفضيلات الوظيفية", "المؤهل العلمي", "الخبرات والمهارات", "التوقعات المالية", "المرفقات"];
 const STEP_LABELS_EN = ["Basic Info", "Job Preferences", "Education", "Experience & Skills", "Financial", "Attachments"];
@@ -32,7 +20,9 @@ const STEP_LABELS_EN = ["Basic Info", "Job Preferences", "Education", "Experienc
 const CustomQuestionsSettings = () => {
   const { t, lang, dir } = useLanguage();
   const { requestDelete } = useDeletePin();
-  const [questions, setQuestions] = useState<CustomQuestion[]>([]);
+  // Shared with CustomQuestionsStep (public ApplicationForm) so revisiting
+  // this settings tab within the staleTime window costs no extra fetch.
+  const { questions } = useCustomQuestions();
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<CustomQuestion | null>(null);
   const [form, setForm] = useState({
@@ -46,19 +36,6 @@ const CustomQuestionsSettings = () => {
     sort_order: 0,
     is_active: true,
   });
-
-  useEffect(() => {
-    fetchQuestions();
-  }, []);
-
-  const fetchQuestions = async () => {
-    const { data } = await supabase
-      .from("custom_questions")
-      .select("*")
-      .order("step_number", { ascending: true })
-      .order("sort_order", { ascending: true });
-    if (data) setQuestions(data as CustomQuestion[]);
-  };
 
   const openForm = (q?: CustomQuestion) => {
     if (q) {
@@ -118,14 +95,14 @@ const CustomQuestionsSettings = () => {
       const { error } = await supabase.from("custom_questions").update(payload).eq("id", editing.id);
       if (!error) {
         toast.success(t("dash.saved"));
-        fetchQuestions();
+        invalidateCustomQuestionsCache();
         setShowForm(false);
       }
     } else {
       const { error } = await supabase.from("custom_questions").insert(payload);
       if (!error) {
         toast.success(t("dash.saved"));
-        fetchQuestions();
+        invalidateCustomQuestionsCache();
         setShowForm(false);
       }
     }
@@ -136,7 +113,7 @@ const CustomQuestionsSettings = () => {
       message: lang === "ar" ? "سيتم حذف هذا السؤال نهائياً." : "This question will be permanently deleted.",
       onConfirm: async () => {
         const { error } = await supabase.from("custom_questions").delete().eq("id", id);
-        if (!error) { toast.success(t("dash.deleted")); fetchQuestions(); }
+        if (!error) { toast.success(t("dash.deleted")); invalidateCustomQuestionsCache(); }
         else toast.error(error.message);
       },
     });
@@ -144,7 +121,7 @@ const CustomQuestionsSettings = () => {
 
   const toggleActive = async (id: string, active: boolean) => {
     await supabase.from("custom_questions").update({ is_active: active }).eq("id", id);
-    fetchQuestions();
+    invalidateCustomQuestionsCache();
   };
 
   const stepLabels = lang === "ar" ? STEP_LABELS_AR : STEP_LABELS_EN;

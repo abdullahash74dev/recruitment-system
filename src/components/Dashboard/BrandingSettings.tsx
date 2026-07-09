@@ -10,7 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { Slider } from "@/components/ui/slider";
 import { toast } from "sonner";
 import { Palette, Upload, Save, Image, Wand2, Flag, RotateCcw, Check, Globe, Lock } from "lucide-react";
-import { invalidateSiteSettingsCache } from "@/hooks/useSiteSettings";
+import { invalidateSiteSettingsCache, useSiteSettings } from "@/hooks/useSiteSettings";
 import { refreshSiteLogo } from "@/components/SiteLogo";
 import { MAX_INLINE_IMAGE_SIZE, readImageAsDataUrl } from "@/lib/imageUpload";
 import defaultHeroBg from "@/assets/hero-bg.jpg";
@@ -64,6 +64,10 @@ const BrandingSettings = () => {
   const { lang } = useLanguage();
   const ar = lang === "ar";
   const { isPrimaryAdmin } = useUserPermissions();
+  // Seeded once from the shared site_settings cache (shared with useSiteContent/
+  // SiteLogo/JobPageSettings/SiteContentSettings) so revisiting this tab within
+  // the staleTime window costs no extra fetch.
+  const { settings: cachedSettings, loading: settingsLoading } = useSiteSettings();
   const [settings, setSettings] = useState<Settings | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadingHero, setUploadingHero] = useState(false);
@@ -72,11 +76,10 @@ const BrandingSettings = () => {
   const fileRef = useRef<HTMLInputElement>(null);
   const heroFileRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => { fetchSettings(); }, []);
-
-  const fetchSettings = async () => {
-    const { data } = await supabase.from("site_settings").select("*").limit(1).single();
-    if (data) setSettings({
+  useEffect(() => {
+    if (settingsLoading || settings) return;
+    const data = cachedSettings as any;
+    setSettings({
       id: data.id,
       logo_url: data.logo_url,
       primary_color: data.primary_color || "#3b82f6",
@@ -112,7 +115,7 @@ const BrandingSettings = () => {
       show_nationality_on_jobs: (data as any).show_nationality_on_jobs ?? false,
       public_theme_palette: (data as any).public_theme_palette ?? "custom",
     });
-  };
+  }, [settingsLoading, cachedSettings, settings]);
 
   const set = (k: keyof Settings, v: any) => settings && setSettings({ ...settings, [k]: v });
 

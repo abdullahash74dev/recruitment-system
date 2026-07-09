@@ -1,0 +1,156 @@
+/**
+ * Central query key factory. Every cached entity gets its keys defined here so
+ * invalidation across hooks/components stays consistent and typo-proof.
+ */
+export const queryKeys = {
+  applicants: {
+    all: ["applicants"] as const,
+    list: (filters?: Record<string, unknown>) => ["applicants", "list", filters ?? {}] as const,
+    customAnswers: (applicantIds: string[]) => ["applicants", "customAnswers", applicantIds] as const,
+  },
+  jobPostings: {
+    all: ["jobPostings"] as const,
+    list: () => ["jobPostings", "list"] as const,
+  },
+  jobAdvertisements: {
+    all: ["jobAdvertisements"] as const,
+    list: () => ["jobAdvertisements", "list"] as const,
+  },
+  jobCategories: {
+    all: ["jobCategories"] as const,
+    list: () => ["jobCategories", "list"] as const,
+    titleCategories: () => ["jobCategories", "titleCategories"] as const,
+  },
+  projects: {
+    all: ["projects"] as const,
+    list: () => ["projects", "list"] as const,
+  },
+  profiles: {
+    all: ["profiles"] as const,
+    list: () => ["profiles", "list"] as const,
+  },
+  userRoles: {
+    all: ["userRoles"] as const,
+    list: () => ["userRoles", "list"] as const,
+    permissions: (userId?: string) => ["userRoles", "permissions", userId] as const,
+    // Raw permission_key/granted override rows for a target user (admin edit
+    // dialog) — distinct shape from `permissions()`, which returns the merged
+    // effective permission set for the CURRENT session user only.
+    permissionOverrides: (userId: string) => ["userRoles", "permissionOverrides", userId] as const,
+  },
+  auditLog: {
+    all: ["auditLog"] as const,
+    list: () => ["auditLog", "list"] as const,
+  },
+  aiUsage: {
+    log: () => ["aiUsage", "log"] as const,
+    settings: () => ["aiUsage", "settings"] as const,
+  },
+  backupRuns: {
+    all: ["backupRuns"] as const,
+    list: () => ["backupRuns", "list"] as const,
+  },
+  recruitmentCandidates: {
+    all: ["recruitmentCandidates"] as const,
+    list: (projectId?: string) => ["recruitmentCandidates", "list", projectId] as const,
+  },
+  recruitmentProjects: {
+    all: ["recruitmentProjects"] as const,
+    list: () => ["recruitmentProjects", "list"] as const,
+  },
+  recruitmentJobTitles: {
+    all: ["recruitmentJobTitles"] as const,
+    list: () => ["recruitmentJobTitles", "list"] as const,
+    // recruitment_job_title_stats is a DB view derived from this table —
+    // nested under the same key prefix so one invalidation covers both.
+    stats: () => ["recruitmentJobTitles", "stats"] as const,
+  },
+  rejectionReasons: {
+    all: ["rejectionReasons"] as const,
+    list: () => ["rejectionReasons", "list"] as const,
+  },
+  executiveShareLinks: {
+    all: ["executiveShareLinks"] as const,
+    list: () => ["executiveShareLinks", "list"] as const,
+  },
+  valueSynonyms: {
+    all: ["valueSynonyms"] as const,
+    list: () => ["valueSynonyms", "list"] as const,
+  },
+  savedFilters: {
+    all: ["savedFilters"] as const,
+    list: () => ["savedFilters", "list"] as const,
+  },
+  dropdownOptions: {
+    all: ["dropdownOptions"] as const,
+    list: (field?: string) => ["dropdownOptions", "list", field] as const,
+    // Unfiltered (incl. inactive rows + id) shape used by the admin editor —
+    // distinct from `all` (active-only, no id) used by the public form fields.
+    adminAll: ["dropdownOptions", "adminAll"] as const,
+  },
+  fieldConfig: {
+    all: ["fieldConfig"] as const,
+    list: () => ["fieldConfig", "list"] as const,
+  },
+  customQuestions: {
+    all: ["customQuestions"] as const,
+  },
+  siteSettings: {
+    all: ["siteSettings"] as const,
+  },
+  dashboardPreferences: {
+    all: ["dashboardPreferences"] as const,
+    forUser: (userId?: string) => ["dashboardPreferences", userId] as const,
+  },
+  notifications: {
+    all: ["notifications"] as const,
+    list: () => ["notifications", "list"] as const,
+  },
+  reportTemplates: {
+    all: ["reportTemplates"] as const,
+    list: () => ["reportTemplates", "list"] as const,
+    runs: () => ["reportTemplates", "runs"] as const,
+  },
+  scheduledReports: {
+    all: ["scheduledReports"] as const,
+    list: () => ["scheduledReports", "list"] as const,
+  },
+  deletedItems: {
+    all: ["deletedItems"] as const,
+    list: () => ["deletedItems", "list"] as const,
+  },
+  errorLog: {
+    all: ["errorLog"] as const,
+    list: (filters?: Record<string, unknown>) => ["errorLog", "list", filters ?? {}] as const,
+  },
+  systemHealth: {
+    usage: () => ["systemHealth", "usage"] as const,
+  },
+  systemDoctor: {
+    all: ["systemDoctor"] as const,
+    history: () => ["systemDoctor", "history"] as const,
+  },
+  executiveKpis: {
+    all: ["executiveKpis"] as const,
+  },
+  executiveReport: {
+    detail: (token?: string) => ["executiveReport", token] as const,
+  },
+  applicantImportTemplates: {
+    all: ["applicantImportTemplates"] as const,
+    list: () => ["applicantImportTemplates", "list"] as const,
+  },
+  applicantImportJobs: {
+    all: ["applicantImportJobs"] as const,
+    list: () => ["applicantImportJobs", "list"] as const,
+    // Separate filtered read (status="running", limit 1) used to detect a job
+    // left mid-run by a crashed/closed tab — same table, nested under the same
+    // prefix so one invalidation after submit() refreshes both.
+    staleCheck: () => ["applicantImportJobs", "staleCheck"] as const,
+  },
+  storage: {
+    // Signed URL for a private storage object — keyed by path so the same
+    // file shown in multiple places (list + detail view) costs one fetch.
+    signedUrl: (path: string) => ["storage", "signedUrl", path] as const,
+  },
+} as const;

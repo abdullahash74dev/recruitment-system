@@ -1,19 +1,7 @@
-import { useEffect, useState } from "react";
+import { useMemo } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { supabase } from "@/integrations/supabase/client";
+import { useCustomQuestions } from "@/hooks/useCustomQuestions";
 import FormField from "../FormField";
-
-interface CustomQuestion {
-  id: string;
-  question_ar: string;
-  question_en: string | null;
-  type: string;
-  options_ar: string[];
-  options_en: string[];
-  is_required: boolean;
-  step_number: number;
-  sort_order: number;
-}
 
 interface Props {
   stepNumber: number;
@@ -23,20 +11,13 @@ interface Props {
 
 const CustomQuestionsStep = ({ stepNumber, data, onChange }: Props) => {
   const { lang } = useLanguage();
-  const [questions, setQuestions] = useState<CustomQuestion[]>([]);
-
-  useEffect(() => {
-    const fetchQuestions = async () => {
-      const { data: qs } = await supabase
-        .from("custom_questions")
-        .select("*")
-        .eq("is_active", true)
-        .eq("step_number", stepNumber)
-        .order("sort_order", { ascending: true });
-      if (qs) setQuestions(qs as CustomQuestion[]);
-    };
-    fetchQuestions();
-  }, [stepNumber]);
+  // Shared with CustomQuestionsSettings (admin editor) so revisiting this
+  // step within the staleTime window costs no extra fetch.
+  const { questions: allQuestions } = useCustomQuestions();
+  const questions = useMemo(
+    () => allQuestions.filter(q => q.is_active && q.step_number === stepNumber),
+    [allQuestions, stepNumber],
+  );
 
   if (questions.length === 0) return null;
 

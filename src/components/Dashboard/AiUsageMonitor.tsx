@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -6,68 +6,28 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Activity, AlertTriangle, CreditCard, ExternalLink, RefreshCw, Sparkles, Zap } from "lucide-react";
-
-interface UsageSetting {
-  id: string;
-  service: string;
-  display_name_ar: string;
-  display_name_en: string | null;
-  monthly_cap_usd: number;
-  warn_threshold_pct: number;
-  hard_stop: boolean;
-}
-
-interface ServiceStat {
-  service: string;
-  totalCost: number;
-  totalCalls: number;
-  totalTokens: number;
-  errors: number;
-  lastUsed: string | null;
-}
+import { useAiUsageLogQuery, useUpdateAiUsageSettingMutation, type ServiceStat, type UsageSetting } from "@/hooks/queries/useAiUsage";
 
 export const AiUsageMonitor = ({ lang }: { lang: "ar" | "en" }) => {
   const isAr = lang === "ar";
-  const [settings, setSettings] = useState<UsageSetting[]>([]);
-  const [stats, setStats] = useState<Record<string, ServiceStat>>({});
-  const [loading, setLoading] = useState(true);
+  const { data, isLoading: loading, refetch } = useAiUsageLogQuery();
+  const settings = data?.settings || [];
+  const stats: Record<string, ServiceStat> = data?.stats || {};
   const [savingId, setSavingId] = useState<string | null>(null);
-
-  const monthStart = (() => { const d = new Date(); d.setDate(1); d.setHours(0, 0, 0, 0); return d.toISOString(); })();
-
-  const fetchAll = async () => {
-    setLoading(true);
-    const [{ data: s }, { data: logs }] = await Promise.all([
-      supabase.from("ai_usage_settings").select("*").order("service"),
-      supabase.from("ai_usage_log").select("service,estimated_cost_usd,total_tokens,status,created_at").gte("created_at", monthStart),
-    ]);
-    setSettings((s as any) || []);
-    const map: Record<string, ServiceStat> = {};
-    for (const l of (logs as any[]) || []) {
-      const k = l.service;
-      if (!map[k]) map[k] = { service: k, totalCost: 0, totalCalls: 0, totalTokens: 0, errors: 0, lastUsed: null };
-      map[k].totalCost += Number(l.estimated_cost_usd || 0);
-      map[k].totalTokens += Number(l.total_tokens || 0);
-      map[k].totalCalls += 1;
-      if (l.status !== "success") map[k].errors += 1;
-      if (!map[k].lastUsed || l.created_at > map[k].lastUsed) map[k].lastUsed = l.created_at;
-    }
-    setStats(map);
-    setLoading(false);
-  };
-
-  useEffect(() => { fetchAll(); }, []);
+  const updateCapMutation = useUpdateAiUsageSettingMutation();
 
   const updateCap = async (row: UsageSetting, patch: Partial<UsageSetting>) => {
     setSavingId(row.id);
-    const { error } = await supabase.from("ai_usage_settings").update(patch).eq("id", row.id);
-    setSavingId(null);
-    if (error) { toast.error(isAr ? "تعذر الحفظ" : "Save failed"); return; }
-    toast.success(isAr ? "تم الحفظ" : "Saved");
-    fetchAll();
+    try {
+      await updateCapMutation.mutateAsync({ row, patch });
+      toast.success(isAr ? "تم الحفظ" : "Saved");
+    } catch {
+      toast.error(isAr ? "تعذر الحفظ" : "Save failed");
+    } finally {
+      setSavingId(null);
+    }
   };
 
   const totalSpend = Object.values(stats).reduce((s, x) => s + x.totalCost, 0);
@@ -106,7 +66,7 @@ export const AiUsageMonitor = ({ lang }: { lang: "ar" | "en" }) => {
 
       <div className="flex items-center justify-between">
         <h3 className="font-bold text-lg">{isAr ? "خدمات الذكاء الاصطناعي" : "AI Services"}</h3>
-        <Button variant="outline" size="sm" onClick={fetchAll} disabled={loading} className="gap-1"><RefreshCw className={`w-3 h-3 ${loading ? "animate-spin" : ""}`} />{isAr ? "تحديث" : "Refresh"}</Button>
+        <Button variant="outline" size="sm" onClick={() => refetch()} disabled={loading} className="gap-1"><RefreshCw className={`w-3 h-3 ${loading ? "animate-spin" : ""}`} />{isAr ? "تحديث" : "Refresh"}</Button>
       </div>
 
       {/* Per-service cards */}

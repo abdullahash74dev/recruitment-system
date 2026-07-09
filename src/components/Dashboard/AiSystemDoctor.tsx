@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { queryClient } from "@/lib/queryClient";
+import { queryKeys } from "@/lib/queryKeys";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -46,13 +49,27 @@ const SEV_COLOR: Record<string, string> = {
 
 const scoreColorFor = (score: number) => (score >= 80 ? "text-green-500" : score >= 60 ? "text-amber-500" : "text-destructive");
 
+async function fetchDoctorHistory(): Promise<DoctorRun[]> {
+  const { data } = await supabase.from("system_doctor_runs")
+    .select("id, health_score, summary, issues, recommendations, analyzed_count, client_error_count, triggered_by, created_at")
+    .order("created_at", { ascending: false })
+    .limit(10);
+  return (data as DoctorRun[]) || [];
+}
+
 const AiSystemDoctor = () => {
   const { lang } = useLanguage();
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<DoctorResult | null>(null);
-  const [history, setHistory] = useState<DoctorRun[]>([]);
   const clientErrorsRef = useRef<{ message: string; source?: string; ts: string }[]>([]);
   const locale = lang === "ar" ? arLocale : enUS;
+
+  // Shared singleton-bound cache so other admin panels visiting this tab
+  // within the staleTime window don't pay for a second fetch.
+  const { data: history = [], refetch: refetchHistory } = useQuery(
+    { queryKey: queryKeys.systemDoctor.history(), queryFn: fetchDoctorHistory },
+    queryClient,
+  );
 
   // Capture browser errors in real-time
   useEffect(() => {
@@ -72,26 +89,17 @@ const AiSystemDoctor = () => {
     };
   }, []);
 
-  const loadHistory = async () => {
-    const { data } = await supabase.from("system_doctor_runs")
-      .select("id, health_score, summary, issues, recommendations, analyzed_count, client_error_count, triggered_by, created_at")
-      .order("created_at", { ascending: false })
-      .limit(10);
-    const rows = (data as DoctorRun[]) || [];
-    setHistory(rows);
-    if (rows.length > 0) {
-      setResult((prev) => prev ?? {
-        health_score: rows[0].health_score ?? undefined,
-        summary: rows[0].summary ?? undefined,
-        issues: rows[0].issues ?? [],
-        recommendations: rows[0].recommendations ?? [],
-        analyzed_count: rows[0].analyzed_count,
-        client_error_count: rows[0].client_error_count,
-      });
-    }
-  };
-
-  useEffect(() => { loadHistory(); }, []);
+  useEffect(() => {
+    if (history.length === 0) return;
+    setResult((prev) => prev ?? {
+      health_score: history[0].health_score ?? undefined,
+      summary: history[0].summary ?? undefined,
+      issues: history[0].issues ?? [],
+      recommendations: history[0].recommendations ?? [],
+      analyzed_count: history[0].analyzed_count,
+      client_error_count: history[0].client_error_count,
+    });
+  }, [history]);
 
   const runDiagnosis = async () => {
     setLoading(true);
@@ -104,7 +112,7 @@ const AiSystemDoctor = () => {
       if (data?.error === "credits_exhausted") { toast.error(lang === "ar" ? "نفدت الأرصدة" : "Credits exhausted"); return; }
       setResult(data);
       toast.success(lang === "ar" ? "اكتمل الفحص" : "Diagnosis complete");
-      loadHistory();
+      refetchHistory();
     } catch (e: any) {
       toast.error(e.message || "Error");
     } finally {

@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { queryKeys } from "@/lib/queryKeys";
 
 // ===== Permission keys, grouped =====
 export const PERMISSION_GROUPS = [
@@ -111,50 +112,54 @@ const ROLE_DEFAULTS: Record<string, PermissionKey[]> = {
 
 export const getDefaultPermissions = (role: string): PermissionKey[] => ROLE_DEFAULTS[role] || [];
 
-export const useUserPermissions = () => {
-  const [permissions, setPermissions] = useState<Record<string, boolean>>({});
-  const [loading, setLoading] = useState(true);
-  const [role, setRole] = useState<string | null>(null);
+interface PermissionsData {
+  role: string | null;
+  permissions: Record<string, boolean>;
   // The "primary admin" is the longest-standing admin account. Only this
   // account may change the public-facing site's color theme.
-  const [isPrimaryAdmin, setIsPrimaryAdmin] = useState(false);
+  isPrimaryAdmin: boolean;
+}
 
-  useEffect(() => { loadPermissions(); }, []);
+async function fetchPermissions(): Promise<PermissionsData> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { role: null, permissions: {}, isPrimaryAdmin: false };
 
-  const loadPermissions = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) { setLoading(false); return; }
+  const { data: roleData } = await supabase.from("user_roles").select("role").eq("user_id", user.id).maybeSingle();
+  const userRole = roleData?.role || "";
+  const defaults = getDefaultPermissions(userRole);
 
-    const { data: roleData } = await supabase.from("user_roles").select("role").eq("user_id", user.id).maybeSingle();
-    const userRole = roleData?.role || "";
-    setRole(userRole);
-    const defaults = getDefaultPermissions(userRole);
+  const { data: customPerms } = await supabase.from("user_permissions").select("permission_key, granted").eq("user_id", user.id);
+  const overrides: Record<string, boolean> = {};
+  customPerms?.forEach((p: any) => { overrides[p.permission_key] = p.granted; });
 
-    const { data: customPerms } = await supabase.from("user_permissions").select("permission_key, granted").eq("user_id", user.id);
-    const overrides: Record<string, boolean> = {};
-    customPerms?.forEach((p: any) => { overrides[p.permission_key] = p.granted; });
+  const permissions: Record<string, boolean> = {};
+  ALL_PERMISSIONS.forEach(key => {
+    permissions[key] = key in overrides ? overrides[key] : defaults.includes(key);
+  });
 
-    const result: Record<string, boolean> = {};
-    ALL_PERMISSIONS.forEach(key => {
-      result[key] = key in overrides ? overrides[key] : defaults.includes(key);
-    });
+  let isPrimaryAdmin = false;
+  if (userRole === "admin") {
+    const { data: primary } = await supabase.rpc("am_i_primary_admin");
+    isPrimaryAdmin = !!primary;
+  }
 
-    setPermissions(result);
+  return { role: userRole, permissions, isPrimaryAdmin };
+}
 
-    if (userRole === "admin") {
-      const { data: primary } = await supabase.rpc("am_i_primary_admin");
-      setIsPrimaryAdmin(!!primary);
-    } else {
-      setIsPrimaryAdmin(false);
-    }
+export const useUserPermissions = () => {
+  const query = useQuery({
+    queryKey: queryKeys.userRoles.permissions(),
+    queryFn: fetchPermissions,
+  });
 
-    setLoading(false);
-  };
+  const role = query.data?.role ?? null;
+  const permissions = query.data?.permissions ?? {};
+  const isPrimaryAdmin = query.data?.isPrimaryAdmin ?? false;
 
   const hasPermission = (key: PermissionKey): boolean => {
     if (role === "admin") return true;
     return permissions[key] ?? false;
   };
 
-  return { permissions, loading, role, isPrimaryAdmin, hasPermission, reload: loadPermissions };
+  return { permissions, loading: query.isLoading, role, isPrimaryAdmin, hasPermission, reload: query.refetch };
 };

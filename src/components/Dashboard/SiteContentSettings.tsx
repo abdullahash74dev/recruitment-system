@@ -9,18 +9,21 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { Save, Type, BarChart3, Sparkles } from "lucide-react";
-import { invalidateSiteSettingsCache } from "@/hooks/useSiteSettings";
+import { invalidateSiteSettingsCache, useSiteSettings } from "@/hooks/useSiteSettings";
 
 const SiteContentSettings = () => {
   const { lang } = useLanguage();
+  // Seeded once from the shared site_settings cache (shared with BrandingSettings/
+  // JobPageSettings/SiteLogo) so revisiting this tab within the staleTime window
+  // costs no extra fetch.
+  const { settings: cachedSettings, loading: settingsLoading } = useSiteSettings();
   const [settings, setSettings] = useState<Record<string, any> | null>(null);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    supabase.from("site_settings").select("*").limit(1).single().then(({ data }) => {
-      if (data) setSettings(data);
-    });
-  }, []);
+    if (settingsLoading || settings) return;
+    setSettings(cachedSettings as any);
+  }, [settingsLoading, cachedSettings, settings]);
 
   const save = async () => {
     if (!settings) return;

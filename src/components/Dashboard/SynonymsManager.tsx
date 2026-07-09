@@ -8,11 +8,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Loader2, Sparkles, Trash2, Plus, RefreshCw, ShieldAlert } from "lucide-react";
-import { useValueSynonyms, normText } from "@/hooks/useValueSynonyms";
+import { useValueSynonyms, normText, type SynonymRow } from "@/hooks/useValueSynonyms";
 import ApplyNormalizationDialog from "./ApplyNormalizationDialog";
 import { getFunctionErrorMessage } from "@/lib/functionError";
 
-type Row = { id: string; field_name: string; canonical_ar: string; canonical_en: string | null; synonyms: string[]; is_active: boolean };
+type Row = SynonymRow;
 
 const FIELD_OPTIONS = [
   { value: "education_level", label: "المستوى التعليمي", table: "applicants", column: "education_level" },
@@ -39,8 +39,10 @@ const FIELD_OPTIONS = [
 ];
 
 export default function SynonymsManager() {
-  const [rows, setRows] = useState<Row[]>([]);
-  const [loading, setLoading] = useState(true);
+  // Shared with AnalyticsHub/AdvancedAnalytics/ApplicantsAdvancedFilters so
+  // revisiting this settings tab within the staleTime window costs no extra
+  // fetch. Mutations below call refresh() to force a fresh read afterwards.
+  const { rows, isLoading: loading, refresh: refreshSynCache } = useValueSynonyms();
   const [aiBusy, setAiBusy] = useState(false);
   const [activeField, setActiveField] = useState(FIELD_OPTIONS[0].value);
   const [newAr, setNewAr] = useState("");
@@ -52,15 +54,6 @@ export default function SynonymsManager() {
   const [liveLoading, setLiveLoading] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [targetRowId, setTargetRowId] = useState<string>("__new__");
-  const { refresh: refreshSynCache } = useValueSynonyms();
-
-  const load = async () => {
-    setLoading(true);
-    const { data } = await supabase.from("value_synonyms").select("*").order("field_name").order("canonical_ar");
-    setRows((data || []) as Row[]);
-    setLoading(false);
-    refreshSynCache();
-  };
 
   const loadLiveValues = async () => {
     const opt = FIELD_OPTIONS.find(f => f.value === activeField);
@@ -80,10 +73,12 @@ export default function SynonymsManager() {
     setLiveLoading(false);
   };
 
-  useEffect(() => { load(); }, []);
   useEffect(() => { loadLiveValues(); setSelected(new Set()); setTargetRowId("__new__"); }, [activeField]);
 
-  const filtered = rows.filter(r => r.field_name === activeField);
+  const filtered = useMemo(
+    () => rows.filter(r => r.field_name === activeField).sort((a, b) => a.canonical_ar.localeCompare(b.canonical_ar)),
+    [rows, activeField],
+  );
 
   // Values not yet covered by any synonym of any row for this field
   const unmatchedValues = useMemo(() => {
@@ -139,7 +134,7 @@ export default function SynonymsManager() {
     if (error) return toast.error(error.message);
     toast.success(`تمت إضافة ${values.length} قيمة إلى "${target.canonical_ar}"`);
     setSelected(new Set());
-    load();
+    refreshSynCache();
   };
 
   const addRow = async () => {
@@ -151,21 +146,21 @@ export default function SynonymsManager() {
     if (error) return toast.error(error.message);
     setNewAr(""); setNewEn(""); setNewSyn(""); setSelected(new Set());
     toast.success("تمت الإضافة");
-    load();
+    refreshSynCache();
   };
 
   const removeRow = async (id: string) => {
     if (!confirm("حذف هذا المرادف؟")) return;
     const { error } = await supabase.from("value_synonyms").delete().eq("id", id);
     if (error) return toast.error(error.message);
-    load();
+    refreshSynCache();
   };
 
   const updateSyns = async (id: string, syns: string) => {
     const synonyms = syns.split(",").map(s => s.trim()).filter(Boolean);
     const { error } = await supabase.from("value_synonyms").update({ synonyms }).eq("id", id);
     if (error) return toast.error(error.message);
-    load();
+    refreshSynCache();
   };
 
   const aiSuggest = async () => {
@@ -178,7 +173,7 @@ export default function SynonymsManager() {
     setAiBusy(false);
     if (error) return toast.error(await getFunctionErrorMessage(error, "فشل الاقتراح بالذكاء الاصطناعي"));
     toast.success(`تم اقتراح وحفظ ${data?.groups?.length || 0} مجموعة`);
-    load();
+    refreshSynCache();
   };
 
   const [applyOpen, setApplyOpen] = useState(false);

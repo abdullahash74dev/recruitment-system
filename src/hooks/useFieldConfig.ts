@@ -1,5 +1,7 @@
-import { useState, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { queryClient } from "@/lib/queryClient";
+import { queryKeys } from "@/lib/queryKeys";
 import type { Lang } from "@/contexts/LanguageContext";
 
 export interface FieldConfig {
@@ -13,28 +15,28 @@ export interface FieldConfig {
   sort_order: number;
 }
 
-let cachedConfig: FieldConfig[] | null = null;
-
-export const fetchFieldConfig = async (): Promise<FieldConfig[]> => {
-  if (cachedConfig) return cachedConfig;
+async function fetchFieldConfigRaw(): Promise<FieldConfig[]> {
   const { data } = await supabase
     .from("form_field_config")
     .select("*")
     .order("step_number", { ascending: true })
     .order("sort_order", { ascending: true });
-  cachedConfig = (data as FieldConfig[]) || [];
-  return cachedConfig;
-};
+  return (data as FieldConfig[]) || [];
+}
 
-export const invalidateFieldConfigCache = () => { cachedConfig = null; };
+export const fetchFieldConfig = (): Promise<FieldConfig[]> =>
+  queryClient.fetchQuery({ queryKey: queryKeys.fieldConfig.all, queryFn: fetchFieldConfigRaw });
+
+export const invalidateFieldConfigCache = () =>
+  queryClient.invalidateQueries({ queryKey: queryKeys.fieldConfig.all });
 
 export const useFieldConfig = () => {
-  const [fields, setFields] = useState<FieldConfig[]>([]);
-  const [loaded, setLoaded] = useState(false);
-
-  useEffect(() => {
-    fetchFieldConfig().then((f) => { setFields(f); setLoaded(true); });
-  }, []);
+  // Bound directly to the singleton queryClient (not context) so this shares
+  // the cache with fetchFieldConfig/invalidateFieldConfigCache even outside a
+  // QueryClientProvider (e.g. in tests).
+  const query = useQuery({ queryKey: queryKeys.fieldConfig.all, queryFn: fetchFieldConfigRaw }, queryClient);
+  const fields = query.data ?? [];
+  const loaded = query.isSuccess;
 
   const isVisible = (fieldName: string): boolean => {
     const f = fields.find(c => c.field_name === fieldName);
