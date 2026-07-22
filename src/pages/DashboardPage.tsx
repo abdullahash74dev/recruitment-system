@@ -862,7 +862,7 @@ const DashboardPage = () => {
               </div>
             )}
             <ApplicantsAdvancedFilters
-              applicants={activeApplicants}
+              applicants={filtered}
               lang={lang}
               filters={advFilters}
               setFilters={setAdvFilters}
