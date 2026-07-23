@@ -581,16 +581,18 @@ const DashboardPage = () => {
     ? "انتظر اكتمال تحميل كل بيانات المتقدمين لاستخدام هذه الميزة"
     : "Wait for all applicants data to finish loading to use this feature");
 
+  const searchStatusFiltered = useMemo(() => activeApplicants.filter(a => {
+    const matchSearch = a.full_name.toLowerCase().includes(searchTermDebounced.toLowerCase()) ||
+      (a.desired_position || "").toLowerCase().includes(searchTermDebounced.toLowerCase());
+    const matchStatus = filterStatus === "all" || a.status === filterStatus;
+    return matchSearch && matchStatus;
+  }), [activeApplicants, searchTermDebounced, filterStatus]);
+
   const filtered = useMemo(() => applyAdvancedFilters(
-    activeApplicants.filter(a => {
-      const matchSearch = a.full_name.toLowerCase().includes(searchTermDebounced.toLowerCase()) ||
-        (a.desired_position || "").toLowerCase().includes(searchTermDebounced.toLowerCase());
-      const matchStatus = filterStatus === "all" || a.status === filterStatus;
-      return matchSearch && matchStatus;
-    }),
+    searchStatusFiltered,
     advFilters,
     aiSelectedIds,
-  ), [activeApplicants, searchTermDebounced, filterStatus, advFilters, aiSelectedIds]);
+  ), [searchStatusFiltered, advFilters, aiSelectedIds]);
 
   const filteredArchived = useMemo(() => archivedApplicants.filter(a => {
     const matchSearch = a.full_name.toLowerCase().includes(searchTermDebounced.toLowerCase()) ||
@@ -863,6 +865,7 @@ const DashboardPage = () => {
             )}
             <ApplicantsAdvancedFilters
               applicants={filtered}
+              baseApplicants={searchStatusFiltered}
               lang={lang}
               filters={advFilters}
               setFilters={setAdvFilters}

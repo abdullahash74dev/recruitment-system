@@ -77,6 +77,7 @@ export type AdvancedFilter = { field: string; value: string };
 
 interface Props {
   applicants: any[];
+  baseApplicants: any[];
   lang: "ar" | "en";
   filters: AdvancedFilter[];
   setFilters: (f: AdvancedFilter[]) => void;
@@ -89,7 +90,7 @@ interface Props {
 }
 
 export default function ApplicantsAdvancedFilters({
-  applicants, lang, filters, setFilters,
+  applicants, baseApplicants, lang, filters, setFilters,
   aiSelectedIds, setAiSelectedIds, aiSummary, setAiSummary, locked, isAdmin,
 }: Props) {
   const [newField, setNewField] = useState<string>("nationality");
@@ -105,10 +106,19 @@ export default function ApplicantsAdvancedFilters({
     return m;
   }, [applicants]);
 
+  // Source for filter options: apply all active filters EXCEPT the field currently
+  // being picked, so the user can always see (and add) values from sibling results
+  // without the current field's own filter narrowing the option list.
+  const valuesSource = useMemo(() => {
+    const otherFilters = filters.filter(f => f.field !== newField);
+    if (otherFilters.length === 0) return baseApplicants;
+    return applyAdvancedFilters(baseApplicants, otherFilters, null);
+  }, [baseApplicants, filters, newField]);
+
   // Distinct values per field (from existing data) with counts
   const distinctValues = useMemo(() => {
     const counts = new Map<string, number>();
-    applicants.forEach((a) => {
+    valuesSource.forEach((a) => {
       const v = a[newField];
       if (v != null && String(v).trim() !== "") {
         const key = String(v).trim();
@@ -118,7 +128,7 @@ export default function ApplicantsAdvancedFilters({
     return Array.from(counts.entries())
       .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
       .map(([value, count]) => ({ value, count }));
-  }, [applicants, newField]);
+  }, [valuesSource, newField]);
 
   const filteredDistinct = useMemo(() => {
     const q = valueSearch.trim().toLowerCase();
