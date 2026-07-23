@@ -1,5 +1,6 @@
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
-import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
+import { createAsyncStoragePersister } from "@tanstack/query-async-storage-persister";
+import localforage from "localforage";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
@@ -31,8 +32,11 @@ import { DeletePinProvider } from "@/components/DeletePinDialog";
 // shape never survives a release (bump alongside meaningful schema changes).
 const CACHE_BUSTER = "v1";
 
-const persister = createSyncStoragePersister({
-  storage: window.localStorage,
+// IndexedDB persister — no size limit (unlike localStorage's 5 MB cap),
+// async so large cache writes never block the main thread.
+localforage.config({ name: "akg", storeName: "query-cache" });
+const persister = createAsyncStoragePersister({
+  storage: localforage,
   key: "akg-query-cache",
 });
 
