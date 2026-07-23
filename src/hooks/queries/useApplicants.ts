@@ -175,8 +175,8 @@ export function useApplicantsQuery(lang: "ar" | "en") {
       setLoadProgress({ loaded: 0, total: 0 });
       return fetchApplicantsProgressive(queryClient, setLoadProgress, () => setIsInitialLoading(false), lang);
     },
-    staleTime: Infinity,
-    meta: { persist: false },
+    staleTime: 10 * 60 * 1000, // 10 min — shows cached instantly, refetches in background after that
+    gcTime: 24 * 60 * 60 * 1000,
   });
 
   return {
