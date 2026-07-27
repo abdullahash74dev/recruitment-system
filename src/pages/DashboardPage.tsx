@@ -56,6 +56,7 @@ import ApplicantsAdvancedFilters, { AdvancedFilter, applyAdvancedFilters } from 
 import { Checkbox } from "@/components/ui/checkbox";
 import { useUserPermissions } from "@/hooks/useUserPermissions";
 import AiSystemDoctor from "@/components/Dashboard/AiSystemDoctor";
+import SystemTests from "@/components/Dashboard/SystemTests";
 import { AiUsageMonitor } from "@/components/Dashboard/AiUsageMonitor";
 import AiProviderSettings from "@/components/Dashboard/AiProviderSettings";
 import AiInsightsPanel from "@/components/Dashboard/AiInsightsPanel";
@@ -70,7 +71,7 @@ import AINetworkBackground from "@/components/AINetworkBackground";
 import AuroraBackground from "@/components/AuroraBackground";
 import type { ApplicantEmailStatus } from "@/lib/applicantEmailTemplates";
 import { STATUSES_WITH_EMAIL } from "@/lib/applicantEmailTemplates";
-import { Mail, Activity, Bot, UserCog, Target, Globe, Menu, Palette, ListChecks } from "lucide-react";
+import { Mail, Activity, Bot, UserCog, Target, Globe, Menu, Palette, ListChecks, FlaskConical } from "lucide-react";
 import DashboardSidebar, { type DashboardNavGroup } from "@/components/Dashboard/DashboardSidebar";
 import DashboardSidebarFuturistic from "@/components/Dashboard/DashboardSidebarFuturistic";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -717,6 +718,7 @@ const DashboardPage = () => {
   if (tabAllowed("tab.backup")) systemItems.push({ value: "backup", label: lang === "ar" ? "نسخ احتياطي" : "Backup", icon: Database });
   if (tabAllowed("tab.auditlog")) systemItems.push({ value: "auditlog", label: lang === "ar" ? "سجل النظام" : "System Log", icon: Shield });
   if (isAdmin) systemItems.push({ value: "system_health", label: lang === "ar" ? "صحة النظام" : "System Health", icon: Activity });
+  if (isAdmin) systemItems.push({ value: "system_tests", label: lang === "ar" ? "اختبارات النظام" : "System Tests", icon: FlaskConical });
   if (tabAllowed("tab.trash")) systemItems.push({ value: "trash", label: lang === "ar" ? "سلة المحذوفات" : "Trash", icon: Trash2 });
   if (systemItems.length) navGroups.push({ id: "system", title: lang === "ar" ? "النظام" : "System", items: systemItems });
 
@@ -1422,6 +1424,10 @@ const DashboardPage = () => {
 
           <TabsContent value="system_health">
             <SystemHealth />
+          </TabsContent>
+
+          <TabsContent value="system_tests">
+            <SystemTests lang={lang} />
           </TabsContent>
 
           <TabsContent value="rejection_reasons">
