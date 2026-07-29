@@ -57,6 +57,10 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useUserPermissions } from "@/hooks/useUserPermissions";
 import AiSystemDoctor from "@/components/Dashboard/AiSystemDoctor";
 import SystemTests from "@/components/Dashboard/SystemTests";
+import InterviewScheduler from "@/components/Dashboard/InterviewScheduler";
+import InterviewScorecards from "@/components/Dashboard/InterviewScorecards";
+import OfferLetters from "@/components/Dashboard/OfferLetters";
+import TalentPool from "@/components/Dashboard/TalentPool";
 import { AiUsageMonitor } from "@/components/Dashboard/AiUsageMonitor";
 import AiProviderSettings from "@/components/Dashboard/AiProviderSettings";
 import AiInsightsPanel from "@/components/Dashboard/AiInsightsPanel";
@@ -71,7 +75,7 @@ import AINetworkBackground from "@/components/AINetworkBackground";
 import AuroraBackground from "@/components/AuroraBackground";
 import type { ApplicantEmailStatus } from "@/lib/applicantEmailTemplates";
 import { STATUSES_WITH_EMAIL } from "@/lib/applicantEmailTemplates";
-import { Mail, Activity, Bot, UserCog, Target, Globe, Menu, Palette, ListChecks, FlaskConical } from "lucide-react";
+import { Mail, Activity, Bot, UserCog, Target, Globe, Menu, Palette, ListChecks, FlaskConical, CalendarDays, Star, FileCheck, Users2 } from "lucide-react";
 import DashboardSidebar, { type DashboardNavGroup } from "@/components/Dashboard/DashboardSidebar";
 import DashboardSidebarFuturistic from "@/components/Dashboard/DashboardSidebarFuturistic";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -699,6 +703,10 @@ const DashboardPage = () => {
   if (tabAllowed("tab.recruitment")) recruitmentItems.push({ value: "recruitment", label: lang === "ar" ? "إدارة التوظيف" : "Recruitment", icon: Target });
   if (tabAllowed("tab.rejection_reasons")) recruitmentItems.push({ value: "rejection_reasons", label: lang === "ar" ? "أسباب الرفض" : "Rejection Reasons", icon: Mail });
   if (tabAllowed("tab.jobpage")) recruitmentItems.push({ value: "jobpage", label: lang === "ar" ? "صفحة الوظائف" : "Job Page", icon: Globe });
+  if (isAdmin) recruitmentItems.push({ value: "interviews", label: lang === "ar" ? "جدولة المقابلات" : "Interviews", icon: CalendarDays });
+  if (isAdmin) recruitmentItems.push({ value: "scorecards", label: lang === "ar" ? "تقييمات المقابلة" : "Scorecards", icon: Star });
+  if (isAdmin) recruitmentItems.push({ value: "offer_letters", label: lang === "ar" ? "عروض التوظيف" : "Offer Letters", icon: FileCheck });
+  if (isAdmin) recruitmentItems.push({ value: "talent_pool", label: lang === "ar" ? "مجمع المواهب" : "Talent Pool", icon: Users2 });
   if (recruitmentItems.length) navGroups.push({ id: "recruitment", title: lang === "ar" ? "التوظيف" : "Recruitment", items: recruitmentItems });
 
   const managementItems: DashboardNavGroup["items"] = [];
@@ -1428,6 +1436,22 @@ const DashboardPage = () => {
 
           <TabsContent value="system_tests">
             <SystemTests lang={lang} />
+          </TabsContent>
+
+          <TabsContent value="interviews">
+            <InterviewScheduler />
+          </TabsContent>
+
+          <TabsContent value="scorecards">
+            <InterviewScorecards />
+          </TabsContent>
+
+          <TabsContent value="offer_letters">
+            <OfferLetters />
+          </TabsContent>
+
+          <TabsContent value="talent_pool">
+            <TalentPool />
           </TabsContent>
 
           <TabsContent value="rejection_reasons">
