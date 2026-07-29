@@ -115,6 +115,10 @@ export const queryKeys = {
     all: ["scheduledReports"] as const,
     list: () => ["scheduledReports", "list"] as const,
   },
+  interviews: {
+    all: ["interviews"] as const,
+    list: () => ["interviews", "list"] as const,
+  },
   deletedItems: {
     all: ["deletedItems"] as const,
     list: () => ["deletedItems", "list"] as const,
@@ -152,5 +156,17 @@ export const queryKeys = {
     // Signed URL for a private storage object — keyed by path so the same
     // file shown in multiple places (list + detail view) costs one fetch.
     signedUrl: (path: string) => ["storage", "signedUrl", path] as const,
+  },
+  scorecards: {
+    all: ["scorecards"] as const,
+    list: () => ["scorecards", "list"] as const,
+  },
+  offerLetters: {
+    all: ["offerLetters"] as const,
+    list: () => ["offerLetters", "list"] as const,
+  },
+  talentPool: {
+    all: ["talentPool"] as const,
+    list: () => ["talentPool", "list"] as const,
   },
 } as const;
