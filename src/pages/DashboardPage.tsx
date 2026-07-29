@@ -61,6 +61,14 @@ import InterviewScheduler from "@/components/Dashboard/InterviewScheduler";
 import InterviewScorecards from "@/components/Dashboard/InterviewScorecards";
 import OfferLetters from "@/components/Dashboard/OfferLetters";
 import TalentPool from "@/components/Dashboard/TalentPool";
+import JobRequisitions from "@/components/Dashboard/JobRequisitions";
+import ReferralProgram from "@/components/Dashboard/ReferralProgram";
+import SLADashboard from "@/components/Dashboard/SLADashboard";
+import RecruiterAssignment from "@/components/Dashboard/RecruiterAssignment";
+import OnboardingModule from "@/components/Dashboard/OnboardingModule";
+import BudgetTracking from "@/components/Dashboard/BudgetTracking";
+import GDPRTools from "@/components/Dashboard/GDPRTools";
+import PipelineAutomation from "@/components/Dashboard/PipelineAutomation";
 import { AiUsageMonitor } from "@/components/Dashboard/AiUsageMonitor";
 import AiProviderSettings from "@/components/Dashboard/AiProviderSettings";
 import AiInsightsPanel from "@/components/Dashboard/AiInsightsPanel";
@@ -75,7 +83,7 @@ import AINetworkBackground from "@/components/AINetworkBackground";
 import AuroraBackground from "@/components/AuroraBackground";
 import type { ApplicantEmailStatus } from "@/lib/applicantEmailTemplates";
 import { STATUSES_WITH_EMAIL } from "@/lib/applicantEmailTemplates";
-import { Mail, Activity, Bot, UserCog, Target, Globe, Menu, Palette, ListChecks, FlaskConical, CalendarDays, Star, FileCheck, Users2 } from "lucide-react";
+import { Mail, Activity, Bot, UserCog, Target, Globe, Menu, Palette, ListChecks, FlaskConical, CalendarDays, Star, FileCheck, Users2, UserPlus2, ClipboardList, Timer, UserCog2, GraduationCap, DollarSign, ShieldCheck, Zap } from "lucide-react";
 import DashboardSidebar, { type DashboardNavGroup } from "@/components/Dashboard/DashboardSidebar";
 import DashboardSidebarFuturistic from "@/components/Dashboard/DashboardSidebarFuturistic";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -707,12 +715,19 @@ const DashboardPage = () => {
   if (isAdmin) recruitmentItems.push({ value: "scorecards", label: lang === "ar" ? "تقييمات المقابلة" : "Scorecards", icon: Star });
   if (isAdmin) recruitmentItems.push({ value: "offer_letters", label: lang === "ar" ? "عروض التوظيف" : "Offer Letters", icon: FileCheck });
   if (isAdmin) recruitmentItems.push({ value: "talent_pool", label: lang === "ar" ? "مجمع المواهب" : "Talent Pool", icon: Users2 });
+  if (isAdmin) recruitmentItems.push({ value: "referrals", label: lang === "ar" ? "برنامج الإحالة" : "Referrals", icon: UserPlus2 });
   if (recruitmentItems.length) navGroups.push({ id: "recruitment", title: lang === "ar" ? "التوظيف" : "Recruitment", items: recruitmentItems });
 
   const managementItems: DashboardNavGroup["items"] = [];
   if (tabAllowed("tab.projects")) managementItems.push({ value: "projects", label: t("dash.tab.projects"), icon: FolderOpen });
   if (tabAllowed("tab.users")) managementItems.push({ value: "users", label: t("dash.tab.users"), icon: UserCog });
   if (tabAllowed("tab.analytics")) managementItems.push({ value: "analytics", label: t("dash.tab.analytics"), icon: BarChart3 });
+  if (isAdmin) managementItems.push({ value: "job_requisitions", label: lang === "ar" ? "طلبات شغل الوظائف" : "Job Requisitions", icon: ClipboardList });
+  if (isAdmin) managementItems.push({ value: "sla_dashboard", label: lang === "ar" ? "لوحة SLA" : "SLA Dashboard", icon: Timer });
+  if (isAdmin) managementItems.push({ value: "recruiter_assignment", label: lang === "ar" ? "تعيين المجندين" : "Recruiter Assignment", icon: UserCog2 });
+  if (isAdmin) managementItems.push({ value: "onboarding", label: lang === "ar" ? "التأهيل الوظيفي" : "Onboarding", icon: GraduationCap });
+  if (isAdmin) managementItems.push({ value: "budget_tracking", label: lang === "ar" ? "الميزانية والتكلفة" : "Budget Tracking", icon: DollarSign });
+  if (isAdmin) managementItems.push({ value: "automation_rules", label: lang === "ar" ? "أتمتة المسار" : "Automation Rules", icon: Zap });
   if (managementItems.length) navGroups.push({ id: "management", title: lang === "ar" ? "الإدارة" : "Management", items: managementItems });
 
   const aiItems: DashboardNavGroup["items"] = [];
@@ -727,6 +742,7 @@ const DashboardPage = () => {
   if (tabAllowed("tab.auditlog")) systemItems.push({ value: "auditlog", label: lang === "ar" ? "سجل النظام" : "System Log", icon: Shield });
   if (isAdmin) systemItems.push({ value: "system_health", label: lang === "ar" ? "صحة النظام" : "System Health", icon: Activity });
   if (isAdmin) systemItems.push({ value: "system_tests", label: lang === "ar" ? "اختبارات النظام" : "System Tests", icon: FlaskConical });
+  if (isAdmin) systemItems.push({ value: "gdpr_tools", label: lang === "ar" ? "الخصوصية والامتثال" : "Privacy & Compliance", icon: ShieldCheck });
   if (tabAllowed("tab.trash")) systemItems.push({ value: "trash", label: lang === "ar" ? "سلة المحذوفات" : "Trash", icon: Trash2 });
   if (systemItems.length) navGroups.push({ id: "system", title: lang === "ar" ? "النظام" : "System", items: systemItems });
 
@@ -1452,6 +1468,38 @@ const DashboardPage = () => {
 
           <TabsContent value="talent_pool">
             <TalentPool />
+          </TabsContent>
+
+          <TabsContent value="referrals">
+            <ReferralProgram />
+          </TabsContent>
+
+          <TabsContent value="job_requisitions">
+            <JobRequisitions />
+          </TabsContent>
+
+          <TabsContent value="sla_dashboard">
+            <SLADashboard />
+          </TabsContent>
+
+          <TabsContent value="recruiter_assignment">
+            <RecruiterAssignment />
+          </TabsContent>
+
+          <TabsContent value="onboarding">
+            <OnboardingModule />
+          </TabsContent>
+
+          <TabsContent value="budget_tracking">
+            <BudgetTracking />
+          </TabsContent>
+
+          <TabsContent value="automation_rules">
+            <PipelineAutomation />
+          </TabsContent>
+
+          <TabsContent value="gdpr_tools">
+            <GDPRTools />
           </TabsContent>
 
           <TabsContent value="rejection_reasons">

@@ -169,4 +169,41 @@ export const queryKeys = {
     all: ["talentPool"] as const,
     list: () => ["talentPool", "list"] as const,
   },
+  jobRequisitions: {
+    all: ["jobRequisitions"] as const,
+    list: () => ["jobRequisitions", "list"] as const,
+  },
+  referrals: {
+    all: ["referrals"] as const,
+    list: () => ["referrals", "list"] as const,
+  },
+  slaDashboard: {
+    all: ["slaDashboard"] as const,
+    config: () => ["slaDashboard", "config"] as const,
+    metrics: () => ["slaDashboard", "metrics"] as const,
+  },
+  recruiterAssignments: {
+    all: ["recruiterAssignments"] as const,
+    list: () => ["recruiterAssignments", "list"] as const,
+  },
+  onboarding: {
+    all: ["onboarding"] as const,
+    templates: () => ["onboarding", "templates"] as const,
+    checklists: () => ["onboarding", "checklists"] as const,
+  },
+  budgetTracking: {
+    all: ["budgetTracking"] as const,
+    budgets: () => ["budgetTracking", "budgets"] as const,
+    costs: () => ["budgetTracking", "costs"] as const,
+  },
+  gdprTools: {
+    all: ["gdprTools"] as const,
+    policies: () => ["gdprTools", "policies"] as const,
+    requests: () => ["gdprTools", "requests"] as const,
+  },
+  automationRules: {
+    all: ["automationRules"] as const,
+    list: () => ["automationRules", "list"] as const,
+    logs: () => ["automationRules", "logs"] as const,
+  },
 } as const;
