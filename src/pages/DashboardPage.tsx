@@ -69,6 +69,12 @@ import OnboardingModule from "@/components/Dashboard/OnboardingModule";
 import BudgetTracking from "@/components/Dashboard/BudgetTracking";
 import GDPRTools from "@/components/Dashboard/GDPRTools";
 import PipelineAutomation from "@/components/Dashboard/PipelineAutomation";
+import AssessmentsModule from "@/components/Dashboard/AssessmentsModule";
+import MessagingCenter from "@/components/Dashboard/MessagingCenter";
+import VideoInterviews from "@/components/Dashboard/VideoInterviews";
+import JobBoardPublishing from "@/components/Dashboard/JobBoardPublishing";
+import EmailTemplates from "@/components/Dashboard/EmailTemplates";
+import IntegrationsHub from "@/components/Dashboard/IntegrationsHub";
 import { AiUsageMonitor } from "@/components/Dashboard/AiUsageMonitor";
 import AiProviderSettings from "@/components/Dashboard/AiProviderSettings";
 import AiInsightsPanel from "@/components/Dashboard/AiInsightsPanel";
@@ -83,7 +89,7 @@ import AINetworkBackground from "@/components/AINetworkBackground";
 import AuroraBackground from "@/components/AuroraBackground";
 import type { ApplicantEmailStatus } from "@/lib/applicantEmailTemplates";
 import { STATUSES_WITH_EMAIL } from "@/lib/applicantEmailTemplates";
-import { Mail, Activity, Bot, UserCog, Target, Globe, Menu, Palette, ListChecks, FlaskConical, CalendarDays, Star, FileCheck, Users2, UserPlus2, ClipboardList, Timer, UserCog2, GraduationCap, DollarSign, ShieldCheck, Zap } from "lucide-react";
+import { Mail, Activity, Bot, UserCog, Target, Globe, Menu, Palette, ListChecks, FlaskConical, CalendarDays, Star, FileCheck, Users2, UserPlus2, ClipboardList, Timer, UserCog2, GraduationCap, DollarSign, ShieldCheck, Zap, FileQuestion, MessageSquare, Video, Share2, MailPlus, Plug } from "lucide-react";
 import DashboardSidebar, { type DashboardNavGroup } from "@/components/Dashboard/DashboardSidebar";
 import DashboardSidebarFuturistic from "@/components/Dashboard/DashboardSidebarFuturistic";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -716,6 +722,10 @@ const DashboardPage = () => {
   if (isAdmin) recruitmentItems.push({ value: "offer_letters", label: lang === "ar" ? "عروض التوظيف" : "Offer Letters", icon: FileCheck });
   if (isAdmin) recruitmentItems.push({ value: "talent_pool", label: lang === "ar" ? "مجمع المواهب" : "Talent Pool", icon: Users2 });
   if (isAdmin) recruitmentItems.push({ value: "referrals", label: lang === "ar" ? "برنامج الإحالة" : "Referrals", icon: UserPlus2 });
+  if (isAdmin) recruitmentItems.push({ value: "assessments", label: lang === "ar" ? "اختبارات المرشحين" : "Assessments", icon: FileQuestion });
+  if (isAdmin) recruitmentItems.push({ value: "messaging", label: lang === "ar" ? "الرسائل النصية والواتساب" : "SMS & WhatsApp", icon: MessageSquare });
+  if (isAdmin) recruitmentItems.push({ value: "video_interviews", label: lang === "ar" ? "مقابلات الفيديو" : "Video Interviews", icon: Video });
+  if (isAdmin) recruitmentItems.push({ value: "job_boards", label: lang === "ar" ? "النشر على مواقع التوظيف" : "Job Board Publishing", icon: Share2 });
   if (recruitmentItems.length) navGroups.push({ id: "recruitment", title: lang === "ar" ? "التوظيف" : "Recruitment", items: recruitmentItems });
 
   const managementItems: DashboardNavGroup["items"] = [];
@@ -728,6 +738,7 @@ const DashboardPage = () => {
   if (isAdmin) managementItems.push({ value: "onboarding", label: lang === "ar" ? "التأهيل الوظيفي" : "Onboarding", icon: GraduationCap });
   if (isAdmin) managementItems.push({ value: "budget_tracking", label: lang === "ar" ? "الميزانية والتكلفة" : "Budget Tracking", icon: DollarSign });
   if (isAdmin) managementItems.push({ value: "automation_rules", label: lang === "ar" ? "أتمتة المسار" : "Automation Rules", icon: Zap });
+  if (isAdmin) managementItems.push({ value: "email_templates", label: lang === "ar" ? "قوالب البريد والحملات" : "Email Templates", icon: MailPlus });
   if (managementItems.length) navGroups.push({ id: "management", title: lang === "ar" ? "الإدارة" : "Management", items: managementItems });
 
   const aiItems: DashboardNavGroup["items"] = [];
@@ -743,6 +754,7 @@ const DashboardPage = () => {
   if (isAdmin) systemItems.push({ value: "system_health", label: lang === "ar" ? "صحة النظام" : "System Health", icon: Activity });
   if (isAdmin) systemItems.push({ value: "system_tests", label: lang === "ar" ? "اختبارات النظام" : "System Tests", icon: FlaskConical });
   if (isAdmin) systemItems.push({ value: "gdpr_tools", label: lang === "ar" ? "الخصوصية والامتثال" : "Privacy & Compliance", icon: ShieldCheck });
+  if (isAdmin) systemItems.push({ value: "integrations", label: lang === "ar" ? "التكاملات والـ Webhooks" : "Integrations", icon: Plug });
   if (tabAllowed("tab.trash")) systemItems.push({ value: "trash", label: lang === "ar" ? "سلة المحذوفات" : "Trash", icon: Trash2 });
   if (systemItems.length) navGroups.push({ id: "system", title: lang === "ar" ? "النظام" : "System", items: systemItems });
 
@@ -1500,6 +1512,30 @@ const DashboardPage = () => {
 
           <TabsContent value="gdpr_tools">
             <GDPRTools />
+          </TabsContent>
+
+          <TabsContent value="assessments">
+            <AssessmentsModule />
+          </TabsContent>
+
+          <TabsContent value="messaging">
+            <MessagingCenter />
+          </TabsContent>
+
+          <TabsContent value="video_interviews">
+            <VideoInterviews />
+          </TabsContent>
+
+          <TabsContent value="job_boards">
+            <JobBoardPublishing />
+          </TabsContent>
+
+          <TabsContent value="email_templates">
+            <EmailTemplates />
+          </TabsContent>
+
+          <TabsContent value="integrations">
+            <IntegrationsHub />
           </TabsContent>
 
           <TabsContent value="rejection_reasons">

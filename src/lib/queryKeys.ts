@@ -206,4 +206,36 @@ export const queryKeys = {
     list: () => ["automationRules", "list"] as const,
     logs: () => ["automationRules", "logs"] as const,
   },
+  assessments: {
+    all: ["assessments"] as const,
+    list: () => ["assessments", "list"] as const,
+    assignments: () => ["assessments", "assignments"] as const,
+  },
+  messaging: {
+    all: ["messaging"] as const,
+    settings: () => ["messaging", "settings"] as const,
+    templates: () => ["messaging", "templates"] as const,
+    log: () => ["messaging", "log"] as const,
+  },
+  videoInterviews: {
+    all: ["videoInterviews"] as const,
+    sessions: () => ["videoInterviews", "sessions"] as const,
+    settings: () => ["videoInterviews", "settings"] as const,
+  },
+  jobBoards: {
+    all: ["jobBoards"] as const,
+    accounts: () => ["jobBoards", "accounts"] as const,
+    publications: () => ["jobBoards", "publications"] as const,
+  },
+  emailTemplates: {
+    all: ["emailTemplates"] as const,
+    list: () => ["emailTemplates", "list"] as const,
+    campaigns: () => ["emailTemplates", "campaigns"] as const,
+  },
+  integrations: {
+    all: ["integrations"] as const,
+    list: () => ["integrations", "list"] as const,
+    webhooks: () => ["integrations", "webhooks"] as const,
+    deliveries: () => ["integrations", "deliveries"] as const,
+  },
 } as const;
