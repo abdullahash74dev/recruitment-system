@@ -20,7 +20,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import * as XLSX from "xlsx";
 import SiteLogo from "@/components/SiteLogo";
 import { MAX_INLINE_IMAGE_SIZE, readImageAsDataUrl } from "@/lib/imageUpload";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import CustomQuestionsSettings from "@/components/Dashboard/CustomQuestionsSettings";
 import StorageImage from "@/components/StorageImage";
 import ProjectLogo from "@/components/ProjectLogo";
@@ -147,6 +147,7 @@ const CircularProgress = ({ percent, size = 44 }: { percent: number; size?: numb
 
 const DashboardPage = () => {
   const { t, dir, lang } = useLanguage();
+  const navigate = useNavigate();
   const { navStyle } = useTheme();
   const { permissions, hasPermission, role: currentUserRole, loading: permsLoading } = useUserPermissions();
   const { requestDelete } = useDeletePin();
@@ -729,6 +730,7 @@ const DashboardPage = () => {
   if (recruitmentItems.length) navGroups.push({ id: "recruitment", title: lang === "ar" ? "التوظيف" : "Recruitment", items: recruitmentItems });
 
   const managementItems: DashboardNavGroup["items"] = [];
+  if (isAdmin || hasPermission("hr_forms.access" as any)) managementItems.push({ value: "hr_forms", label: lang === "ar" ? "نماذج الموارد البشرية" : "HR Forms", icon: ClipboardList });
   if (tabAllowed("tab.projects")) managementItems.push({ value: "projects", label: t("dash.tab.projects"), icon: FolderOpen });
   if (tabAllowed("tab.users")) managementItems.push({ value: "users", label: t("dash.tab.users"), icon: UserCog });
   if (tabAllowed("tab.analytics")) managementItems.push({ value: "analytics", label: t("dash.tab.analytics"), icon: BarChart3 });
@@ -763,7 +765,8 @@ const DashboardPage = () => {
   const sidebarProps = {
     groups: navGroups,
     activeTab,
-    onChange: setActiveTab,
+    // "hr_forms" is a standalone route (its own sub-app), not a dashboard tab.
+    onChange: (v: string) => (v === "hr_forms" ? navigate("/admin/hr-forms") : setActiveTab(v)),
     collapsed: sidebarCollapsed,
     onToggleCollapsed: () => setSidebarCollapsed((v) => !v),
     mobileOpen: mobileNavOpen,
@@ -876,7 +879,7 @@ const DashboardPage = () => {
         )}
 
         {/* Tabs */}
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <Tabs value={activeTab} onValueChange={(v) => (v === "hr_forms" ? navigate("/admin/hr-forms") : setActiveTab(v))}>
           {navStyle === "classic" && (
             <TabsList className="flex flex-wrap w-full h-auto gap-1.5 p-1.5 bg-muted/60 backdrop-blur-sm border border-border/50 rounded-xl justify-start shadow-sm">
               {flatNavItems.map((item) => (

@@ -44,6 +44,12 @@ export const PERMISSION_GROUPS = [
     en: "System",
     items: ["manage_settings", "manage_users", "manage_backup", "view_audit_log", "manage_synonyms"],
   },
+  {
+    key: "hr_forms",
+    ar: "نماذج الموارد البشرية",
+    en: "HR Forms",
+    items: ["hr_forms.access", "hr_forms.view_employees", "hr_forms.manage_employees", "hr_forms.manage_templates"],
+  },
 ] as const;
 
 export const ALL_PERMISSIONS = PERMISSION_GROUPS.flatMap(g => g.items) as readonly string[];
@@ -94,6 +100,11 @@ export const PERMISSION_LABELS: Record<string, { ar: string; en: string }> = {
   manage_backup: { ar: "إدارة النسخ الاحتياطي", en: "Manage backup" },
   view_audit_log: { ar: "عرض سجل النظام", en: "View audit log" },
   manage_synonyms: { ar: "إدارة توحيد اللغة", en: "Manage synonyms" },
+  // hr forms
+  "hr_forms.access": { ar: "دخول نماذج الموارد البشرية", en: "Access HR Forms" },
+  "hr_forms.view_employees": { ar: "عرض بيانات الموظفين", en: "View employees" },
+  "hr_forms.manage_employees": { ar: "إدارة بيانات الموظفين", en: "Manage employees" },
+  "hr_forms.manage_templates": { ar: "إدارة قوالب النماذج", en: "Manage form templates" },
 };
 
 // Default permissions per role
@@ -102,6 +113,7 @@ const HR_BASE = [
   "view_applicants","edit_applicants","applicants.export","applicants.import","applicants.send_email",
   "view_jobs","edit_jobs","jobs.publish_ad",
   "view_projects","view_analytics","analytics.export",
+  "hr_forms.access","hr_forms.view_employees",
 ];
 const ROLE_DEFAULTS: Record<string, PermissionKey[]> = {
   admin: [...ALL_PERMISSIONS],

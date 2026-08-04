@@ -238,4 +238,19 @@ export const queryKeys = {
     webhooks: () => ["integrations", "webhooks"] as const,
     deliveries: () => ["integrations", "deliveries"] as const,
   },
+  employees: {
+    all: ["employees"] as const,
+    list: () => ["employees", "list"] as const,
+    detail: (id?: string) => ["employees", "detail", id] as const,
+  },
+  hrFormTemplates: {
+    all: ["hrFormTemplates"] as const,
+    list: () => ["hrFormTemplates", "list"] as const,
+    detail: (id?: string) => ["hrFormTemplates", "detail", id] as const,
+  },
+  hrFormSubmissions: {
+    all: ["hrFormSubmissions"] as const,
+    list: (filters?: Record<string, unknown>) => ["hrFormSubmissions", "list", filters ?? {}] as const,
+    detail: (id?: string) => ["hrFormSubmissions", "detail", id] as const,
+  },
 } as const;

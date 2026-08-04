@@ -22,6 +22,7 @@ import AdminVerifyPage from "./pages/AdminVerifyPage.tsx";
 import ForgotPasswordPage from "./pages/ForgotPasswordPage.tsx";
 import ResetPasswordPage from "./pages/ResetPasswordPage.tsx";
 import DashboardPage from "./pages/DashboardPage.tsx";
+import HrFormsShell from "./pages/HrForms/HrFormsShell.tsx";
 import ExecutiveRecruitmentPage from "./pages/ExecutiveRecruitmentPage.tsx";
 import NotFound from "./pages/NotFound.tsx";
 import { useEffect } from "react";
@@ -116,6 +117,7 @@ const App = () => (
                 <Route path="/admin/forgot-password" element={<ForgotPasswordPage />} />
                 <Route path="/admin/reset-password" element={<ResetPasswordPage />} />
                 <Route path="/admin" element={<AdminGuard><DashboardPage /></AdminGuard>} />
+                <Route path="/admin/hr-forms/*" element={<AdminGuard><HrFormsShell /></AdminGuard>} />
 
                 {/* Legacy redirect */}
                 <Route path="/dashboard" element={<AdminGuard><DashboardPage /></AdminGuard>} />
