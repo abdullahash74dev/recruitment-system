@@ -41,6 +41,13 @@ const FORMULAS: Record<string, FormulaFn> = {
   /** subtract(a, b) = a - b. */
   subtract: ([aKey, bKey], data) => num(data[aKey]) - num(data[bKey]),
 
+  /** divide(a, b) = a / b, null when b is zero/blank (e.g. loan installment). */
+  divide: ([aKey, bKey], data) => {
+    const b = num(data[bKey]);
+    if (b === 0) return null;
+    return Math.round((num(data[aKey]) / b) * 100) / 100;
+  },
+
   /** Sum of one or more numeric columns across all rows of a table field: sum_table_columns(table, col1, col2). */
   sum_table_columns: ([tableKey, ...colKeys], data) => {
     const rows = data[tableKey];
@@ -110,6 +117,7 @@ export const FORMULA_DESCRIPTIONS: Record<string, { en: string; ar: string }> = 
   date_diff_days: { en: "Days between two dates (inclusive)", ar: "عدد الأيام بين تاريخين (شامل)" },
   sum_fields: { en: "Sum of numeric fields", ar: "مجموع حقول رقمية" },
   subtract: { en: "First field minus second field", ar: "الحقل الأول ناقص الثاني" },
+  divide: { en: "First field divided by second field", ar: "الحقل الأول مقسومًا على الثاني" },
   sum_table_columns: { en: "Sum of table columns across all rows", ar: "مجموع أعمدة جدول عبر كل الصفوف" },
   period_ymd: { en: "Period between two dates (years/months/days)", ar: "المدة بين تاريخين (سنوات/أشهر/أيام)" },
   eos_gratuity: { en: "End-of-service award (Saudi Labor Law)", ar: "مكافأة نهاية الخدمة (نظام العمل السعودي)" },

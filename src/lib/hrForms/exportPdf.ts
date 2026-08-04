@@ -9,7 +9,7 @@ const A4_WIDTH_MM = 210;
 const A4_HEIGHT_MM = 297;
 const PAGE_MARGIN_MM = 8;
 
-export async function exportNodeToPdf(node: HTMLElement, fileName: string): Promise<void> {
+async function buildPdf(node: HTMLElement): Promise<jsPDF> {
   const canvas = await toCanvas(node, {
     pixelRatio: 2,
     backgroundColor: "#ffffff",
@@ -48,5 +48,13 @@ export async function exportNodeToPdf(node: HTMLElement, fileName: string): Prom
     );
   }
 
-  pdf.save(fileName);
+  return pdf;
+}
+
+export async function exportNodeToPdf(node: HTMLElement, fileName: string): Promise<void> {
+  (await buildPdf(node)).save(fileName);
+}
+
+export async function pdfBlobFromNode(node: HTMLElement): Promise<Blob> {
+  return (await buildPdf(node)).output("blob");
 }

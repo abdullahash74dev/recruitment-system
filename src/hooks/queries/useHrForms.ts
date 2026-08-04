@@ -289,3 +289,247 @@ export function useDeleteSubmissionMutation() {
     onError: (error: Error) => toast.error(error.message),
   });
 }
+
+// ---------------------------------------------------------------------------
+// Workflow: submit → approve/reject → issue
+// ---------------------------------------------------------------------------
+
+/** Best-effort in-app notification; RLS only lets us notify ourselves unless admin. */
+async function notify(userId: string, title: string, body: string, link: string) {
+  try {
+    await db.from("notifications").insert({
+      user_id: userId, type: "hr_forms", title, body, link, severity: "info",
+    });
+  } catch {
+    // Notifications are a convenience — never block the workflow on them.
+  }
+}
+
+export function useSubmitSubmissionMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await db
+        .from("hr_form_submissions")
+        .update({ status: "submitted", submitted_at: new Date().toISOString() })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.hrFormSubmissions.all });
+      toast.success("Submitted for approval");
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+}
+
+export function useDecideSubmissionMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ submission, decision, reason }: {
+      submission: HrFormSubmission;
+      decision: "approved" | "rejected";
+      reason?: string;
+    }) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not signed in");
+      const { error } = await db
+        .from("hr_form_submissions")
+        .update({
+          status: decision,
+          decided_by: user.id,
+          decided_by_email: user.email,
+          decided_at: new Date().toISOString(),
+          rejection_reason: decision === "rejected" ? (reason ?? null) : null,
+        })
+        .eq("id", submission.id);
+      if (error) throw error;
+      await notify(
+        submission.requested_by,
+        decision === "approved" ? "Form request approved" : "Form request rejected",
+        decision === "rejected" && reason ? `Reason: ${reason}` : "Open HR Forms to view the request.",
+        `/admin/hr-forms/fill/${submission.template_id}?submission=${submission.id}`,
+      );
+    },
+    onSuccess: (_, { decision }) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.hrFormSubmissions.all });
+      toast.success(decision === "approved" ? "Request approved" : "Request rejected");
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+}
+
+export interface IssueFilesInput {
+  submission: HrFormSubmission;
+  templateTitle: string;
+  employeeName: string | null;
+  /** format -> file blob; uploaded to the hr-form-documents bucket. */
+  files: Record<string, Blob>;
+}
+
+const FILE_EXTENSIONS: Record<string, string> = { pdf: "pdf", xlsx: "xlsx", docx: "docx", png: "png" };
+
+export function useIssueSubmissionMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ submission, templateTitle, employeeName, files }: IssueFilesInput) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not signed in");
+
+      const urls: Record<string, string> = {};
+      for (const [format, blob] of Object.entries(files)) {
+        const ext = FILE_EXTENSIONS[format] ?? format;
+        const path = `${submission.id}/${format}.${ext}`;
+        const { error: upErr } = await supabase.storage
+          .from("hr-form-documents")
+          .upload(path, blob, { upsert: true, contentType: blob.type || undefined });
+        if (upErr) throw new Error(`Upload failed (${format}): ${upErr.message}`);
+        urls[format] = path;
+      }
+
+      const { error } = await db
+        .from("hr_form_submissions")
+        .update({
+          status: "issued",
+          issued_at: new Date().toISOString(),
+          issued_by: user.id,
+          issued_file_pdf_url: urls.pdf ?? null,
+          issued_file_xlsx_url: urls.xlsx ?? null,
+          issued_file_docx_url: urls.docx ?? null,
+          issued_file_png_url: urls.png ?? null,
+        })
+        .eq("id", submission.id);
+      if (error) throw error;
+
+      const { error: ledgerErr } = await db.from("hr_form_issuances").insert({
+        submission_id: submission.id,
+        template_id: submission.template_id,
+        template_title: templateTitle,
+        employee_id: submission.employee_id,
+        employee_name: employeeName,
+        issued_by: user.id,
+        issued_by_email: user.email,
+        formats: Object.keys(urls),
+        file_urls: urls,
+      });
+      if (ledgerErr) throw ledgerErr;
+
+      await notify(
+        submission.requested_by,
+        "Form issued",
+        `${templateTitle} has been issued and archived.`,
+        `/admin/hr-forms/fill/${submission.template_id}?submission=${submission.id}`,
+      );
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.hrFormSubmissions.all });
+      queryClient.invalidateQueries({ queryKey: queryKeys.hrFormIssuances.all });
+      toast.success("Form issued and archived");
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Per-template fill grants
+// ---------------------------------------------------------------------------
+
+export interface TemplatePermission {
+  id: string;
+  template_id: string;
+  user_id: string;
+  can_fill: boolean;
+  granted_by: string;
+  created_at: string;
+}
+
+export function useTemplatePermissionsQuery() {
+  return useQuery({
+    queryKey: queryKeys.hrFormTemplatePermissions.list(),
+    queryFn: async (): Promise<TemplatePermission[]> => {
+      const { data, error } = await db
+        .from("hr_form_template_permissions")
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as TemplatePermission[];
+    },
+    staleTime: 60 * 1000,
+  });
+}
+
+export function useGrantTemplatePermissionMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ templateId, userId }: { templateId: string; userId: string }) => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("Not signed in");
+      const { error } = await db.from("hr_form_template_permissions").insert({
+        template_id: templateId, user_id: userId, granted_by: user.id,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.hrFormTemplatePermissions.all });
+      toast.success("Access granted");
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+}
+
+export function useRevokeTemplatePermissionMutation() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (grantId: string) => {
+      const { error } = await db.from("hr_form_template_permissions").delete().eq("id", grantId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.hrFormTemplatePermissions.all });
+      toast.success("Access revoked");
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Issuance ledger (usage log)
+// ---------------------------------------------------------------------------
+
+export interface HrFormIssuance {
+  id: string;
+  submission_id: string;
+  template_id: string;
+  template_title: string;
+  employee_id: string | null;
+  employee_name: string | null;
+  issued_by: string;
+  issued_by_email: string | null;
+  formats: string[];
+  file_urls: Record<string, string>;
+  issued_at: string;
+}
+
+export function useHrFormIssuancesQuery() {
+  return useQuery({
+    queryKey: queryKeys.hrFormIssuances.list(),
+    queryFn: async (): Promise<HrFormIssuance[]> => {
+      const { data, error } = await db
+        .from("hr_form_issuances")
+        .select("*")
+        .order("issued_at", { ascending: false });
+      if (error) throw error;
+      return (data ?? []) as HrFormIssuance[];
+    },
+    staleTime: 60 * 1000,
+  });
+}
+
+/** Signed URL for a stored issued document (private bucket). */
+export async function getIssuedFileUrl(path: string): Promise<string> {
+  const { data, error } = await supabase.storage
+    .from("hr-form-documents")
+    .createSignedUrl(path, 60 * 10);
+  if (error || !data?.signedUrl) throw error ?? new Error("Could not sign URL");
+  return data.signedUrl;
+}

@@ -15,7 +15,7 @@ import { useSiteSettings } from "@/hooks/useSiteSettings";
 import { useUserPermissions } from "@/hooks/useUserPermissions";
 import { useHrFormTemplatesQuery, useUpdateTemplateMutation, type TemplateInput } from "@/hooks/queries/useHrForms";
 import { resolveForm } from "@/lib/hrForms/templateEngine";
-import type { HrTemplateSchema } from "@/lib/hrForms/types";
+import type { HrFormTemplate, HrTemplateSchema } from "@/lib/hrForms/types";
 import TemplateSchemaEditor from "@/components/HrForms/Builder/TemplateSchemaEditor";
 import FormRenderer from "@/components/HrForms/FormRenderer/FormRenderer";
 
@@ -53,7 +53,7 @@ const TemplateBuilderEditorPage = () => {
   }, [template]);
 
   const previewTemplate = useMemo(
-    () => (template ? { ...template, ...meta, schema } : null),
+    () => (template ? ({ ...template, ...meta, schema } as HrFormTemplate) : null),
     [template, meta, schema],
   );
 

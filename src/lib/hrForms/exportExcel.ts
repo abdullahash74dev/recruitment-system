@@ -19,7 +19,7 @@ interface DataEntryRef {
   row: number;
 }
 
-export function exportFormToExcel(resolved: ResolvedForm, lang: "en" | "ar", fileName: string): void {
+function buildWorkbook(resolved: ResolvedForm, lang: "en" | "ar"): XLSX.WorkBook {
   const { template, values, branding } = resolved;
 
   // ---- Sheet 1: Data Entry -------------------------------------------------
@@ -130,7 +130,16 @@ export function exportFormToExcel(resolved: ResolvedForm, lang: "en" | "ar", fil
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, formSheet, FORM_SHEET);
   XLSX.utils.book_append_sheet(wb, dataSheet, DATA_SHEET);
-  XLSX.writeFile(wb, fileName);
+  return wb;
+}
+
+export function exportFormToExcel(resolved: ResolvedForm, lang: "en" | "ar", fileName: string): void {
+  XLSX.writeFile(buildWorkbook(resolved, lang), fileName);
+}
+
+export function excelBlob(resolved: ResolvedForm, lang: "en" | "ar"): Blob {
+  const array = XLSX.write(buildWorkbook(resolved, lang), { type: "array", bookType: "xlsx" });
+  return new Blob([array], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
 }
 
 function fieldLabel(field: HrField, lang: "en" | "ar"): string {

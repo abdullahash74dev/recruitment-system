@@ -253,4 +253,12 @@ export const queryKeys = {
     list: (filters?: Record<string, unknown>) => ["hrFormSubmissions", "list", filters ?? {}] as const,
     detail: (id?: string) => ["hrFormSubmissions", "detail", id] as const,
   },
+  hrFormTemplatePermissions: {
+    all: ["hrFormTemplatePermissions"] as const,
+    list: () => ["hrFormTemplatePermissions", "list"] as const,
+  },
+  hrFormIssuances: {
+    all: ["hrFormIssuances"] as const,
+    list: () => ["hrFormIssuances", "list"] as const,
+  },
 } as const;
