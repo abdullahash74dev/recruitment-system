@@ -243,6 +243,26 @@ export default function ClientRentalManagement() {
     setUsersOpen(true);
   };
 
+  // supabase.functions.invoke() swallows the edge function's actual JSON
+  // error body on a non-2xx response (its `error.message` is a generic
+  // "Edge Function returned a non-2xx status code"). DashboardPage.tsx's
+  // existing callManageUser() avoids this with a raw fetch that always
+  // reads the body via res.json() regardless of status — mirrored here so
+  // failures surface their real reason instead of a dead-end toast.
+  const callManageUser = async (body: Record<string, unknown>) => {
+    const { data: { session } } = await supabase.auth.getSession();
+    const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/manage-user`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+      },
+      body: JSON.stringify(body),
+    });
+    return res.json();
+  };
+
   const createClientUser = async () => {
     if (!usersOrg || !newUserForm.email.trim() || newUserForm.password.length < 6) {
       toast.error(ar ? "أدخل بريداً وكلمة مرور (6 أحرف على الأقل)" : "Enter an email and a password (6+ chars)");
@@ -250,16 +270,13 @@ export default function ClientRentalManagement() {
     }
     setCreatingUser(true);
     try {
-      const { data, error } = await supabase.functions.invoke("manage-user", {
-        body: {
-          action: "create_client_user",
-          email: newUserForm.email.trim(),
-          password: newUserForm.password,
-          full_name: newUserForm.full_name.trim() || null,
-          client_organization_id: usersOrg.id,
-        },
+      const data = await callManageUser({
+        action: "create_client_user",
+        email: newUserForm.email.trim(),
+        password: newUserForm.password,
+        full_name: newUserForm.full_name.trim() || null,
+        client_organization_id: usersOrg.id,
       });
-      if (error) throw error;
       if (data?.error) throw new Error(data.error);
       toast.success(ar ? "تم إنشاء حساب المستخدم" : "User account created");
       setNewUserForm({ email: "", password: "", full_name: "" });
@@ -273,10 +290,7 @@ export default function ClientRentalManagement() {
 
   const toggleClientUserActive = async (clientUserId: string, isActive: boolean) => {
     try {
-      const { data, error } = await supabase.functions.invoke("manage-user", {
-        body: { action: "toggle_client_user_active", client_user_id: clientUserId, is_active: isActive },
-      });
-      if (error) throw error;
+      const data = await callManageUser({ action: "toggle_client_user_active", client_user_id: clientUserId, is_active: isActive });
       if (data?.error) throw new Error(data.error);
       queryClient.invalidateQueries({ queryKey: ["clientUsers", usersOrg?.id] });
     } catch (e) {
