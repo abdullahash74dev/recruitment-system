@@ -40,11 +40,51 @@ const QUERYABLE_FIELDS = [
 ] as const;
 const QUERYABLE_FIELD_SET = new Set<string>(QUERYABLE_FIELDS);
 
+// Mirrors ApplicantsAdvancedFilters.tsx's SYNONYM_FIELD_MAP -- maps a
+// filterable applicants column to its value_synonyms.field_name group.
+// current_city is the odd one out: it shares the "city" group with
+// preferred_city.
+const SYNONYM_FIELD_MAP: Record<string, string> = {
+  nationality: "nationality",
+  desired_position: "desired_position",
+  preferred_city: "preferred_city",
+  current_city: "city",
+  gender: "gender",
+  marital_status: "marital_status",
+  education_level: "education_level",
+  major: "major",
+  university: "university",
+  job_type: "job_type",
+  current_title: "current_title",
+  currently_employed: "currently_employed",
+  has_transport: "has_transport",
+  arabic_level: "arabic_level",
+  english_level: "english_level",
+  hear_about: "hear_about",
+};
+
+const CANON_PREFIX = "__canon__:";
+
+// Free-text search columns -- wider than admin's dashboard quick-search
+// (full_name/desired_position only), since client-portal users have no
+// other way to browse the pool besides search + filters.
+const SEARCH_COLUMNS = [
+  "full_name",
+  "desired_position",
+  "current_title",
+  "major",
+  "university",
+  "nationality",
+  "current_city",
+  "preferred_city",
+];
+
 type Filter = { field: string; value: string };
+type SynonymRow = { field_name: string; canonical_ar: string; canonical_en: string | null; synonyms: string[] };
 
 // PostgREST's .or()/.ilike() filter strings use "," to separate conditions and
 // "()" for grouping, so a raw value containing those could break out of the
-// intended clause. Strip them defensively — worst case a stray comma/paren in
+// intended clause. Strip them defensively -- worst case a stray comma/paren in
 // someone's search term gets dropped, it never lets them add a new clause.
 function sanitizeFilterValue(value: string): string {
   return String(value).replace(/[(),]/g, "").trim();
@@ -75,17 +115,42 @@ function maskEmail(email: string | null | undefined): string | null {
   return `${first}***@***${lastSeg ? "." + lastSeg : ""}`;
 }
 
-// Applies is_archived + the allow-listed advanced filters + free-text search
-// to a query builder. Mirrors the admin UI's semantics: multiple filters on
-// the SAME field are OR'd together, filters across DIFFERENT fields are AND'd.
+// A "__canon__:<canonical_ar>" filter value means "match any known synonym
+// of this group", not a literal substring. Expand it into one literal
+// filter per group member (canonical_ar/canonical_en/synonyms[]) so the
+// rest of the pipeline can keep treating everything as plain ilike values.
+// Unknown canonical keys (e.g. a stale group an admin since deleted) are
+// dropped silently rather than matching nothing-vs-erroring.
+function expandCanonicalFilters(filters: Filter[], synonymRows: SynonymRow[]): Filter[] {
+  const out: Filter[] = [];
+  for (const f of filters) {
+    if (!f || typeof f.field !== "string" || typeof f.value !== "string") continue;
+    if (!QUERYABLE_FIELD_SET.has(f.field)) continue;
+    if (!f.value.startsWith(CANON_PREFIX)) {
+      out.push(f);
+      continue;
+    }
+    const canonical = f.value.slice(CANON_PREFIX.length);
+    const synField = SYNONYM_FIELD_MAP[f.field];
+    const row = synField
+      ? synonymRows.find((r) => r.field_name === synField && r.canonical_ar === canonical)
+      : undefined;
+    if (!row) continue;
+    const variants = [row.canonical_ar, row.canonical_en, ...(row.synonyms || [])].filter(Boolean) as string[];
+    for (const v of variants) out.push({ field: f.field, value: v });
+  }
+  return out;
+}
+
+// Applies is_archived + the allow-listed advanced filters to a query
+// builder. Mirrors the admin UI's semantics: multiple filters on the SAME
+// field are OR'd together, filters across DIFFERENT fields are AND'd.
 // deno-lint-ignore no-explicit-any
-function applyFilters(query: any, filters: Filter[], search?: string) {
+function applyFieldFilters(query: any, filters: Filter[]) {
   query = query.eq("is_archived", false);
 
   const byField = new Map<string, string[]>();
   for (const f of filters) {
-    if (!f || typeof f.field !== "string" || typeof f.value !== "string") continue;
-    if (!QUERYABLE_FIELD_SET.has(f.field)) continue; // reject unknown fields
     const cleanValue = sanitizeFilterValue(f.value);
     if (!cleanValue) continue;
     const arr = byField.get(f.field) || [];
@@ -98,13 +163,27 @@ function applyFilters(query: any, filters: Filter[], search?: string) {
     query = query.or(orExpr);
   }
 
-  if (search && typeof search === "string") {
-    const term = sanitizeFilterValue(search);
-    if (term) {
-      query = query.or(`full_name.ilike.%${term}%,desired_position.ilike.%${term}%`);
-    }
-  }
+  return query;
+}
 
+// Boolean free-text search across SEARCH_COLUMNS. "any" = at least one word
+// matches at least one column (single OR clause). "all" = every word must
+// match at least one column (one .or() call per word -- chained .or() calls
+// AND together, same mechanism applyFieldFilters uses across fields).
+// deno-lint-ignore no-explicit-any
+function applySearch(query: any, search: string | undefined, mode: string | undefined) {
+  const term = (search || "").trim();
+  if (!term) return query;
+  const words = term.split(/\s+/).map(sanitizeFilterValue).filter(Boolean);
+  if (words.length === 0) return query;
+
+  if (mode === "all") {
+    for (const w of words) {
+      query = query.or(SEARCH_COLUMNS.map((c) => `${c}.ilike.%${w}%`).join(","));
+    }
+  } else {
+    query = query.or(words.flatMap((w) => SEARCH_COLUMNS.map((c) => `${c}.ilike.%${w}%`)).join(","));
+  }
   return query;
 }
 
@@ -178,6 +257,7 @@ Deno.serve(async (req) => {
     let body: {
       filters?: Filter[];
       search?: string;
+      searchMode?: string;
       page?: number;
       pageSize?: number;
     } = {};
@@ -187,19 +267,28 @@ Deno.serve(async (req) => {
       body = {};
     }
 
-    const filters = Array.isArray(body.filters) ? body.filters : [];
+    const rawFilters = Array.isArray(body.filters) ? body.filters : [];
     const search = typeof body.search === "string" ? body.search : undefined;
+    const searchMode = body.searchMode === "all" ? "all" : "any";
     const page = clampInt(body.page, 1, 1, 1_000_000);
     const pageSize = clampInt(body.pageSize, 50, 1, 100); // never trust client pageSize blindly
     const from = (page - 1) * pageSize;
     const to = from + pageSize - 1;
 
-    const selectColumns =
-      "id, full_name, phone, email, desired_position, nationality, preferred_city, current_city, education_level, years_experience, current_title, job_type, created_at";
+    // Fetch synonym groups once per request (small table) so canonical
+    // filter values can be expanded into their literal member strings.
+    const { data: synonymRows } = await supabaseAdmin
+      .from("value_synonyms")
+      .select("field_name, canonical_ar, canonical_en, synonyms");
+    const filters = expandCanonicalFilters(rawFilters, (synonymRows || []) as SynonymRow[]);
 
-    // 5. Query applicants (service role — this function IS the authorization boundary).
+    const selectColumns =
+      "id, full_name, phone, email, desired_position, nationality, preferred_city, current_city, education_level, years_experience, current_title, job_type, created_at, resume_url";
+
+    // 5. Query applicants (service role -- this function IS the authorization boundary).
     let dataQuery = supabaseAdmin.from("applicants").select(selectColumns);
-    dataQuery = applyFilters(dataQuery, filters, search);
+    dataQuery = applyFieldFilters(dataQuery, filters);
+    dataQuery = applySearch(dataQuery, search, searchMode);
     dataQuery = dataQuery.order("created_at", { ascending: false }).range(from, to);
 
     const { data: applicants, error: dataError } = await dataQuery;
@@ -211,7 +300,8 @@ Deno.serve(async (req) => {
     let countQuery = supabaseAdmin
       .from("applicants")
       .select("id", { count: "exact", head: true });
-    countQuery = applyFilters(countQuery, filters, search);
+    countQuery = applyFieldFilters(countQuery, filters);
+    countQuery = applySearch(countQuery, search, searchMode);
     const { count, error: countError } = await countQuery;
     if (countError) {
       return json({ error: countError.message }, 400);
@@ -229,7 +319,11 @@ Deno.serve(async (req) => {
       for (const r of reveals || []) revealedSet.add(r.applicant_id);
     }
 
-    // 7. Build masked/unmasked rows.
+    // 7. Build masked/unmasked rows. resume_url is never sent as-is (it's a
+    // private storage path, useless without a signed URL anyway) -- only
+    // whether a résumé exists at all. The actual signed download link is
+    // only ever minted by reveal-candidate, after a credit has been spent,
+    // same as phone/email.
     const rows = (applicants || []).map((a: Record<string, unknown>) => {
       const isRevealed = revealedSet.has(a.id as string);
       return {
@@ -245,6 +339,7 @@ Deno.serve(async (req) => {
         job_type: a.job_type,
         created_at: a.created_at,
         is_revealed: isRevealed,
+        has_resume: !!a.resume_url,
         phone: isRevealed ? (a.phone as string | null) : maskPhone(a.phone as string | null),
         email: isRevealed ? (a.email as string | null) : maskEmail(a.email as string | null),
       };

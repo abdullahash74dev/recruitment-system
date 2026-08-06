@@ -99,7 +99,7 @@ Deno.serve(async (req) => {
     // bogus id, and gives us the row we need to return in step 7.
     const { data: applicant, error: applicantError } = await supabaseAdmin
       .from("applicants")
-      .select("id, full_name, phone, email, desired_position")
+      .select("id, full_name, phone, email, desired_position, resume_url")
       .eq("id", applicantId)
       .maybeSingle();
 
@@ -191,12 +191,31 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 7. Return the applicant's real contact details.
+    // 7. Résumé access is bundled into the same credit as phone/email --
+    // there's no separate charge for it. resume_url is a private path in
+    // the "resumes" storage bucket (except legacy/imported rows that are
+    // already a full http(s)/data URL), so mint a short-lived signed URL
+    // here rather than ever handing the client org the raw path.
+    let resumeUrl: string | null = null;
+    const rawResumePath = applicant.resume_url as string | null;
+    if (rawResumePath) {
+      if (rawResumePath.startsWith("http") || rawResumePath.startsWith("data:")) {
+        resumeUrl = rawResumePath;
+      } else {
+        const { data: signed } = await supabaseAdmin.storage
+          .from("resumes")
+          .createSignedUrl(rawResumePath, 3600);
+        resumeUrl = signed?.signedUrl ?? null;
+      }
+    }
+
+    // 8. Return the applicant's real contact details.
     return json({
       phone: applicant.phone,
       email: applicant.email,
       full_name: applicant.full_name,
       desired_position: applicant.desired_position,
+      resume_url: resumeUrl,
       credits_remaining: creditsRemaining,
     });
   } catch (e) {

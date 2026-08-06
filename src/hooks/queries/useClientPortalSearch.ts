@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { queryKeys } from "@/lib/queryKeys";
@@ -25,9 +25,24 @@ export interface ClientApplicantRow {
   job_type: string | null;
   created_at: string;
   is_revealed: boolean;
+  has_resume: boolean;
+  /** Signed download URL, only ever populated after a reveal (same credit as phone/email). */
+  resume_url?: string | null;
   phone: string | null;
   email: string | null;
 }
+
+/** One distinct-value facet entry from `client-portal-facets`, e.g. a single
+ * literal value or a synonym-group match (`isGroup: true`, `value` is an
+ * opaque `__canon__:...` token, `label` is the human-readable canonical name). */
+export interface ClientFacetValue {
+  value: string;
+  count: number;
+  label: string;
+  isGroup?: boolean;
+}
+
+export type ClientSearchMode = "any" | "all";
 
 export interface ClientSearchResult {
   rows: ClientApplicantRow[];
@@ -88,12 +103,13 @@ export function useClientSearchQuery(
   search: string,
   page: number,
   lang: "ar" | "en" = "ar",
+  searchMode: ClientSearchMode = "any",
 ) {
   return useQuery({
-    queryKey: queryKeys.clientPortal.search(filters, search, page),
+    queryKey: queryKeys.clientPortal.search(filters, search, page, searchMode),
     queryFn: async (): Promise<ClientSearchResult> => {
       const { data, error } = await supabase.functions.invoke("client-search-applicants", {
-        body: { filters, search, page, pageSize: CLIENT_PORTAL_PAGE_SIZE },
+        body: { filters, search, searchMode, page, pageSize: CLIENT_PORTAL_PAGE_SIZE },
       });
       if (error) {
         const { message } = await extractEdgeFunctionError(error);
@@ -104,6 +120,63 @@ export function useClientSearchQuery(
     },
     staleTime: 30 * 1000,
     placeholderData: (prev) => prev, // keep the previous page on screen while a new page/filter loads
+  });
+}
+
+/**
+ * Distinct-value counts for one filterable field via `client-portal-facets`,
+ * scoped by every OTHER currently-applied filter (faceted counting — picking
+ * a nationality narrows the counts shown for city, etc). `enabled` lets the
+ * caller only fetch once a field's row is actually expanded in the UI.
+ */
+async function fetchFacetValues(
+  field: string,
+  otherFilters: ClientFilterValue[],
+  lang: "ar" | "en",
+): Promise<ClientFacetValue[]> {
+  const { data, error } = await supabase.functions.invoke("client-portal-facets", {
+    body: { field, filters: otherFilters },
+  });
+  if (error) {
+    const { message } = await extractEdgeFunctionError(error);
+    toast.error(message || (lang === "ar" ? "تعذر تحميل خيارات الفلتر" : "Failed to load filter options"));
+    throw new Error(message);
+  }
+  return (data as { values: ClientFacetValue[] }).values;
+}
+
+export function useClientFacetsQuery(
+  field: string,
+  otherFilters: ClientFilterValue[],
+  enabled: boolean,
+  lang: "ar" | "en" = "ar",
+) {
+  return useQuery({
+    queryKey: queryKeys.clientPortal.facets(field, otherFilters),
+    queryFn: () => fetchFacetValues(field, otherFilters, lang),
+    enabled,
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+/**
+ * Imperative counterpart of useClientFacetsQuery, for CategorizedFilterPanel's
+ * synchronous `getDistinctValues(field)` contract — that callback can't itself
+ * be async, so the panel's host page calls this to warm react-query's cache
+ * (dedup'd by queryKey, so an already-in-flight or cached field/otherFilters
+ * combo never double-fetches) and re-reads via queryClient.getQueryData once
+ * it resolves.
+ */
+export function fetchClientFacets(
+  queryClient: QueryClient,
+  field: string,
+  otherFilters: ClientFilterValue[],
+  lang: "ar" | "en" = "ar",
+) {
+  return queryClient.fetchQuery({
+    queryKey: queryKeys.clientPortal.facets(field, otherFilters),
+    queryFn: () => fetchFacetValues(field, otherFilters, lang),
+    staleTime: 5 * 60 * 1000,
   });
 }
 
@@ -129,7 +202,7 @@ export function useRevealCandidateMutation(lang: "ar" | "en" = "ar") {
         err.status = status;
         throw err;
       }
-      return data as { phone: string; email: string; credits_remaining: number };
+      return data as { phone: string; email: string; resume_url: string | null; credits_remaining: number };
     },
     onSuccess: (data, applicantId) => {
       queryClient.setQueriesData<ClientSearchResult>(
@@ -141,7 +214,7 @@ export function useRevealCandidateMutation(lang: "ar" | "en" = "ar") {
             credits_remaining: data.credits_remaining,
             rows: old.rows.map((row) =>
               row.id === applicantId
-                ? { ...row, is_revealed: true, phone: data.phone, email: data.email }
+                ? { ...row, is_revealed: true, phone: data.phone, email: data.email, resume_url: data.resume_url }
                 : row
             ),
           };

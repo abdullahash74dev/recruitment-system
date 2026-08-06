@@ -1,8 +1,9 @@
+import { useMemo } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Loader2, Lock, Unlock, Phone, Mail, SearchX } from "lucide-react";
+import { Loader2, Lock, Unlock, Phone, Mail, SearchX, FileText } from "lucide-react";
 import { useRevealCandidateMutation, type ClientApplicantRow } from "@/hooks/queries/useClientPortalSearch";
 
 interface ClientResultsTableProps {
@@ -12,6 +13,23 @@ interface ClientResultsTableProps {
 }
 
 const dash = (v: string | null | undefined) => (v && v.trim() ? v : "—");
+
+// Optional data columns -- hidden entirely (header + cells) when every row on
+// the current page has nothing to show for them, so a page of results never
+// drags along a wall of "—" cells for a field this batch of candidates just
+// didn't fill in.
+const DATA_COLUMNS: {
+  key: string;
+  ar: string;
+  en: string;
+  getValue: (row: ClientApplicantRow) => string | null | undefined;
+}[] = [
+  { key: "position", ar: "الوظيفة المطلوبة", en: "Desired Position", getValue: (r) => r.desired_position },
+  { key: "nationality", ar: "الجنسية", en: "Nationality", getValue: (r) => r.nationality },
+  { key: "city", ar: "المدينة", en: "City", getValue: (r) => r.preferred_city || r.current_city },
+  { key: "education", ar: "المؤهل العلمي", en: "Education", getValue: (r) => r.education_level },
+  { key: "experience", ar: "سنوات الخبرة", en: "Experience", getValue: (r) => r.years_experience },
+];
 
 /**
  * Results table for the client search portal. Purely presentational aside from
@@ -25,14 +43,17 @@ export default function ClientResultsTable({ lang, rows, isLoading }: ClientResu
   const revealMutation = useRevealCandidateMutation(lang);
   const revealingId = revealMutation.isPending ? (revealMutation.variables as string) : null;
 
-  const columns: { key: string; ar: string; en: string }[] = [
+  const visibleDataColumns = useMemo(
+    () => DATA_COLUMNS.filter((c) => rows.some((r) => { const v = c.getValue(r); return v && String(v).trim(); })),
+    [rows]
+  );
+  const anyHasResume = useMemo(() => rows.some((r) => r.has_resume), [rows]);
+
+  const columns = [
     { key: "name", ar: "الاسم", en: "Name" },
-    { key: "position", ar: "الوظيفة المطلوبة", en: "Desired Position" },
-    { key: "nationality", ar: "الجنسية", en: "Nationality" },
-    { key: "city", ar: "المدينة", en: "City" },
-    { key: "education", ar: "المؤهل العلمي", en: "Education" },
-    { key: "experience", ar: "سنوات الخبرة", en: "Experience" },
+    ...visibleDataColumns,
     { key: "contact", ar: "بيانات الاتصال", en: "Contact Info" },
+    ...(anyHasResume ? [{ key: "cv", ar: "السيرة الذاتية", en: "Résumé" }] : []),
   ];
 
   if (isLoading) {
@@ -92,11 +113,9 @@ export default function ClientResultsTable({ lang, rows, isLoading }: ClientResu
             return (
               <TableRow key={row.id}>
                 <TableCell className="font-medium">{dash(row.full_name)}</TableCell>
-                <TableCell>{dash(row.desired_position)}</TableCell>
-                <TableCell>{dash(row.nationality)}</TableCell>
-                <TableCell>{dash(row.preferred_city || row.current_city)}</TableCell>
-                <TableCell>{dash(row.education_level)}</TableCell>
-                <TableCell>{dash(row.years_experience)}</TableCell>
+                {visibleDataColumns.map((c) => (
+                  <TableCell key={c.key}>{dash(c.getValue(row))}</TableCell>
+                ))}
                 <TableCell>
                   {row.is_revealed ? (
                     <div className="flex flex-col gap-1">
@@ -147,6 +166,25 @@ export default function ClientResultsTable({ lang, rows, isLoading }: ClientResu
                     </div>
                   )}
                 </TableCell>
+                {anyHasResume && (
+                  <TableCell>
+                    {!row.has_resume ? (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    ) : row.is_revealed && row.resume_url ? (
+                      <Button size="sm" variant="outline" asChild>
+                        <a href={row.resume_url} target="_blank" rel="noopener noreferrer">
+                          <FileText className="h-3.5 w-3.5 ms-1.5" />
+                          {ar ? "عرض السيرة الذاتية" : "View résumé"}
+                        </a>
+                      </Button>
+                    ) : (
+                      <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <Lock className="h-3.5 w-3.5 shrink-0" />
+                        {ar ? "بعد الكشف" : "After reveal"}
+                      </span>
+                    )}
+                  </TableCell>
+                )}
               </TableRow>
             );
           })}

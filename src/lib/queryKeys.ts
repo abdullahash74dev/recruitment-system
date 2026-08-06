@@ -266,7 +266,11 @@ export const queryKeys = {
     // Nested under `all` so useRevealCandidateMutation can patch every cached
     // page/filter/search combo at once via a prefix match, without needing to
     // know which exact page the user is currently viewing.
-    search: (filters?: { field: string; value: string }[], search?: string, page?: number) =>
-      ["clientPortal", "search", filters ?? [], search ?? "", page ?? 1] as const,
+    search: (filters?: { field: string; value: string }[], search?: string, page?: number, searchMode?: string) =>
+      ["clientPortal", "search", filters ?? [], search ?? "", page ?? 1, searchMode ?? "any"] as const,
+    // Distinct-value facet counts for one filterable field, scoped to the
+    // OTHER currently-applied filters (so counts stay faceted/contextual).
+    facets: (field: string, otherFilters?: { field: string; value: string }[]) =>
+      ["clientPortal", "facets", field, otherFilters ?? []] as const,
   },
 } as const;
