@@ -11,7 +11,7 @@ import { Slider } from "@/components/ui/slider";
 import { toast } from "sonner";
 import { Palette, Upload, Save, Image, Wand2, Flag, RotateCcw, Check, Globe, Lock } from "lucide-react";
 import { invalidateSiteSettingsCache, useSiteSettings } from "@/hooks/useSiteSettings";
-import { refreshSiteLogo } from "@/components/SiteLogo";
+import { refreshSiteLogo, clampLogoOffset } from "@/components/SiteLogo";
 import { MAX_INLINE_IMAGE_SIZE, readImageAsDataUrl } from "@/lib/imageUpload";
 import defaultHeroBg from "@/assets/hero-bg.jpg";
 import { PALETTE_LABELS, type ThemePalette } from "@/contexts/ThemeContext";
@@ -374,38 +374,51 @@ const BrandingSettings = () => {
             </div>
           </div>
 
-          {/* Live Preview */}
-          {settings.logo_url && (
-            <div className="mt-3 p-6 rounded-lg border bg-gradient-to-br from-primary to-accent">
-              <p className="text-xs text-primary-foreground/80 mb-3">{ar ? "معاينة على خلفية ملوّنة" : "Preview on colored background"}</p>
-              <div className={`flex ${settings.logo_alignment === "center" ? "justify-center" : "justify-start"}`}>
-                <div
-                  style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    padding: `${settings.logo_padding}px`,
-                    borderRadius: `${parseInt(settings.logo_border_radius) || 0}px`,
-                    background: settings.logo_bg_color
-                      ? settings.logo_bg_color
-                      : (settings.logo_bg_enabled ? "rgba(255,255,255,0.85)" : "transparent"),
-                    boxShadow: settings.logo_shadow ? "0 8px 24px -8px rgba(0,0,0,0.5)" : undefined,
-                    border: settings.logo_border ? "1px solid rgba(255,255,255,0.4)" : undefined,
-                    transform: `translate(${settings.logo_offset_x}px, ${settings.logo_offset_y}px) rotate(${settings.logo_rotation}deg)`,
-                  }}
-                >
-                  <img src={settings.logo_url} alt="Preview"
+          {/* Live Preview — matches SiteLogo.tsx's fixed-height, self-clipping
+              box + clamped offsets, so what's previewed here is exactly what
+              renders everywhere else (no overlap with the controls above,
+              no unexpected cropping once it's shown in a header/sidebar). */}
+          {settings.logo_url && (() => {
+            const previewBoxH = logoH + settings.logo_padding * 2;
+            const previewBoxW = settings.logo_width ? settings.logo_width + settings.logo_padding * 2 : null;
+            const previewOffsetX = clampLogoOffset(settings.logo_offset_x, previewBoxW ?? previewBoxH);
+            const previewOffsetY = clampLogoOffset(settings.logo_offset_y, previewBoxH);
+            return (
+              <div className="mt-3 p-6 rounded-lg border bg-gradient-to-br from-primary to-accent">
+                <p className="text-xs text-primary-foreground/80 mb-3">{ar ? "معاينة على خلفية ملوّنة" : "Preview on colored background"}</p>
+                <div className={`flex ${settings.logo_alignment === "center" ? "justify-center" : "justify-start"}`}>
+                  <div
                     style={{
-                      height: `${logoH}px`,
-                      width: settings.logo_width ? `${settings.logo_width}px` : "auto",
-                      objectFit: settings.logo_fit as any,
-                      display: "block",
+                      position: "relative",
+                      overflow: "hidden",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      width: previewBoxW ? `${previewBoxW}px` : undefined,
+                      height: `${previewBoxH}px`,
+                      borderRadius: `${parseInt(settings.logo_border_radius) || 0}px`,
+                      background: settings.logo_bg_color
+                        ? settings.logo_bg_color
+                        : (settings.logo_bg_enabled ? "rgba(255,255,255,0.85)" : "transparent"),
+                      boxShadow: settings.logo_shadow ? "0 8px 24px -8px rgba(0,0,0,0.5)" : undefined,
+                      border: settings.logo_border ? "1px solid rgba(255,255,255,0.4)" : undefined,
                     }}
-                  />
+                  >
+                    <div style={{ display: "inline-flex", transform: `translate(${previewOffsetX}px, ${previewOffsetY}px) rotate(${settings.logo_rotation}deg)` }}>
+                      <img src={settings.logo_url} alt="Preview"
+                        style={{
+                          height: `${logoH}px`,
+                          width: settings.logo_width ? `${settings.logo_width}px` : "auto",
+                          objectFit: settings.logo_fit as any,
+                          display: "block",
+                        }}
+                      />
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
         </CardContent>
       </Card>
 

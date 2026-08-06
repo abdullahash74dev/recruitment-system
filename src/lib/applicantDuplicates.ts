@@ -10,6 +10,14 @@ interface DupMatchable {
   desired_position?: string | null;
 }
 
+// Every key requires `pos` (desired_position) — matching the tool's own stated
+// rule "الاسم + الجوال/الإيميل + الوظيفة" (name + phone/email + job). Previously
+// two keys (name+phone, name+email) omitted job title, which folded the same
+// person's applications to two DIFFERENT jobs into one "duplicate" group —
+// inflating the flagged count and risking archiving a real, distinct application.
+// Phone-number normalization strips non-digits only (no leading-zero/country-code
+// collapsing), so e.g. "0501234567" and "+966501234567" are NOT treated as equal —
+// this under-matches rather than over-matches, which is the safer failure mode here.
 export const dupKeys = (r: DupMatchable): string[] => {
   const n = String(r.full_name || "").trim().toLowerCase().replace(/\s+/g, " ");
   const p = String(r.phone || "").replace(/\D/g, "");
@@ -19,9 +27,6 @@ export const dupKeys = (r: DupMatchable): string[] => {
   if (n && p && e && pos) keys.push(`all:${n}|${p}|${e}|${pos}`);
   if (n && p && pos) keys.push(`name_phone_pos:${n}|${p}|${pos}`);
   if (n && e && pos) keys.push(`name_email_pos:${n}|${e}|${pos}`);
-  if (n && p && e) keys.push(`name_phone_email:${n}|${p}|${e}`);
-  if (n && p) keys.push(`name_phone:${n}|${p}`);
-  if (n && e) keys.push(`name_email:${n}|${e}`);
   return keys;
 };
 
