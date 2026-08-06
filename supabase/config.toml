@@ -11,3 +11,6 @@ verify_jwt = true
 
 [functions.reveal-candidate]
 verify_jwt = true
+
+[functions.client-portal-facets]
+verify_jwt = true

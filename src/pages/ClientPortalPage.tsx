@@ -1,48 +1,62 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { ChevronLeft, ChevronRight, LogOut, Search, Wallet, X } from "lucide-react";
-import { getNationalities, getSaudiCities, getEducationLevels, getJobPositions, getYearsOfExperience } from "@/data/jobPositions";
-import { useClientSearchQuery, type ClientFilterValue } from "@/hooks/queries/useClientPortalSearch";
+import {
+  useClientSearchQuery,
+  fetchClientFacets,
+  type ClientFilterValue,
+  type ClientFacetValue,
+  type ClientSearchMode,
+} from "@/hooks/queries/useClientPortalSearch";
+import { queryKeys } from "@/lib/queryKeys";
+import CategorizedFilterPanel, { type CategorizedFilterField } from "@/components/Dashboard/CategorizedFilterPanel";
 import ClientResultsTable from "@/components/ClientPortal/ClientResultsTable";
 
-const ALL = "__all__"; // sentinel for the "no filter" option — Radix <Select> rejects an empty-string value
-
-// The MVP filter set: a handful of the most-searched fields as plain <Select>s.
-// Options come from the same static bilingual lists used on the public application
-// form (src/data/jobPositions.ts) rather than a server-aggregated distinct-values
-// endpoint — the search edge function doesn't expose one yet. A follow-up pass
-// swaps this whole panel for <CategorizedFilterPanel> once it does.
-function useFilterFieldDefs(lang: "ar" | "en") {
-  return useMemo(
-    () => [
-      { key: "nationality", ar: "الجنسية", en: "Nationality", options: getNationalities(lang) },
-      { key: "desired_position", ar: "الوظيفة المطلوبة", en: "Desired Position", options: getJobPositions(lang) },
-      { key: "preferred_city", ar: "المدينة المفضلة", en: "Preferred City", options: getSaudiCities(lang) },
-      { key: "education_level", ar: "المؤهل العلمي", en: "Education Level", options: getEducationLevels(lang) },
-      { key: "years_experience", ar: "سنوات الخبرة", en: "Years of Experience", options: getYearsOfExperience(lang) },
-    ],
-    [lang]
-  );
-}
+// The same 19 fields the admin dashboard's ApplicantsAdvancedFilters exposes
+// (and the only ones client-search-applicants/client-portal-facets allow-list),
+// grouped into CategorizedFilterPanel's fixed 5-category taxonomy.
+const CLIENT_PORTAL_FIELDS: CategorizedFilterField[] = [
+  { key: "nationality", ar: "الجنسية", en: "Nationality", category: "personal" },
+  { key: "gender", ar: "الجنس", en: "Gender", category: "personal" },
+  { key: "marital_status", ar: "الحالة الاجتماعية", en: "Marital Status", category: "personal" },
+  { key: "current_city", ar: "المدينة الحالية", en: "Current City", category: "personal" },
+  { key: "preferred_city", ar: "المدينة المفضلة", en: "Preferred City", category: "personal" },
+  { key: "has_transport", ar: "وسيلة نقل", en: "Has Transport", category: "personal" },
+  { key: "desired_position", ar: "المسمى الوظيفي", en: "Desired Position", category: "experience" },
+  { key: "job_type", ar: "نوع الوظيفة", en: "Job Type", category: "experience" },
+  { key: "years_experience", ar: "سنوات الخبرة", en: "Years Experience", category: "experience" },
+  { key: "current_title", ar: "المسمى الحالي", en: "Current Title", category: "experience" },
+  { key: "currently_employed", ar: "موظف حالياً", en: "Currently Employed", category: "experience" },
+  { key: "source", ar: "المصدر", en: "Source", category: "experience" },
+  { key: "source_company", ar: "اسم الشركة المصدر", en: "Source Company", category: "experience" },
+  { key: "education_level", ar: "المؤهل العلمي", en: "Education", category: "education" },
+  { key: "major", ar: "التخصص", en: "Major", category: "education" },
+  { key: "university", ar: "الجامعة", en: "University", category: "education" },
+  { key: "arabic_level", ar: "اللغة العربية", en: "Arabic Level", category: "languages" },
+  { key: "english_level", ar: "اللغة الإنجليزية", en: "English Level", category: "languages" },
+  { key: "hear_about", ar: "كيف سمع عنا", en: "Heard About Us", category: "additional" },
+];
 
 export default function ClientPortalPage() {
   const { lang } = useLanguage();
   const ar = lang === "ar";
   const navigate = useNavigate();
-  const filterFieldDefs = useFilterFieldDefs(lang);
+  const queryClient = useQueryClient();
 
   const [searchInput, setSearchInput] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [selectValues, setSelectValues] = useState<Record<string, string>>({});
+  const [searchMode, setSearchMode] = useState<ClientSearchMode>("any");
+  const [filters, setFilters] = useState<ClientFilterValue[]>([]);
   const [page, setPage] = useState(1);
+  const [facetsTick, setFacetsTick] = useState(0);
 
   // Debounce free-text search so every keystroke doesn't fire a network request.
   useEffect(() => {
@@ -50,20 +64,30 @@ export default function ClientPortalPage() {
     return () => clearTimeout(t);
   }, [searchInput]);
 
-  // Reset back to page 1 whenever the effective query (search or any filter) changes.
+  // Reset back to page 1 whenever the effective query (search, mode, or any filter) changes.
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, selectValues]);
+  }, [debouncedSearch, searchMode, filters]);
 
-  const filters: ClientFilterValue[] = useMemo(
-    () =>
-      Object.entries(selectValues)
-        .filter(([, value]) => value && value !== ALL)
-        .map(([field, value]) => ({ field, value })),
-    [selectValues]
+  const { data, isLoading, isFetching } = useClientSearchQuery(filters, debouncedSearch, page, lang, searchMode);
+
+  // Faceted distinct-value counts per field, scoped by every OTHER active
+  // filter. CategorizedFilterPanel's getDistinctValues contract is
+  // synchronous, so this warms react-query's cache on first call for a given
+  // (field, otherFilters) combo and returns [] until it resolves, then bumps
+  // facetsTick to force a fresh getDistinctValues reference so the panel
+  // re-reads the now-cached value.
+  const getDistinctValues = useCallback(
+    (field: string) => {
+      const otherFilters = filters.filter((f) => f.field !== field);
+      const cached = queryClient.getQueryData<ClientFacetValue[]>(queryKeys.clientPortal.facets(field, otherFilters));
+      if (cached) return cached;
+      fetchClientFacets(queryClient, field, otherFilters, lang).then(() => setFacetsTick((t) => t + 1));
+      return [];
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filters, queryClient, lang, facetsTick]
   );
-
-  const { data, isLoading, isFetching } = useClientSearchQuery(filters, debouncedSearch, page, lang);
 
   const rows = data?.rows ?? [];
   const total = data?.total ?? 0;
@@ -75,7 +99,7 @@ export default function ClientPortalPage() {
 
   const clearFilters = () => {
     setSearchInput("");
-    setSelectValues({});
+    setFilters([]);
   };
 
   const handleLogout = async () => {
@@ -109,98 +133,104 @@ export default function ClientPortalPage() {
         </div>
       </header>
 
-      <main className="mx-auto max-w-7xl space-y-4 px-4 py-6">
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">{ar ? "بحث وتصفية" : "Search & Filters"}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="relative">
-              <Search className="pointer-events-none absolute top-1/2 -translate-y-1/2 start-3 h-4 w-4 text-muted-foreground" />
-              <Input
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-                placeholder={ar ? "ابحث بالاسم، المسمى الوظيفي..." : "Search by name, job title..."}
-                className="ps-9"
+      <main className="mx-auto max-w-7xl px-4 py-6">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[300px_1fr]">
+          <Card className="lg:sticky lg:top-[73px] lg:h-[calc(100vh-90px)] lg:overflow-hidden">
+            <CardContent className="pt-4 h-full overflow-hidden">
+              <CategorizedFilterPanel
+                fields={CLIENT_PORTAL_FIELDS}
+                lang={lang}
+                filters={filters}
+                setFilters={setFilters}
+                getDistinctValues={getDistinctValues}
               />
-            </div>
+            </CardContent>
+          </Card>
 
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
-              {filterFieldDefs.map((field) => (
-                <div key={field.key} className="space-y-1.5">
-                  <Label className="text-xs text-muted-foreground">{ar ? field.ar : field.en}</Label>
-                  <Select
-                    value={selectValues[field.key] ?? ALL}
-                    onValueChange={(value) =>
-                      setSelectValues((prev) => ({ ...prev, [field.key]: value }))
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder={ar ? "الكل" : "All"} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={ALL}>{ar ? "الكل" : "All"}</SelectItem>
-                      {field.options.map((opt) => (
-                        <SelectItem key={opt} value={opt}>
-                          {opt}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+          <div className="space-y-4">
+            <Card>
+              <CardContent className="pt-4 space-y-3">
+                <div className="relative">
+                  <Search className="pointer-events-none absolute top-1/2 -translate-y-1/2 start-3 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    value={searchInput}
+                    onChange={(e) => setSearchInput(e.target.value)}
+                    placeholder={ar ? "ابحث بالاسم، المسمى الوظيفي، التخصص..." : "Search by name, job title, major..."}
+                    className="ps-9"
+                  />
                 </div>
-              ))}
-            </div>
 
-            {hasActiveFilters && (
-              <Button variant="ghost" size="sm" onClick={clearFilters}>
-                <X className="h-3.5 w-3.5 ms-1.5" />
-                {ar ? "مسح الفلاتر" : "Clear filters"}
-              </Button>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-3">
-            <CardTitle className="text-base">
-              {ar ? `النتائج (${total})` : `Results (${total})`}
-            </CardTitle>
-            {isFetching && !isLoading && (
-              <span className="text-xs text-muted-foreground">{ar ? "جارِ التحديث..." : "Updating..."}</span>
-            )}
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <ClientResultsTable lang={lang} rows={rows} isLoading={isLoading} />
-
-            {total > 0 && (
-              <div className="flex items-center justify-between gap-2 pt-1">
-                <span className="text-sm text-muted-foreground">
-                  {ar ? `الصفحة ${page} من ${totalPages}` : `Page ${page} of ${totalPages}`}
-                </span>
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs text-muted-foreground">
+                    {ar ? "نمط البحث:" : "Search mode:"}
+                  </span>
+                  <ToggleGroup
+                    type="single"
                     size="sm"
-                    disabled={page <= 1}
-                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    value={searchMode}
+                    onValueChange={(v) => v && setSearchMode(v as ClientSearchMode)}
                   >
-                    {ar ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
-                    {ar ? "السابق" : "Previous"}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={page >= totalPages}
-                    onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  >
-                    {ar ? "التالي" : "Next"}
-                    {ar ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
-                  </Button>
+                    <ToggleGroupItem value="any" className="text-xs px-3">
+                      {ar ? "أي كلمة" : "Any words"}
+                    </ToggleGroupItem>
+                    <ToggleGroupItem value="all" className="text-xs px-3">
+                      {ar ? "كل الكلمات" : "All words"}
+                    </ToggleGroupItem>
+                  </ToggleGroup>
+
+                  {hasActiveFilters && (
+                    <Button variant="ghost" size="sm" onClick={clearFilters} className="ms-auto">
+                      <X className="h-3.5 w-3.5 ms-1.5" />
+                      {ar ? "مسح الكل" : "Clear all"}
+                    </Button>
+                  )}
                 </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-3">
+                <CardTitle className="text-base">
+                  {ar ? `النتائج (${total})` : `Results (${total})`}
+                </CardTitle>
+                {isFetching && !isLoading && (
+                  <span className="text-xs text-muted-foreground">{ar ? "جارِ التحديث..." : "Updating..."}</span>
+                )}
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <ClientResultsTable lang={lang} rows={rows} isLoading={isLoading} />
+
+                {total > 0 && (
+                  <div className="flex items-center justify-between gap-2 pt-1">
+                    <span className="text-sm text-muted-foreground">
+                      {ar ? `الصفحة ${page} من ${totalPages}` : `Page ${page} of ${totalPages}`}
+                    </span>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={page <= 1}
+                        onClick={() => setPage((p) => Math.max(1, p - 1))}
+                      >
+                        {ar ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+                        {ar ? "السابق" : "Previous"}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={page >= totalPages}
+                        onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                      >
+                        {ar ? "التالي" : "Next"}
+                        {ar ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       </main>
     </div>
   );

@@ -1,11 +1,11 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from "@/components/ui/accordion";
-import { ChevronDown, ChevronUp, Search, X, XCircle } from "lucide-react";
+import { ChevronDown, ChevronUp, Search, Sparkles, X, XCircle } from "lucide-react";
 
 export interface CategorizedFilterField {
   key: string;
@@ -19,12 +19,25 @@ export interface CategorizedFilterValue {
   value: string;
 }
 
+// A distinct-value entry from getDistinctValues(). `value` is what's actually
+// stored in filters/sent to the backend (may be an opaque encoded key, e.g. a
+// canonical synonym-group token) -- `label` is what's shown to the user, and
+// defaults to `value` when omitted. `isGroup` marks a synonym-group entry
+// (multiple raw values collapsed into one canonical match) for a small visual
+// hint, distinguishing it from a literal single-value match.
+export interface DistinctValueEntry {
+  value: string;
+  count: number;
+  label?: string;
+  isGroup?: boolean;
+}
+
 interface CategorizedFilterPanelProps {
   fields: CategorizedFilterField[];
   lang: "ar" | "en";
   filters: CategorizedFilterValue[];
   setFilters: (f: CategorizedFilterValue[]) => void;
-  getDistinctValues: (field: string) => { value: string; count: number }[];
+  getDistinctValues: (field: string) => DistinctValueEntry[];
   locked?: boolean;
 }
 
@@ -185,7 +198,7 @@ interface FieldRowProps {
   onToggleValue: (value: string) => void;
   search: string;
   onSearchChange: (value: string) => void;
-  getDistinctValues: (field: string) => { value: string; count: number }[];
+  getDistinctValues: (field: string) => DistinctValueEntry[];
 }
 
 function FieldRow({
@@ -196,17 +209,25 @@ function FieldRow({
 
   // Only compute distinct values while the row is expanded — getDistinctValues may be
   // an expensive scan/aggregate on the caller's side, so avoid running it for every
-  // collapsed field on every render.
-  const distinct = useMemo(() => {
-    if (!isExpanded) return [];
-    return getDistinctValues(field.key);
+  // collapsed field on every render. Kept in state (not reset to [] on collapse) so
+  // the applied-chips row below can still resolve a human label for a value applied
+  // while the row was previously open, instead of falling back to its raw token.
+  const [distinct, setDistinct] = useState<DistinctValueEntry[]>([]);
+  useEffect(() => {
+    if (isExpanded) setDistinct(getDistinctValues(field.key));
   }, [isExpanded, getDistinctValues, field.key]);
+
+  const labelByValue = useMemo(() => {
+    const map = new Map<string, DistinctValueEntry>();
+    for (const d of distinct) map.set(d.value, d);
+    return map;
+  }, [distinct]);
 
   const filteredDistinct = useMemo(() => {
     const q = search.trim().toLowerCase();
     const sorted = [...distinct].sort((a, b) => b.count - a.count || a.value.localeCompare(b.value));
     if (!q) return sorted;
-    return sorted.filter((d) => d.value.toLowerCase().includes(q));
+    return sorted.filter((d) => (d.label ?? d.value).toLowerCase().includes(q));
   }, [distinct, search]);
 
   return (
@@ -230,7 +251,8 @@ function FieldRow({
         <div className="flex flex-wrap gap-1 px-2 pb-1.5 ps-4">
           {Array.from(applied).map((v) => (
             <Badge key={v} variant="outline" className="gap-1 pe-1 text-[11px] font-normal">
-              <span className="truncate max-w-[160px]">{v}</span>
+              {labelByValue.get(v)?.isGroup && <Sparkles className="w-3 h-3 shrink-0 opacity-70" />}
+              <span className="truncate max-w-[160px]">{labelByValue.get(v)?.label ?? v}</span>
               <button
                 type="button"
                 onClick={() => onRemoveValue(v)}
@@ -276,7 +298,8 @@ function FieldRow({
                       className="w-full flex items-center gap-2 px-2 py-1.5 rounded hover:bg-muted text-start text-xs disabled:cursor-not-allowed"
                     >
                       <Checkbox checked={checked} className="pointer-events-none shrink-0" />
-                      <span className="flex-1 truncate">{d.value}</span>
+                      {d.isGroup && <Sparkles className="w-3.5 h-3.5 shrink-0 opacity-60" />}
+                      <span className="flex-1 truncate">{d.label ?? d.value}</span>
                       <Badge variant="secondary" className="text-[10px] h-5 shrink-0">{d.count}</Badge>
                     </button>
                   );
