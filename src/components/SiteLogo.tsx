@@ -39,6 +39,18 @@ async function fetchLogoRow(): Promise<LogoData | null> {
 
 export const refreshSiteLogo = () => queryClient.invalidateQueries({ queryKey: queryKeys.siteSettings.all });
 
+/**
+ * Keeps a configured logo offset inside a sane fraction of its own box instead
+ * of letting it slide arbitrarily far. Without this, the same offset value
+ * renders as "overlapping neighboring UI" wherever the container has no
+ * overflow clipping and as "cropped" wherever it does — exported so both
+ * <SiteLogo/> and the live preview in BrandingSettings.tsx clamp identically.
+ */
+export const clampLogoOffset = (value: number, boxSize: number, maxFraction = 0.35): number => {
+  const max = boxSize * maxFraction;
+  return Math.min(max, Math.max(-max, value));
+};
+
 interface Props {
   alt?: string;
   className?: string;
@@ -83,36 +95,57 @@ export const SiteLogo = ({ alt = "Logo", className = "", heightOverride }: Props
 
   const altName = alt || data?.site_name_ar || data?.site_name_en || "Logo";
 
+  // Fixed-height, self-clipping box: the logo can never visually escape it
+  // vertically, so the same offset/rotation renders identically as "contained"
+  // everywhere this component is used — instead of "overlapping" wherever the
+  // parent happens to have no overflow clipping and "cropped" wherever it does.
+  // Width stays auto (undefined) when logo_width isn't set, so a non-square
+  // logo isn't squeezed into a square box — overflow:hidden is a no-op on an
+  // auto-width flex item since there's nothing wider than its own content.
+  const boxH = h + padding * 2;
+  const boxW = w ? w + padding * 2 : null;
+  const offsetX = clampLogoOffset(data?.logo_offset_x ?? 0, boxW ?? boxH);
+  const offsetY = clampLogoOffset(data?.logo_offset_y ?? 0, boxH);
+
   return (
     <div
       className={className}
       style={{
+        position: "relative",
+        overflow: "hidden",
         display: "inline-flex",
         alignItems: "center",
         justifyContent: "center",
-        padding: `${padding}px`,
+        width: boxW ? `${boxW}px` : undefined,
+        height: `${boxH}px`,
         borderRadius: `${parseInt(String(radius)) || 0}px`,
         background: bg || (data?.logo_bg_enabled ? "rgba(255,255,255,0.9)" : "transparent"),
         boxShadow: data?.logo_shadow ? "0 8px 24px -8px rgba(0,0,0,0.25)" : undefined,
         border: data?.logo_border ? "1px solid hsl(var(--border))" : undefined,
-        transform: `translate(${data?.logo_offset_x ?? 0}px, ${data?.logo_offset_y ?? 0}px) rotate(${data?.logo_rotation ?? 0}deg)`,
-        transition: "all 0.2s ease",
       }}
     >
-      {url ? (
-        <img
-          src={url}
-          alt={altName}
-          style={{
-            height: `${h}px`,
-            width: w ? `${w}px` : "auto",
-            objectFit: (data?.logo_fit as any) || "contain",
-            display: "block",
-          }}
-        />
-      ) : (
-        <BrandMark size={h} aria-label={altName} />
-      )}
+      <div
+        style={{
+          display: "inline-flex",
+          transform: `translate(${offsetX}px, ${offsetY}px) rotate(${data?.logo_rotation ?? 0}deg)`,
+          transition: "all 0.2s ease",
+        }}
+      >
+        {url ? (
+          <img
+            src={url}
+            alt={altName}
+            style={{
+              height: `${h}px`,
+              width: w ? `${w}px` : "auto",
+              objectFit: (data?.logo_fit as any) || "contain",
+              display: "block",
+            }}
+          />
+        ) : (
+          <BrandMark size={h} aria-label={altName} />
+        )}
+      </div>
     </div>
   );
 };

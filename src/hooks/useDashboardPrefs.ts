@@ -87,14 +87,26 @@ interface PrefsData {
 }
 
 async function fetchDashboardPrefs(): Promise<PrefsData> {
-  const { data: { user } } = await supabase.auth.getUser();
+  // getSession() reads the locally-cached JWT and only hits the network if it's
+  // actually expired. getUser() always makes a live round-trip to the Auth
+  // server and — unlike a rejected promise — resolves `{ user: null }` on a
+  // transient network blip or a background token-refresh race, with no error
+  // thrown. That silently fell through to the localStorage/default theme below,
+  // discarding a real "Professional Graphite" choice already saved in the DB —
+  // the "theme reverts after a while" bug. Throwing on a real error here instead
+  // lets React Query's retry/keep-previous-data behavior handle it, rather than
+  // this function quietly reporting "logged out."
+  const { data: { session }, error } = await supabase.auth.getSession();
+  if (error) throw error;
+  const user = session?.user ?? null;
   if (!user) {
     const local = localStorage.getItem(STORAGE_KEY);
     let prefs = DEFAULT_PREFS;
     if (local) { try { prefs = mergeWithDefaults(JSON.parse(local)); } catch { /* ignore corrupt local prefs */ } }
     return { prefs, userId: null };
   }
-  const { data } = await supabase.from("dashboard_preferences").select("prefs").eq("user_id", user.id).maybeSingle();
+  const { data, error: prefsError } = await supabase.from("dashboard_preferences").select("prefs").eq("user_id", user.id).maybeSingle();
+  if (prefsError) throw prefsError;
   return { prefs: mergeWithDefaults(data?.prefs as Partial<DashboardPrefs> | undefined), userId: user.id };
 }
 

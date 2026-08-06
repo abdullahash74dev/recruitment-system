@@ -93,6 +93,7 @@ function Harness() {
         <ThemeProvider>
           <ApplicantsAdvancedFilters
             applicants={APPLICANTS}
+            baseApplicants={APPLICANTS}
             lang="ar"
             filters={filters}
             setFilters={setFilters}

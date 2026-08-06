@@ -158,30 +158,35 @@ async function fetchApplicantsProgressive(
 }
 
 /**
- * Wraps the original progressive applicants loader in `useQuery` so the result
- * survives navigation/remounts within the session (no persistence to localStorage
- * — this list is too large/volatile for that, matching the original "fetch once
- * per mount" behavior on a hard refresh).
+ * Wraps the original progressive applicants loader in `useQuery`, persisted to
+ * IndexedDB (see App.tsx). `staleTime: Infinity` is deliberate: at 100k+ rows a
+ * background restale re-runs the full ~104-request progressive fetch, which is
+ * exactly the "every dashboard open is slow" complaint this was causing when the
+ * staleTime was 10 minutes. The cached table is trusted until an explicit
+ * `refetch()` (manual refresh, or after an import completes) or a mutation
+ * invalidates `queryKeys.applicants.all`.
  */
 export function useApplicantsQuery(lang: "ar" | "en") {
   const queryClient = useQueryClient();
-  const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [loadProgress, setLoadProgress] = useState<ApplicantsLoadProgress>({ loaded: 0, total: 0 });
 
   const query = useQuery({
     queryKey: APPLICANTS_QUERY_KEY,
     queryFn: () => {
-      setIsInitialLoading(true);
       setLoadProgress({ loaded: 0, total: 0 });
-      return fetchApplicantsProgressive(queryClient, setLoadProgress, () => setIsInitialLoading(false), lang);
+      return fetchApplicantsProgressive(queryClient, setLoadProgress, () => {}, lang);
     },
-    staleTime: 10 * 60 * 1000, // 10 min — shows cached instantly, refetches in background after that
+    staleTime: Infinity,
     gcTime: 24 * 60 * 60 * 1000,
   });
 
+  const applicants = query.data ?? [];
   return {
-    applicants: query.data ?? [],
-    isLoading: isInitialLoading,
+    applicants,
+    // Only block the UI when there is truly no data yet (cold start with an
+    // empty/expired cache) — a query considered "stale" by a mutation elsewhere
+    // must never re-show this gate while the previous full table is still valid.
+    isLoading: applicants.length === 0 && (query.isLoading || query.isFetching),
     loadProgress,
     refetch: query.refetch,
   };

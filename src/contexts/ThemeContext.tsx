@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { useLocation } from "react-router-dom";
 import { fetchSiteSettings } from "@/hooks/useSiteSettings";
+import { logClientError } from "@/lib/errorLog";
 
 export type ThemeMode = "light" | "dark";
 export type ThemePalette =
@@ -227,12 +228,25 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     if (isAdminRoute) return;
     let mounted = true;
-    fetchSiteSettings().then((settings) => {
-      if (!mounted) return;
-      const raw = settings.public_theme_palette as ThemePalette;
-      const publicPalette: ThemePalette = PALETTES.includes(raw) ? raw : "custom";
-      setPublicTokens(computePublicThemeTokens(publicPalette, settings.primary_color, settings.accent_color));
-    });
+    fetchSiteSettings()
+      .then((settings) => {
+        if (!mounted) return;
+        const raw = settings.public_theme_palette as ThemePalette;
+        const publicPalette: ThemePalette = PALETTES.includes(raw) ? raw : "custom";
+        setPublicTokens(computePublicThemeTokens(publicPalette, settings.primary_color, settings.accent_color));
+      })
+      .catch((error) => {
+        // Leave publicTokens as whatever was last successfully applied rather
+        // than silently resetting to the generic blue default — a transient
+        // fetch failure must not visibly "un-brand" the public site.
+        if (!mounted) return;
+        logClientError({
+          severity: "warning",
+          source: "client",
+          message: error instanceof Error ? error.message : String(error),
+          context: { where: "ThemeContext.fetchSiteSettings" },
+        });
+      });
     return () => { mounted = false; };
   }, [isAdminRoute]);
 
