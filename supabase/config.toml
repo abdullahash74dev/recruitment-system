@@ -5,3 +5,9 @@ verify_jwt = true
 
 [functions.system-health]
 verify_jwt = true
+
+[functions.client-search-applicants]
+verify_jwt = true
+
+[functions.reveal-candidate]
+verify_jwt = true

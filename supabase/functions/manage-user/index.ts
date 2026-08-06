@@ -204,6 +204,99 @@ Deno.serve(async (req) => {
       });
     }
 
+    if (action === "create_client_user") {
+      const { email, password, full_name, client_organization_id } = body;
+      if (!email || !password || !client_organization_id) {
+        return new Response(JSON.stringify({ error: "Missing required fields" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const { data: org, error: orgLookupError } = await supabaseAdmin
+        .from("client_organizations")
+        .select("id")
+        .eq("id", client_organization_id)
+        .maybeSingle();
+      if (orgLookupError || !org) {
+        return new Response(JSON.stringify({ error: "Unknown client_organization_id" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const { data: userData, error: createError } = await supabaseAdmin.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true,
+        user_metadata: { display_name: full_name || email },
+      });
+
+      if (createError) {
+        return new Response(JSON.stringify({ error: createError.message }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      await supabaseAdmin.from("user_roles").insert({
+        user_id: userData.user.id,
+        role: "client",
+      });
+
+      const { error: clientUserInsertError } = await supabaseAdmin.from("client_users").insert({
+        user_id: userData.user.id,
+        client_organization_id,
+        full_name: full_name || null,
+        email,
+      });
+
+      if (clientUserInsertError) {
+        // Roll back the auth user so a failed client_users insert never leaves
+        // an orphaned login with no organization attached.
+        await supabaseAdmin.auth.admin.deleteUser(userData.user.id);
+        return new Response(JSON.stringify({ error: clientUserInsertError.message }), {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      return new Response(JSON.stringify({ success: true, user_id: userData.user.id }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    if (action === "toggle_client_user_active") {
+      const { client_user_id, is_active } = body;
+      if (!client_user_id || typeof is_active !== "boolean") {
+        return new Response(JSON.stringify({ error: "Missing required fields" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      const { data: clientUser } = await supabaseAdmin
+        .from("client_users")
+        .select("user_id")
+        .eq("id", client_user_id)
+        .maybeSingle();
+      if (!clientUser) {
+        return new Response(JSON.stringify({ error: "Unknown client_user_id" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      await supabaseAdmin.from("client_users").update({ is_active }).eq("id", client_user_id);
+      await supabaseAdmin.auth.admin.updateUserById(clientUser.user_id, {
+        ban_duration: is_active ? "none" : "876600h",
+      });
+
+      return new Response(JSON.stringify({ success: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     return new Response(JSON.stringify({ error: "Unknown action" }), {
       status: 400,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
