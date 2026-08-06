@@ -24,6 +24,9 @@ import ResetPasswordPage from "./pages/ResetPasswordPage.tsx";
 import DashboardPage from "./pages/DashboardPage.tsx";
 import HrFormsShell from "./pages/HrForms/HrFormsShell.tsx";
 import ExecutiveRecruitmentPage from "./pages/ExecutiveRecruitmentPage.tsx";
+import ClientPortalLoginPage from "./pages/ClientPortalLoginPage.tsx";
+import ClientPortalPage from "./pages/ClientPortalPage.tsx";
+import ClientPortalGuard from "@/components/ClientPortal/ClientPortalGuard";
 import NotFound from "./pages/NotFound.tsx";
 import { useEffect } from "react";
 import { loadUIStyles, applyUIStyles } from "@/components/Dashboard/UIStylingSettings";
@@ -121,6 +124,10 @@ const App = () => (
 
                 {/* Legacy redirect */}
                 <Route path="/dashboard" element={<AdminGuard><DashboardPage /></AdminGuard>} />
+
+                {/* Client rental portal — separate auth/guard from the HR admin dashboard */}
+                <Route path="/client-portal/login" element={<ClientPortalLoginPage />} />
+                <Route path="/client-portal" element={<ClientPortalGuard><ClientPortalPage /></ClientPortalGuard>} />
 
                 <Route path="*" element={<NotFound />} />
               </Routes>

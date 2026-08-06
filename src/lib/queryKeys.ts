@@ -261,4 +261,12 @@ export const queryKeys = {
     all: ["hrFormIssuances"] as const,
     list: () => ["hrFormIssuances", "list"] as const,
   },
+  clientPortal: {
+    all: ["clientPortal"] as const,
+    // Nested under `all` so useRevealCandidateMutation can patch every cached
+    // page/filter/search combo at once via a prefix match, without needing to
+    // know which exact page the user is currently viewing.
+    search: (filters?: { field: string; value: string }[], search?: string, page?: number) =>
+      ["clientPortal", "search", filters ?? [], search ?? "", page ?? 1] as const,
+  },
 } as const;

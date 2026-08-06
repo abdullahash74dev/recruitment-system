@@ -68,6 +68,7 @@ import RecruiterAssignment from "@/components/Dashboard/RecruiterAssignment";
 import OnboardingModule from "@/components/Dashboard/OnboardingModule";
 import BudgetTracking from "@/components/Dashboard/BudgetTracking";
 import GDPRTools from "@/components/Dashboard/GDPRTools";
+import ClientRentalManagement from "@/components/Dashboard/ClientRentalManagement";
 import PipelineAutomation from "@/components/Dashboard/PipelineAutomation";
 import AssessmentsModule from "@/components/Dashboard/AssessmentsModule";
 import MessagingCenter from "@/components/Dashboard/MessagingCenter";
@@ -89,7 +90,7 @@ import AINetworkBackground from "@/components/AINetworkBackground";
 import AuroraBackground from "@/components/AuroraBackground";
 import type { ApplicantEmailStatus } from "@/lib/applicantEmailTemplates";
 import { STATUSES_WITH_EMAIL } from "@/lib/applicantEmailTemplates";
-import { Mail, Activity, Bot, UserCog, Target, Globe, Menu, Palette, ListChecks, FlaskConical, CalendarDays, Star, FileCheck, Users2, UserPlus2, ClipboardList, Timer, UserCog2, GraduationCap, DollarSign, ShieldCheck, Zap, FileQuestion, MessageSquare, Video, Share2, MailPlus, Plug } from "lucide-react";
+import { Mail, Activity, Bot, UserCog, Target, Globe, Menu, Palette, ListChecks, FlaskConical, CalendarDays, Star, FileCheck, Users2, UserPlus2, ClipboardList, Timer, UserCog2, GraduationCap, DollarSign, ShieldCheck, Zap, FileQuestion, MessageSquare, Video, Share2, MailPlus, Plug, Building2 } from "lucide-react";
 import DashboardSidebar, { type DashboardNavGroup } from "@/components/Dashboard/DashboardSidebar";
 import DashboardSidebarFuturistic from "@/components/Dashboard/DashboardSidebarFuturistic";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -740,6 +741,7 @@ const DashboardPage = () => {
   if (isAdmin) managementItems.push({ value: "onboarding", label: lang === "ar" ? "التأهيل الوظيفي" : "Onboarding", icon: GraduationCap });
   if (isAdmin) managementItems.push({ value: "budget_tracking", label: lang === "ar" ? "الميزانية والتكلفة" : "Budget Tracking", icon: DollarSign });
   if (isAdmin) managementItems.push({ value: "automation_rules", label: lang === "ar" ? "أتمتة المسار" : "Automation Rules", icon: Zap });
+  if (isAdmin) managementItems.push({ value: "client_rental", label: lang === "ar" ? "الشركات المستأجرة" : "Client Rental", icon: Building2 });
   if (isAdmin) managementItems.push({ value: "email_templates", label: lang === "ar" ? "قوالب البريد والحملات" : "Email Templates", icon: MailPlus });
   if (managementItems.length) navGroups.push({ id: "management", title: lang === "ar" ? "الإدارة" : "Management", items: managementItems });
 
@@ -1515,6 +1517,10 @@ const DashboardPage = () => {
 
           <TabsContent value="gdpr_tools">
             <GDPRTools />
+          </TabsContent>
+
+          <TabsContent value="client_rental">
+            <ClientRentalManagement />
           </TabsContent>
 
           <TabsContent value="assessments">
