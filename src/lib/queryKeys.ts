@@ -275,5 +275,8 @@ export const queryKeys = {
     // OTHER currently-applied filters (so counts stay faceted/contextual).
     facets: (field: string, otherFilters?: { field: string; value: string }[]) =>
       ["clientPortal", "facets", field, otherFilters ?? []] as const,
+    // The org's full reveal history (client-revealed-candidates), independent
+    // of any current search/filter state.
+    revealed: (page?: number) => ["clientPortal", "revealed", page ?? 1] as const,
   },
 } as const;

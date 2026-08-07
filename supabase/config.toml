@@ -17,3 +17,6 @@ verify_jwt = true
 
 [functions.reveal-candidates-bulk]
 verify_jwt = true
+
+[functions.client-revealed-candidates]
+verify_jwt = true

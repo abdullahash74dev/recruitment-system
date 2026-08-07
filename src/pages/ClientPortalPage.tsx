@@ -8,13 +8,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
-  CheckSquare, ChevronLeft, ChevronRight, Loader2, LogOut, Save, Search, Trash2, Unlock, Wallet, X,
+  CheckSquare, ChevronLeft, ChevronRight, History, Loader2, LogOut, Save, Search, Trash2, Unlock, Wallet, X,
 } from "lucide-react";
 import {
   useClientSearchQuery,
   useBulkRevealCandidatesMutation,
+  useClientRevealedCandidatesQuery,
   fetchClientFacets,
   type ClientFilterValue,
   type ClientFacetValue,
@@ -28,6 +30,7 @@ import {
 import { queryKeys } from "@/lib/queryKeys";
 import CategorizedFilterPanel, { type CategorizedFilterField } from "@/components/Dashboard/CategorizedFilterPanel";
 import ClientResultsTable from "@/components/ClientPortal/ClientResultsTable";
+import ClientRevealedCandidatesTable from "@/components/ClientPortal/ClientRevealedCandidatesTable";
 
 // The same 19 fields the admin dashboard's ApplicantsAdvancedFilters exposes
 // (and the only ones client-search-applicants/client-portal-facets allow-list),
@@ -191,6 +194,15 @@ export default function ClientPortalPage() {
     navigate("/client-portal/login");
   };
 
+  // ---- "المرشحين المكشوفين" tab: the org's full reveal history, independent
+  // of the search tab's current filters/page. ----
+  const [activeTab, setActiveTab] = useState<"search" | "revealed">("search");
+  const [revealedPage, setRevealedPage] = useState(1);
+  const { data: revealedData, isLoading: revealedLoading } = useClientRevealedCandidatesQuery(revealedPage, lang);
+  const revealedRows = revealedData?.rows ?? [];
+  const revealedTotal = revealedData?.total ?? 0;
+  const revealedTotalPages = Math.max(1, Math.ceil(revealedTotal / 20));
+
   return (
     <div dir={ar ? "rtl" : "ltr"} className="min-h-screen bg-muted/30">
       <header className="sticky top-0 z-10 border-b bg-background">
@@ -218,6 +230,62 @@ export default function ClientPortalPage() {
       </header>
 
       <main className="mx-auto max-w-7xl px-4 py-6">
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "search" | "revealed")} className="mb-4">
+          <TabsList>
+            <TabsTrigger value="search" className="gap-1.5">
+              <Search className="h-3.5 w-3.5" />
+              {ar ? "البحث" : "Search"}
+            </TabsTrigger>
+            <TabsTrigger value="revealed" className="gap-1.5">
+              <History className="h-3.5 w-3.5" />
+              {ar ? "المرشحين المكشوفين" : "Revealed Candidates"}
+              {revealedTotal > 0 && (
+                <Badge variant="secondary" className="text-[10px] h-4 px-1.5">{revealedTotal}</Badge>
+              )}
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+
+        {activeTab === "revealed" ? (
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">
+                {ar ? `المرشحين المكشوفين (${revealedTotal})` : `Revealed Candidates (${revealedTotal})`}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <ClientRevealedCandidatesTable lang={lang} rows={revealedRows} isLoading={revealedLoading} />
+
+              {revealedTotal > 0 && (
+                <div className="flex items-center justify-between gap-2 pt-1">
+                  <span className="text-sm text-muted-foreground">
+                    {ar ? `الصفحة ${revealedPage} من ${revealedTotalPages}` : `Page ${revealedPage} of ${revealedTotalPages}`}
+                  </span>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={revealedPage <= 1}
+                      onClick={() => setRevealedPage((p) => Math.max(1, p - 1))}
+                    >
+                      {ar ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+                      {ar ? "السابق" : "Previous"}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={revealedPage >= revealedTotalPages}
+                      onClick={() => setRevealedPage((p) => Math.min(revealedTotalPages, p + 1))}
+                    >
+                      {ar ? "التالي" : "Next"}
+                      {ar ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        ) : (
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-[300px_1fr]">
           <Card className="lg:sticky lg:top-[73px] lg:h-[calc(100vh-90px)] lg:overflow-hidden">
             <CardContent className="pt-4 h-full overflow-hidden">
@@ -399,6 +467,7 @@ export default function ClientPortalPage() {
             </Card>
           </div>
         </div>
+        )}
       </main>
 
       <Dialog open={bulkConfirmOpen} onOpenChange={setBulkConfirmOpen}>
