@@ -73,6 +73,52 @@ export interface ClientRevealedResult {
   total: number;
 }
 
+/** Full profile returned by `client-applicant-profile` -- only ever fetchable
+ * for an applicant this org has already revealed (enforced server-side, not
+ * just hidden in the UI). Document fields are signed URLs, not raw storage
+ * paths. Deliberately excludes internal-only columns (notes, status,
+ * source/source_company, submission_token_hash, is_archived) -- see the edge
+ * function's PROFILE_COLUMNS comment for why. */
+export interface ClientApplicantProfile {
+  id: string;
+  full_name: string;
+  phone: string | null;
+  email: string | null;
+  gender: string | null;
+  nationality: string | null;
+  birth_date: string | null;
+  marital_status: string | null;
+  current_city: string | null;
+  preferred_city: string | null;
+  has_transport: string | null;
+  linkedin: string | null;
+  education_level: string | null;
+  major: string | null;
+  university: string | null;
+  graduation_year: string | null;
+  gpa: string | null;
+  desired_position: string | null;
+  job_type: string | null;
+  years_experience: string | null;
+  currently_employed: string | null;
+  current_title: string | null;
+  current_salary: string | null;
+  expected_salary: string | null;
+  available_date: string | null;
+  current_tasks: string | null;
+  other_experience: string | null;
+  facility_management_exp: string | null;
+  arabic_level: string | null;
+  english_level: string | null;
+  other_language: string | null;
+  self_summary: string | null;
+  resume_url: string | null;
+  degree_url: string | null;
+  experience_cert_url: string | null;
+  training_certs_url: string | null;
+  other_docs_url: string | null;
+}
+
 export const CLIENT_PORTAL_PAGE_SIZE = 20;
 
 interface EdgeFunctionErrorInfo {
@@ -168,6 +214,34 @@ export function useClientRevealedCandidatesQuery(page: number, lang: "ar" | "en"
     },
     staleTime: 30 * 1000,
     placeholderData: (prev) => prev,
+  });
+}
+
+/**
+ * The full structured profile for one applicant via `client-applicant-profile`
+ * -- server-side enforces this only ever resolves for an applicant this org
+ * has already revealed (`enabled` here is just UX gating, not the real
+ * security boundary; the edge function checks candidate_reveals itself).
+ * This is the client-facing replacement for handing out the raw uploaded
+ * résumé PDF: a structured, always-legible view instead of an arbitrary
+ * file, and the natural landing spot for AI-parsed résumé fields later.
+ */
+export function useClientApplicantProfileQuery(applicantId: string | null, lang: "ar" | "en" = "ar") {
+  return useQuery({
+    queryKey: ["clientPortal", "profile", applicantId],
+    queryFn: async (): Promise<ClientApplicantProfile> => {
+      const { data, error } = await supabase.functions.invoke("client-applicant-profile", {
+        body: { applicant_id: applicantId },
+      });
+      if (error) {
+        const { message } = await extractEdgeFunctionError(error);
+        toast.error(message || (lang === "ar" ? "تعذر تحميل الملف الكامل" : "Failed to load full profile"));
+        throw new Error(message);
+      }
+      return data as ClientApplicantProfile;
+    },
+    enabled: !!applicantId,
+    staleTime: 5 * 60 * 1000,
   });
 }
 
