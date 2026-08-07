@@ -272,9 +272,14 @@ export const queryKeys = {
     search: (filters?: { field: string; value: string }[], search?: string, page?: number, searchMode?: string) =>
       ["clientPortal", "search", filters ?? [], search ?? "", page ?? 1, searchMode ?? "any"] as const,
     // Distinct-value facet counts for one filterable field, scoped to the
-    // OTHER currently-applied filters (so counts stay faceted/contextual).
-    facets: (field: string, otherFilters?: { field: string; value: string }[]) =>
-      ["clientPortal", "facets", field, otherFilters ?? []] as const,
+    // OTHER currently-applied filters AND the current search box (so counts
+    // stay faceted/contextual -- must match what's actually on screen).
+    facets: (
+      field: string,
+      otherFilters?: { field: string; value: string }[],
+      search?: string,
+      searchMode?: string,
+    ) => ["clientPortal", "facets", field, otherFilters ?? [], search ?? "", searchMode ?? "any"] as const,
     // The org's full reveal history (client-revealed-candidates), independent
     // of any current search/filter state.
     revealed: (page?: number) => ["clientPortal", "revealed", page ?? 1] as const,

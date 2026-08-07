@@ -110,20 +110,20 @@ export default function ClientPortalPage() {
   const getDistinctValues = useCallback(
     (field: string) => {
       const otherFilters = filters.filter((f) => f.field !== field);
-      const key = queryKeys.clientPortal.facets(field, otherFilters);
+      const key = queryKeys.clientPortal.facets(field, otherFilters, debouncedSearch, searchMode);
       const cached = queryClient.getQueryData<ClientFacetValue[]>(key);
       // fetchQuery resolves with the SAME reference already in cache when
       // the entry is still fresh (no network call made) -- only bump
       // facetsTick when a real refetch actually changed the data, or this
       // would re-trigger itself forever (bump -> re-render -> effect fires
       // -> calls this again -> bump...).
-      fetchClientFacets(queryClient, field, otherFilters, lang).then((fresh) => {
+      fetchClientFacets(queryClient, field, otherFilters, debouncedSearch, searchMode, lang).then((fresh) => {
         if (fresh !== cached) setFacetsTick((t) => t + 1);
       });
       return cached || [];
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [filters, queryClient, lang, facetsTick]
+    [filters, debouncedSearch, searchMode, queryClient, lang, facetsTick]
   );
 
   const rows = data?.rows ?? [];

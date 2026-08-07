@@ -227,7 +227,7 @@ Deno.serve(async (req) => {
       return json({ error: "Subscription inactive or expired", error_code: "subscription_expired" }, 403);
     }
 
-    let body: { field?: unknown; filters?: Filter[] } = {};
+    let body: { field?: unknown; filters?: Filter[]; search?: unknown; searchMode?: unknown } = {};
     try {
       body = await req.json();
     } catch {
@@ -239,6 +239,8 @@ Deno.serve(async (req) => {
       return json({ error: "Unknown field" }, 400);
     }
     const otherFilters = Array.isArray(body.filters) ? body.filters : [];
+    const search = typeof body.search === "string" ? body.search : "";
+    const searchMode = body.searchMode === "all" ? "all" : "any";
 
     const { data: synonymRows } = await supabaseAdmin
       .from("value_synonyms")
@@ -253,6 +255,8 @@ Deno.serve(async (req) => {
     const { data, error } = await supabaseAdmin.rpc("client_portal_facet_counts", {
       p_field: field,
       p_filters: expandedOtherFilters,
+      p_search: search || null,
+      p_search_mode: searchMode,
     });
     if (error) {
       return json({ error: error.message }, 400);
