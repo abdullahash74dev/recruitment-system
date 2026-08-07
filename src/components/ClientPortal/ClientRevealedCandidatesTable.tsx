@@ -2,13 +2,14 @@ import { useMemo } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Phone, Mail, SearchX, FileText } from "lucide-react";
+import { Phone, Mail, SearchX, UserRound } from "lucide-react";
 import type { ClientRevealedRow } from "@/hooks/queries/useClientPortalSearch";
 
 interface ClientRevealedCandidatesTableProps {
   lang: "ar" | "en";
   rows: ClientRevealedRow[];
   isLoading: boolean;
+  onViewProfile: (id: string) => void;
 }
 
 const dash = (v: string | null | undefined) => (v && v.trim() ? v : "—");
@@ -32,21 +33,20 @@ const DATA_COLUMNS: {
  * there's no lock/reveal button here since every row is already paid for and
  * always shows real contact info straight from the edge function.
  */
-export default function ClientRevealedCandidatesTable({ lang, rows, isLoading }: ClientRevealedCandidatesTableProps) {
+export default function ClientRevealedCandidatesTable({ lang, rows, isLoading, onViewProfile }: ClientRevealedCandidatesTableProps) {
   const ar = lang === "ar";
 
   const visibleDataColumns = useMemo(
     () => DATA_COLUMNS.filter((c) => rows.some((r) => { const v = c.getValue(r); return v && String(v).trim(); })),
     [rows]
   );
-  const anyHasResume = useMemo(() => rows.some((r) => r.has_resume), [rows]);
 
   const columns = [
     { key: "name", ar: "الاسم", en: "Name" },
     ...visibleDataColumns,
     { key: "contact", ar: "بيانات الاتصال", en: "Contact Info" },
     { key: "revealed_at", ar: "تاريخ الكشف", en: "Revealed On" },
-    ...(anyHasResume ? [{ key: "cv", ar: "السيرة الذاتية", en: "Résumé" }] : []),
+    { key: "profile", ar: "الملف الكامل", en: "Full Profile" },
   ];
 
   if (isLoading) {
@@ -122,22 +122,12 @@ export default function ClientRevealedCandidatesTable({ lang, rows, isLoading }:
               <TableCell className="text-sm text-muted-foreground">
                 {new Date(row.revealed_at).toLocaleDateString(ar ? "ar-SA" : "en-US")}
               </TableCell>
-              {anyHasResume && (
-                <TableCell>
-                  {!row.has_resume ? (
-                    <span className="text-xs text-muted-foreground">—</span>
-                  ) : row.resume_url ? (
-                    <Button size="sm" variant="outline" asChild>
-                      <a href={row.resume_url} target="_blank" rel="noopener noreferrer">
-                        <FileText className="h-3.5 w-3.5 ms-1.5" />
-                        {ar ? "عرض السيرة الذاتية" : "View résumé"}
-                      </a>
-                    </Button>
-                  ) : (
-                    <span className="text-xs text-muted-foreground">—</span>
-                  )}
-                </TableCell>
-              )}
+              <TableCell>
+                <Button size="sm" variant="outline" onClick={() => onViewProfile(row.id)}>
+                  <UserRound className="h-3.5 w-3.5 ms-1.5" />
+                  {ar ? "عرض الملف الكامل" : "View full profile"}
+                </Button>
+              </TableCell>
             </TableRow>
           ))}
         </TableBody>

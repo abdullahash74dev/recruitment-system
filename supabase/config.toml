@@ -20,3 +20,6 @@ verify_jwt = true
 
 [functions.client-revealed-candidates]
 verify_jwt = true
+
+[functions.client-applicant-profile]
+verify_jwt = true

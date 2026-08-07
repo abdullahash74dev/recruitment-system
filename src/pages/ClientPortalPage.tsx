@@ -31,6 +31,7 @@ import { queryKeys } from "@/lib/queryKeys";
 import CategorizedFilterPanel, { type CategorizedFilterField } from "@/components/Dashboard/CategorizedFilterPanel";
 import ClientResultsTable from "@/components/ClientPortal/ClientResultsTable";
 import ClientRevealedCandidatesTable from "@/components/ClientPortal/ClientRevealedCandidatesTable";
+import ClientApplicantProfileDialog from "@/components/ClientPortal/ClientApplicantProfileDialog";
 
 // The same 19 fields the admin dashboard's ApplicantsAdvancedFilters exposes
 // (and the only ones client-search-applicants/client-portal-facets allow-list),
@@ -203,6 +204,10 @@ export default function ClientPortalPage() {
   const revealedTotal = revealedData?.total ?? 0;
   const revealedTotalPages = Math.max(1, Math.ceil(revealedTotal / 20));
 
+  // ---- Full applicant profile dialog (structured view, not the raw résumé
+  // file -- see ClientApplicantProfileDialog). ----
+  const [viewProfileId, setViewProfileId] = useState<string | null>(null);
+
   return (
     <div dir={ar ? "rtl" : "ltr"} className="min-h-screen bg-muted/30">
       <header className="sticky top-0 z-10 border-b bg-background">
@@ -254,7 +259,12 @@ export default function ClientPortalPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              <ClientRevealedCandidatesTable lang={lang} rows={revealedRows} isLoading={revealedLoading} />
+              <ClientRevealedCandidatesTable
+                lang={lang}
+                rows={revealedRows}
+                isLoading={revealedLoading}
+                onViewProfile={setViewProfileId}
+              />
 
               {revealedTotal > 0 && (
                 <div className="flex items-center justify-between gap-2 pt-1">
@@ -434,6 +444,7 @@ export default function ClientPortalPage() {
                   selectedIds={selectedIds}
                   onToggleSelect={toggleSelect}
                   onToggleSelectAll={toggleSelectAll}
+                  onViewProfile={setViewProfileId}
                 />
 
                 {total > 0 && (
@@ -533,6 +544,8 @@ export default function ClientPortalPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <ClientApplicantProfileDialog lang={lang} applicantId={viewProfileId} onClose={() => setViewProfileId(null)} />
     </div>
   );
 }
