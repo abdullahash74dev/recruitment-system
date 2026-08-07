@@ -73,17 +73,30 @@ export default function ClientPortalPage() {
 
   // Faceted distinct-value counts per field, scoped by every OTHER active
   // filter. CategorizedFilterPanel's getDistinctValues contract is
-  // synchronous, so this warms react-query's cache on first call for a given
-  // (field, otherFilters) combo and returns [] until it resolves, then bumps
-  // facetsTick to force a fresh getDistinctValues reference so the panel
-  // re-reads the now-cached value.
+  // synchronous, so this returns whatever's already cached (possibly stale,
+  // possibly nothing yet) immediately for a snappy UI, while ALWAYS also
+  // calling fetchClientFacets -- that goes through queryClient.fetchQuery,
+  // which is staleTime-aware and only actually hits the network when the
+  // cached entry (including one rehydrated from the persisted IndexedDB
+  // cache from a previous session) is stale. Do NOT short-circuit on "cache
+  // has *some* value" the way an earlier version of this did: that served
+  // permanently-stale counts forever after a server-side facets fix shipped,
+  // since a plain page reload rehydrates the old persisted entry and nothing
+  // ever re-triggers a revalidation for it otherwise.
   const getDistinctValues = useCallback(
     (field: string) => {
       const otherFilters = filters.filter((f) => f.field !== field);
-      const cached = queryClient.getQueryData<ClientFacetValue[]>(queryKeys.clientPortal.facets(field, otherFilters));
-      if (cached) return cached;
-      fetchClientFacets(queryClient, field, otherFilters, lang).then(() => setFacetsTick((t) => t + 1));
-      return [];
+      const key = queryKeys.clientPortal.facets(field, otherFilters);
+      const cached = queryClient.getQueryData<ClientFacetValue[]>(key);
+      // fetchQuery resolves with the SAME reference already in cache when
+      // the entry is still fresh (no network call made) -- only bump
+      // facetsTick when a real refetch actually changed the data, or this
+      // would re-trigger itself forever (bump -> re-render -> effect fires
+      // -> calls this again -> bump...).
+      fetchClientFacets(queryClient, field, otherFilters, lang).then((fresh) => {
+        if (fresh !== cached) setFacetsTick((t) => t + 1);
+      });
+      return cached || [];
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [filters, queryClient, lang, facetsTick]
