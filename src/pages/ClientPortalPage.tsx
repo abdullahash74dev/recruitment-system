@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { ChevronLeft, ChevronRight, LogOut, Search, Wallet, X } from "lucide-react";
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ChevronLeft, ChevronRight, Loader2, LogOut, Save, Search, Trash2, Wallet, X } from "lucide-react";
 import {
   useClientSearchQuery,
   fetchClientFacets,
@@ -16,6 +17,11 @@ import {
   type ClientFacetValue,
   type ClientSearchMode,
 } from "@/hooks/queries/useClientPortalSearch";
+import {
+  useClientSavedFiltersQuery,
+  useSaveClientFilterMutation,
+  useDeleteClientSavedFilterMutation,
+} from "@/hooks/queries/useClientSavedFilters";
 import { queryKeys } from "@/lib/queryKeys";
 import CategorizedFilterPanel, { type CategorizedFilterField } from "@/components/Dashboard/CategorizedFilterPanel";
 import ClientResultsTable from "@/components/ClientPortal/ClientResultsTable";
@@ -115,6 +121,33 @@ export default function ClientPortalPage() {
     setFilters([]);
   };
 
+  // ---- Saved filters ----
+  const { data: savedFilters = [] } = useClientSavedFiltersQuery();
+  const saveFilterMutation = useSaveClientFilterMutation(lang);
+  const deleteSavedFilterMutation = useDeleteClientSavedFilterMutation(lang);
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+  const [saveFilterName, setSaveFilterName] = useState("");
+
+  const openSaveDialog = () => {
+    setSaveFilterName("");
+    setSaveDialogOpen(true);
+  };
+
+  const submitSaveFilter = () => {
+    if (!saveFilterName.trim()) return;
+    saveFilterMutation.mutate(
+      { name: saveFilterName.trim(), filters, search: debouncedSearch, search_mode: searchMode, result_count: total },
+      { onSuccess: () => setSaveDialogOpen(false) }
+    );
+  };
+
+  const applySavedFilter = (saved: (typeof savedFilters)[number]) => {
+    setFilters(saved.filters);
+    setSearchInput(saved.search);
+    setDebouncedSearch(saved.search);
+    setSearchMode(saved.search_mode);
+  };
+
   const handleLogout = async () => {
     await supabase.auth.signOut();
     navigate("/client-portal/login");
@@ -191,13 +224,56 @@ export default function ClientPortalPage() {
                     </ToggleGroupItem>
                   </ToggleGroup>
 
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={openSaveDialog}
+                    disabled={!hasActiveFilters}
+                    className={hasActiveFilters ? "ms-auto" : "ms-auto opacity-60"}
+                  >
+                    <Save className="h-3.5 w-3.5 ms-1.5" />
+                    {ar ? "حفظ الفلتر الحالي" : "Save current filter"}
+                  </Button>
+
                   {hasActiveFilters && (
-                    <Button variant="ghost" size="sm" onClick={clearFilters} className="ms-auto">
+                    <Button variant="ghost" size="sm" onClick={clearFilters}>
                       <X className="h-3.5 w-3.5 ms-1.5" />
                       {ar ? "مسح الكل" : "Clear all"}
                     </Button>
                   )}
                 </div>
+
+                {savedFilters.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-1.5 border-t pt-3">
+                    <span className="text-xs text-muted-foreground shrink-0">
+                      {ar ? "الفلاتر المحفوظة:" : "Saved filters:"}
+                    </span>
+                    {savedFilters.map((saved) => (
+                      <Badge
+                        key={saved.id}
+                        variant="outline"
+                        className="gap-1 pe-1 cursor-pointer hover:bg-muted font-normal"
+                        onClick={() => applySavedFilter(saved)}
+                      >
+                        <span>{saved.name}</span>
+                        {typeof saved.result_count === "number" && (
+                          <span className="text-muted-foreground">({saved.result_count})</span>
+                        )}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deleteSavedFilterMutation.mutate(saved.id);
+                          }}
+                          className="hover:bg-destructive/20 rounded p-0.5"
+                          aria-label={ar ? "حذف" : "Delete"}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </button>
+                      </Badge>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -245,6 +321,30 @@ export default function ClientPortalPage() {
           </div>
         </div>
       </main>
+
+      <Dialog open={saveDialogOpen} onOpenChange={setSaveDialogOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>{ar ? "حفظ الفلتر الحالي" : "Save current filter"}</DialogTitle>
+          </DialogHeader>
+          <Input
+            autoFocus
+            value={saveFilterName}
+            onChange={(e) => setSaveFilterName(e.target.value)}
+            placeholder={ar ? "اسم الفلتر (مثال: مرشحين رياض بخبرة 3-5)" : "Filter name (e.g. Riyadh, 3-5 yrs exp)"}
+            onKeyDown={(e) => e.key === "Enter" && submitSaveFilter()}
+          />
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setSaveDialogOpen(false)}>
+              {ar ? "إلغاء" : "Cancel"}
+            </Button>
+            <Button onClick={submitSaveFilter} disabled={!saveFilterName.trim() || saveFilterMutation.isPending}>
+              {saveFilterMutation.isPending && <Loader2 className="h-4 w-4 animate-spin ms-1.5" />}
+              {ar ? "حفظ" : "Save"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
