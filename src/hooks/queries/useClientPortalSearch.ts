@@ -206,9 +206,9 @@ export function useRevealCandidateMutation(lang: "ar" | "en" = "ar") {
     },
     onSuccess: (data, applicantId) => {
       queryClient.setQueriesData<ClientSearchResult>(
-        { queryKey: queryKeys.clientPortal.all, exact: false },
+        { queryKey: queryKeys.clientPortal.searchAll, exact: false },
         (old) => {
-          if (!old) return old;
+          if (!old || !Array.isArray(old.rows)) return old;
           return {
             ...old,
             credits_remaining: data.credits_remaining,
