@@ -158,6 +158,9 @@ export default function ClientApplicantProfileDialog({ lang, applicantId, onClos
               <Separator />
               <div>
                 <SectionTitle>{ar ? "الخبرة العملية" : "Work Experience"}</SectionTitle>
+                <InfoRow icon={Briefcase} label={ar ? "الوظيفة المطلوبة" : "Desired Position"} value={dash(data.desired_position)} />
+                <InfoRow icon={Briefcase} label={ar ? "نوع الوظيفة" : "Job Type"} value={dash(data.job_type)} />
+                <InfoRow icon={Briefcase} label={ar ? "موظف حالياً" : "Currently Employed"} value={dash(data.currently_employed)} />
                 <InfoRow icon={Briefcase} label={ar ? "المسمى الحالي" : "Current Title"} value={dash(data.current_title)} />
                 <InfoRow icon={Briefcase} label={ar ? "سنوات الخبرة" : "Years of Experience"} value={dash(data.years_experience)} />
                 <InfoRow icon={Wallet} label={ar ? "الراتب الحالي" : "Current Salary"} value={dash(data.current_salary)} />
