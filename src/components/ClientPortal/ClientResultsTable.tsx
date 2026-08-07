@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Loader2, Lock, Unlock, Phone, Mail, SearchX, FileText } from "lucide-react";
 import { useRevealCandidateMutation, type ClientApplicantRow } from "@/hooks/queries/useClientPortalSearch";
@@ -10,6 +11,9 @@ interface ClientResultsTableProps {
   lang: "ar" | "en";
   rows: ClientApplicantRow[];
   isLoading: boolean;
+  selectedIds: Set<string>;
+  onToggleSelect: (id: string) => void;
+  onToggleSelectAll: () => void;
 }
 
 const dash = (v: string | null | undefined) => (v && v.trim() ? v : "—");
@@ -38,7 +42,9 @@ const DATA_COLUMNS: {
  * Takes `lang` as a prop rather than calling `useLanguage()` so it stays reusable
  * outside the language-context tree, same convention as CategorizedFilterPanel.
  */
-export default function ClientResultsTable({ lang, rows, isLoading }: ClientResultsTableProps) {
+export default function ClientResultsTable({
+  lang, rows, isLoading, selectedIds, onToggleSelect, onToggleSelectAll,
+}: ClientResultsTableProps) {
   const ar = lang === "ar";
   const revealMutation = useRevealCandidateMutation(lang);
   const revealingId = revealMutation.isPending ? (revealMutation.variables as string) : null;
@@ -48,6 +54,10 @@ export default function ClientResultsTable({ lang, rows, isLoading }: ClientResu
     [rows]
   );
   const anyHasResume = useMemo(() => rows.some((r) => r.has_resume), [rows]);
+
+  const selectedOnPage = rows.filter((r) => selectedIds.has(r.id)).length;
+  const allOnPageSelected = rows.length > 0 && selectedOnPage === rows.length;
+  const headerCheckedState = allOnPageSelected ? true : selectedOnPage > 0 ? "indeterminate" : false;
 
   const columns = [
     { key: "name", ar: "الاسم", en: "Name" },
@@ -62,6 +72,7 @@ export default function ClientResultsTable({ lang, rows, isLoading }: ClientResu
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-8" />
               {columns.map((c) => (
                 <TableHead key={c.key}>{ar ? c.ar : c.en}</TableHead>
               ))}
@@ -70,6 +81,7 @@ export default function ClientResultsTable({ lang, rows, isLoading }: ClientResu
           <TableBody>
             {Array.from({ length: 6 }).map((_, i) => (
               <TableRow key={i}>
+                <TableCell />
                 {columns.map((c) => (
                   <TableCell key={c.key}>
                     <Skeleton className="h-4 w-full max-w-[140px]" />
@@ -102,6 +114,13 @@ export default function ClientResultsTable({ lang, rows, isLoading }: ClientResu
       <Table>
         <TableHeader>
           <TableRow>
+            <TableHead className="w-8">
+              <Checkbox
+                checked={headerCheckedState}
+                onCheckedChange={onToggleSelectAll}
+                aria-label={ar ? "تحديد كل هذه الصفحة" : "Select all on this page"}
+              />
+            </TableHead>
             {columns.map((c) => (
               <TableHead key={c.key}>{ar ? c.ar : c.en}</TableHead>
             ))}
@@ -111,7 +130,14 @@ export default function ClientResultsTable({ lang, rows, isLoading }: ClientResu
           {rows.map((row) => {
             const isRevealing = revealingId === row.id;
             return (
-              <TableRow key={row.id}>
+              <TableRow key={row.id} data-state={selectedIds.has(row.id) ? "selected" : undefined}>
+                <TableCell>
+                  <Checkbox
+                    checked={selectedIds.has(row.id)}
+                    onCheckedChange={() => onToggleSelect(row.id)}
+                    aria-label={ar ? "تحديد" : "Select"}
+                  />
+                </TableCell>
                 <TableCell className="font-medium">{dash(row.full_name)}</TableCell>
                 {visibleDataColumns.map((c) => (
                   <TableCell key={c.key}>{dash(c.getValue(row))}</TableCell>
