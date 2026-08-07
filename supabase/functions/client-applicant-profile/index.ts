@@ -19,6 +19,14 @@ function json(body: unknown, status = 200) {
 // competitive-intel fields that must never reach an external client org, no
 // matter how many credits they've spent. Mirrors the admin detail dialog
 // (DashboardPage.tsx) minus that internal set.
+//
+// Everything here is viewable WITHOUT a reveal -- this endpoint is the
+// Bayt.com-style "browse the full CV" surface. Only phone, email, and the
+// résumé PDF are credit-gated (masked/withheld below until a reveal exists),
+// same as client-search-applicants' masking. The other four supporting
+// documents (degree/experience/training/other) are NOT gated -- the client
+// explicitly asked for "everything except the number, email, and the
+// original résumé PDF" to be free to browse.
 const PROFILE_COLUMNS = [
   "id", "full_name", "phone", "email", "gender", "nationality", "birth_date",
   "marital_status", "current_city", "preferred_city", "has_transport", "linkedin",
@@ -31,7 +39,26 @@ const PROFILE_COLUMNS = [
   "resume_url", "degree_url", "experience_cert_url", "training_certs_url", "other_docs_url",
 ].join(", ");
 
-const DOC_FIELDS = ["resume_url", "degree_url", "experience_cert_url", "training_certs_url", "other_docs_url"] as const;
+const OPEN_DOC_FIELDS = ["degree_url", "experience_cert_url", "training_certs_url", "other_docs_url"] as const;
+
+function maskPhone(phone: string | null | undefined): string | null {
+  if (!phone) return null;
+  const s = String(phone);
+  if (s.length <= 2) return s + "********";
+  return s.slice(0, 2) + "********";
+}
+
+function maskEmail(email: string | null | undefined): string | null {
+  if (!email) return null;
+  const s = String(email);
+  const atIdx = s.indexOf("@");
+  if (atIdx <= 0) return "***";
+  const first = s[0];
+  const domain = s.slice(atIdx + 1);
+  const parts = domain.split(".").filter(Boolean);
+  const lastSeg = parts.length > 0 ? parts[parts.length - 1] : "";
+  return `${first}***@***${lastSeg ? "." + lastSeg : ""}`;
+}
 
 async function signIfNeeded(supabaseAdmin: ReturnType<typeof createClient>, path: string | null): Promise<string | null> {
   if (!path) return null;
@@ -104,20 +131,6 @@ Deno.serve(async (req) => {
       return json({ error: "applicant_id is required" }, 400);
     }
 
-    // The full profile (salary, birth date, documents, etc.) is strictly
-    // gated behind an existing reveal for this applicant -- same credit as
-    // phone/email, no separate/implicit unlock. A client can't view this by
-    // guessing an id for a candidate they never paid to reveal.
-    const { data: reveal } = await supabaseAdmin
-      .from("candidate_reveals")
-      .select("id")
-      .eq("client_organization_id", clientOrganizationId)
-      .eq("applicant_id", applicantId)
-      .maybeSingle();
-    if (!reveal) {
-      return json({ error: "This candidate has not been revealed yet", error_code: "not_revealed" }, 403);
-    }
-
     const { data: applicant, error: applicantError } = await supabaseAdmin
       .from("applicants")
       .select(PROFILE_COLUMNS)
@@ -127,13 +140,36 @@ Deno.serve(async (req) => {
       return json({ error: "Applicant not found" }, 404);
     }
 
+    const { data: reveal } = await supabaseAdmin
+      .from("candidate_reveals")
+      .select("id")
+      .eq("client_organization_id", clientOrganizationId)
+      .eq("applicant_id", applicantId)
+      .maybeSingle();
+    const isRevealed = !!reveal;
+
     const a = applicant as Record<string, unknown>;
+
+    // The 4 non-résumé supporting documents are always signed/open.
     const docs: Record<string, string | null> = {};
-    for (const field of DOC_FIELDS) {
+    for (const field of OPEN_DOC_FIELDS) {
       docs[field] = await signIfNeeded(supabaseAdmin, a[field] as string | null);
     }
 
-    return json({ ...a, ...docs });
+    // Phone, email, and the résumé PDF itself are the only credit-gated
+    // fields -- withheld/masked until this org has revealed this applicant.
+    const rawResumePath = a.resume_url as string | null;
+    const resumeUrl = isRevealed ? await signIfNeeded(supabaseAdmin, rawResumePath) : null;
+
+    return json({
+      ...a,
+      phone: isRevealed ? a.phone : maskPhone(a.phone as string | null),
+      email: isRevealed ? a.email : maskEmail(a.email as string | null),
+      resume_url: resumeUrl,
+      has_resume: !!rawResumePath,
+      ...docs,
+      is_revealed: isRevealed,
+    });
   } catch (e) {
     return json({ error: e instanceof Error ? e.message : String(e) }, 500);
   }

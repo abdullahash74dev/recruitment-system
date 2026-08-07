@@ -5,10 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Award, Briefcase, Calendar, Car, FileText, GraduationCap, Languages as LanguagesIcon,
-  Linkedin, Mail, MapPin, Phone, User, Wallet,
+  Award, Briefcase, Calendar, Car, Download, FileText, GraduationCap, Languages as LanguagesIcon,
+  Linkedin, Loader2, Mail, MapPin, Phone, Unlock, User, Wallet,
 } from "lucide-react";
-import { useClientApplicantProfileQuery, type ClientApplicantProfile } from "@/hooks/queries/useClientPortalSearch";
+import {
+  useClientApplicantProfileQuery,
+  useRevealCandidateMutation,
+} from "@/hooks/queries/useClientPortalSearch";
 
 interface ClientApplicantProfileDialogProps {
   lang: "ar" | "en";
@@ -45,19 +48,19 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
 }
 
 /**
- * Client-facing full applicant profile -- a structured, always-legible
- * vertical CV-style view built from the same DB columns instead of handing
- * out the candidate's raw uploaded résumé PDF. Deliberately does NOT offer
- * the résumé file itself (résumé download was removed from the client
- * portal in favor of this page); the other supporting documents (degree,
- * experience/training certs) are still offered as-is since they're
- * verification attachments a hiring org legitimately needs, not the primary
- * "CV" surface. This is also the natural landing spot for AI-extracted
- * résumé fields later, without any layout rework.
+ * Client-facing full applicant profile -- Bayt.com-style: the ENTIRE CV is
+ * browsable for free (education, experience, languages, salary
+ * expectations, supporting documents), same as client-search-applicants'
+ * results list. Only phone, email, and the résumé PDF itself are
+ * credit-gated -- masked/withheld until this org has revealed this
+ * applicant, with a reveal CTA right here so a client doesn't have to close
+ * the dialog and go find the row again. Also the natural landing spot for
+ * AI-extracted résumé fields later, without any layout rework.
  */
 export default function ClientApplicantProfileDialog({ lang, applicantId, onClose }: ClientApplicantProfileDialogProps) {
   const ar = lang === "ar";
   const { data, isLoading } = useClientApplicantProfileQuery(applicantId, lang);
+  const revealMutation = useRevealCandidateMutation(lang);
 
   return (
     <Dialog open={!!applicantId} onOpenChange={(open) => !open && onClose()}>
@@ -101,11 +104,31 @@ export default function ClientApplicantProfileDialog({ lang, applicantId, onClos
                 </div>
               </div>
 
-              {/* Contact -- reachable here only because this dialog only ever
-                  opens for an already-revealed candidate. */}
+              {/* Contact + résumé -- the only credit-gated part of this page.
+                  Everything below is visible regardless of reveal status. */}
               <div className="rounded-lg border bg-muted/30 p-3 space-y-1">
                 <InfoRow icon={Phone} label={ar ? "الهاتف" : "Phone"} value={dash(data.phone)} />
                 <InfoRow icon={Mail} label={ar ? "الإيميل" : "Email"} value={dash(data.email)} />
+
+                <div className="flex items-center gap-2.5 py-1.5">
+                  <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs text-muted-foreground">{ar ? "السيرة الذاتية" : "Résumé"}</p>
+                    {!data.has_resume ? (
+                      <p className="text-sm text-muted-foreground">{ar ? "لا يوجد ملف مرفوع" : "No file uploaded"}</p>
+                    ) : data.is_revealed && data.resume_url ? (
+                      <Button size="sm" variant="outline" className="mt-1" asChild>
+                        <a href={data.resume_url} target="_blank" rel="noopener noreferrer">
+                          <Download className="h-3.5 w-3.5 ms-1.5" />
+                          {ar ? "تحميل السيرة الذاتية" : "Download résumé"}
+                        </a>
+                      </Button>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">{ar ? "مقفول — بعد الكشف" : "Locked — after reveal"}</p>
+                    )}
+                  </div>
+                </div>
+
                 {dash(data.linkedin) && (
                   <div className="flex items-center gap-2.5 py-1.5">
                     <Linkedin className="h-4 w-4 shrink-0 text-muted-foreground" />
@@ -116,6 +139,30 @@ export default function ClientApplicantProfileDialog({ lang, applicantId, onClos
                     ) : (
                       <span className="text-sm">{data.linkedin}</span>
                     )}
+                  </div>
+                )}
+
+                {!data.is_revealed && (
+                  <Button
+                    size="sm"
+                    className="w-full mt-1"
+                    disabled={revealMutation.isPending}
+                    onClick={() => revealMutation.mutate(data.id)}
+                  >
+                    {revealMutation.isPending ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin ms-1.5" />
+                    ) : (
+                      <Unlock className="h-3.5 w-3.5 ms-1.5" />
+                    )}
+                    {ar ? "كشف الهاتف والإيميل والسيرة الذاتية" : "Reveal phone, email & résumé"}
+                  </Button>
+                )}
+                {data.is_revealed && (
+                  <div className="flex items-center gap-1.5 pt-1">
+                    <Unlock className="h-3.5 w-3.5 shrink-0 text-emerald-600" />
+                    <Badge variant="outline" className="border-emerald-600/40 text-emerald-600 text-[10px]">
+                      {ar ? "مكشوف" : "Unlocked"}
+                    </Badge>
                   </div>
                 )}
               </div>
