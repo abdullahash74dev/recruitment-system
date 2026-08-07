@@ -9,9 +9,12 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ChevronLeft, ChevronRight, Loader2, LogOut, Save, Search, Trash2, Wallet, X } from "lucide-react";
+import {
+  CheckSquare, ChevronLeft, ChevronRight, Loader2, LogOut, Save, Search, Trash2, Unlock, Wallet, X,
+} from "lucide-react";
 import {
   useClientSearchQuery,
+  useBulkRevealCandidatesMutation,
   fetchClientFacets,
   type ClientFilterValue,
   type ClientFacetValue,
@@ -77,6 +80,17 @@ export default function ClientPortalPage() {
 
   const { data, isLoading, isFetching } = useClientSearchQuery(filters, debouncedSearch, page, lang, searchMode);
 
+  // ---- Bulk selection (scoped to the current page only -- resets whenever
+  // the page or the underlying result set changes, so a selection never
+  // silently refers to rows the user can no longer see). ----
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [page, debouncedSearch, searchMode, filters]);
+
+  const bulkRevealMutation = useBulkRevealCandidatesMutation(lang);
+  const [bulkConfirmOpen, setBulkConfirmOpen] = useState(false);
+
   // Faceted distinct-value counts per field, scoped by every OTHER active
   // filter. CategorizedFilterPanel's getDistinctValues contract is
   // synchronous, so this returns whatever's already cached (possibly stale,
@@ -113,6 +127,30 @@ export default function ClientPortalPage() {
   const creditsRemaining = data?.credits_remaining;
   const pageSize = 20;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
+
+  const revealedOnPage = rows.filter((r) => r.is_revealed).length;
+  const selectedRows = rows.filter((r) => selectedIds.has(r.id));
+  const selectedUnrevealedCount = selectedRows.filter((r) => !r.is_revealed).length;
+
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    setSelectedIds((prev) => {
+      const allSelected = rows.length > 0 && rows.every((r) => prev.has(r.id));
+      return allSelected ? new Set() : new Set(rows.map((r) => r.id));
+    });
+  };
+
+  const confirmBulkReveal = () => {
+    setBulkConfirmOpen(false);
+    bulkRevealMutation.mutate([...selectedIds], { onSuccess: () => setSelectedIds(new Set()) });
+  };
 
   const hasActiveFilters = filters.length > 0 || debouncedSearch.length > 0;
 
@@ -279,15 +317,56 @@ export default function ClientPortalPage() {
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-3">
-                <CardTitle className="text-base">
-                  {ar ? `النتائج (${total})` : `Results (${total})`}
-                </CardTitle>
+                <div>
+                  <CardTitle className="text-base">
+                    {ar ? `النتائج (${total})` : `Results (${total})`}
+                  </CardTitle>
+                  {!isLoading && rows.length > 0 && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {ar
+                        ? `معروض ${rows.length} بهذه الصفحة — ${revealedOnPage} مكشوف، ${rows.length - revealedOnPage} غير مكشوف`
+                        : `Showing ${rows.length} on this page — ${revealedOnPage} revealed, ${rows.length - revealedOnPage} locked`}
+                    </p>
+                  )}
+                </div>
                 {isFetching && !isLoading && (
                   <span className="text-xs text-muted-foreground">{ar ? "جارِ التحديث..." : "Updating..."}</span>
                 )}
               </CardHeader>
               <CardContent className="space-y-4">
-                <ClientResultsTable lang={lang} rows={rows} isLoading={isLoading} />
+                {selectedIds.size > 0 && (
+                  <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/50 px-3 py-2">
+                    <CheckSquare className="h-4 w-4 shrink-0 text-primary" />
+                    <span className="text-sm">
+                      {ar ? `تم تحديد ${selectedIds.size} مرشح` : `${selectedIds.size} candidates selected`}
+                    </span>
+                    <Button
+                      size="sm"
+                      className="ms-auto gap-1"
+                      disabled={bulkRevealMutation.isPending}
+                      onClick={() => setBulkConfirmOpen(true)}
+                    >
+                      {bulkRevealMutation.isPending ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Unlock className="h-3.5 w-3.5" />
+                      )}
+                      {ar ? "كشف المحدد" : "Reveal selected"}
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())}>
+                      {ar ? "إلغاء التحديد" : "Clear selection"}
+                    </Button>
+                  </div>
+                )}
+
+                <ClientResultsTable
+                  lang={lang}
+                  rows={rows}
+                  isLoading={isLoading}
+                  selectedIds={selectedIds}
+                  onToggleSelect={toggleSelect}
+                  onToggleSelectAll={toggleSelectAll}
+                />
 
                 {total > 0 && (
                   <div className="flex items-center justify-between gap-2 pt-1">
@@ -321,6 +400,46 @@ export default function ClientPortalPage() {
           </div>
         </div>
       </main>
+
+      <Dialog open={bulkConfirmOpen} onOpenChange={setBulkConfirmOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>{ar ? "تأكيد الكشف الجماعي" : "Confirm bulk reveal"}</DialogTitle>
+          </DialogHeader>
+          <div className="text-sm space-y-2">
+            <p>
+              {ar
+                ? `حددت ${selectedIds.size} مرشح.`
+                : `You selected ${selectedIds.size} candidates.`}
+            </p>
+            <p>
+              {selectedUnrevealedCount > 0
+                ? ar
+                  ? `سيُخصم ${selectedUnrevealedCount} رصيد كشف (${selectedIds.size - selectedUnrevealedCount} منهم مكشوفون مسبقاً، بدون خصم إضافي).`
+                  : `${selectedUnrevealedCount} credits will be spent (${selectedIds.size - selectedUnrevealedCount} already revealed, no extra charge).`
+                : ar
+                ? "كل المحدد مكشوف مسبقاً — ما راح يُخصم أي رصيد."
+                : "Everything selected is already revealed -- no credits will be spent."}
+            </p>
+            {typeof creditsRemaining === "number" && selectedUnrevealedCount > creditsRemaining && (
+              <p className="text-destructive">
+                {ar
+                  ? `رصيدك الحالي (${creditsRemaining}) أقل من المطلوب — سيتم كشف أول ${creditsRemaining} فقط.`
+                  : `Your balance (${creditsRemaining}) is less than needed -- only the first ${creditsRemaining} will be revealed.`}
+              </p>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBulkConfirmOpen(false)}>
+              {ar ? "إلغاء" : "Cancel"}
+            </Button>
+            <Button onClick={confirmBulkReveal} disabled={bulkRevealMutation.isPending}>
+              {bulkRevealMutation.isPending && <Loader2 className="h-4 w-4 animate-spin ms-1.5" />}
+              {ar ? "تأكيد الكشف" : "Confirm reveal"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={saveDialogOpen} onOpenChange={setSaveDialogOpen}>
         <DialogContent className="max-w-sm">

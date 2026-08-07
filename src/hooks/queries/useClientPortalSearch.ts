@@ -237,3 +237,84 @@ export function useRevealCandidateMutation(lang: "ar" | "en" = "ar") {
     },
   });
 }
+
+interface BulkRevealResult {
+  revealed: {
+    applicant_id: string;
+    phone: string | null;
+    email: string | null;
+    resume_url: string | null;
+  }[];
+  failed: { applicant_id: string; reason: "not_found" | "no_credits" | "error" }[];
+  credits_remaining: number;
+}
+
+/**
+ * Reveals multiple candidates in one request via `reveal-candidates-bulk`.
+ * The function itself stops charging credits once the org's balance hits 0
+ * (later ids come back in `failed` with reason "no_credits") rather than
+ * failing the whole batch -- so this always patches whatever DID succeed
+ * into the cache, even on a partial result, and reports the split via toast.
+ */
+export function useBulkRevealCandidatesMutation(lang: "ar" | "en" = "ar") {
+  const queryClient = useQueryClient();
+  const ar = lang === "ar";
+
+  return useMutation({
+    mutationFn: async (applicantIds: string[]): Promise<BulkRevealResult> => {
+      const { data, error } = await supabase.functions.invoke("reveal-candidates-bulk", {
+        body: { applicant_ids: applicantIds },
+      });
+      if (error) {
+        const { status, message } = await extractEdgeFunctionError(error);
+        const err = new Error(message) as Error & { status?: number };
+        err.status = status;
+        throw err;
+      }
+      return data as BulkRevealResult;
+    },
+    onSuccess: (data) => {
+      if (data.revealed.length > 0) {
+        const revealedById = new Map(data.revealed.map((r) => [r.applicant_id, r]));
+        queryClient.setQueriesData<ClientSearchResult>(
+          { queryKey: queryKeys.clientPortal.searchAll, exact: false },
+          (old) => {
+            if (!old || !Array.isArray(old.rows)) return old;
+            return {
+              ...old,
+              credits_remaining: data.credits_remaining,
+              rows: old.rows.map((row) => {
+                const r = revealedById.get(row.id);
+                return r ? { ...row, is_revealed: true, phone: r.phone, email: r.email, resume_url: r.resume_url } : row;
+              }),
+            };
+          }
+        );
+      }
+
+      const noCreditsCount = data.failed.filter((f) => f.reason === "no_credits").length;
+      if (data.revealed.length > 0 && data.failed.length === 0) {
+        toast.success(
+          ar
+            ? `تم كشف ${data.revealed.length} مرشح — الرصيد المتبقي: ${data.credits_remaining}`
+            : `Revealed ${data.revealed.length} candidates — ${data.credits_remaining} reveals remaining`
+        );
+      } else if (data.revealed.length > 0 && noCreditsCount > 0) {
+        toast.warning(
+          ar
+            ? `كُشف ${data.revealed.length} مرشح، وتوقف الباقي (${noCreditsCount}) لنفاد الرصيد`
+            : `Revealed ${data.revealed.length}, stopped for the rest (${noCreditsCount}) -- out of credits`
+        );
+      } else if (data.revealed.length === 0 && noCreditsCount > 0) {
+        toast.error(ar ? "لا يوجد رصيد كافٍ لكشف أي من المحدد" : "Not enough credits to reveal any of the selection");
+      }
+    },
+    onError: (error: Error & { status?: number }) => {
+      if (error.status === 403) {
+        toast.error(ar ? "انتهت صلاحية الاشتراك" : "Your subscription has expired");
+      } else {
+        toast.error(error.message || (ar ? "تعذر تنفيذ الكشف الجماعي" : "Bulk reveal failed"));
+      }
+    },
+  });
+}

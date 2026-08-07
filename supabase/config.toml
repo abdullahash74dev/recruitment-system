@@ -14,3 +14,6 @@ verify_jwt = true
 
 [functions.client-portal-facets]
 verify_jwt = true
+
+[functions.reveal-candidates-bulk]
+verify_jwt = true
