@@ -63,10 +63,6 @@ const CANON_PREFIX = "__canon__:";
 type Filter = { field: string; value: string };
 type SynonymRow = { field_name: string; canonical_ar: string; canonical_en: string | null; synonyms: string[] };
 
-function sanitizeFilterValue(value: string): string {
-  return String(value).replace(/[(),]/g, "").trim();
-}
-
 // Ported verbatim from src/hooks/useValueSynonyms.ts's normText(), so a raw
 // applicant value normalizes identically here and in the admin dashboard.
 function normText(s: string | null | undefined): string {
@@ -106,24 +102,6 @@ function expandCanonicalFilters(filters: Filter[], synonymRows: SynonymRow[]): F
     for (const v of variants) out.push({ field: f.field, value: v });
   }
   return out;
-}
-
-// deno-lint-ignore no-explicit-any
-function applyOtherFilters(query: any, filters: Filter[], excludeField: string) {
-  query = query.eq("is_archived", false);
-  const byField = new Map<string, string[]>();
-  for (const f of filters) {
-    if (f.field === excludeField) continue; // never filter a field by itself
-    const cleanValue = sanitizeFilterValue(f.value);
-    if (!cleanValue) continue;
-    const arr = byField.get(f.field) || [];
-    arr.push(cleanValue);
-    byField.set(f.field, arr);
-  }
-  for (const [field, values] of byField.entries()) {
-    query = query.or(values.map((v) => `${field}.ilike.%${v}%`).join(","));
-  }
-  return query;
 }
 
 // Groups raw distinct values into their canonical synonym group where one
@@ -268,25 +246,22 @@ Deno.serve(async (req) => {
     const rows = (synonymRows || []) as SynonymRow[];
     const expandedOtherFilters = expandCanonicalFilters(otherFilters, rows);
 
-    // Single-column projection, aggregated in JS -- the applicants table is
-    // ~100k rows, small enough that transferring one text column and
-    // counting client-side is simpler (and safer against SQL injection on a
-    // caller-chosen column name) than dynamic SQL for a GROUP BY.
-    let query = supabaseAdmin.from("applicants").select(field).not(field, "is", null);
-    query = applyOtherFilters(query, expandedOtherFilters, field);
-
-    const { data, error } = await query;
+    // Real server-side GROUP BY via RPC (see the client_portal_facet_counts
+    // migration) -- NOT a `select(field)` + JS-side count. PostgREST caps an
+    // unpaginated select at 1000 rows, which on a ~100k-row applicants table
+    // silently under-counts every facet from only its first 1000 matches.
+    const { data, error } = await supabaseAdmin.rpc("client_portal_facet_counts", {
+      p_field: field,
+      p_filters: expandedOtherFilters,
+    });
     if (error) {
       return json({ error: error.message }, 400);
     }
 
     const counts = new Map<string, number>();
-    for (const row of (data || []) as Record<string, unknown>[]) {
-      const raw = row[field];
-      if (raw === null || raw === undefined) continue;
-      const v = String(raw).trim();
-      if (!v) continue;
-      counts.set(v, (counts.get(v) || 0) + 1);
+    for (const row of (data || []) as { value: string; count: number }[]) {
+      if (!row.value) continue;
+      counts.set(row.value, Number(row.count));
     }
 
     const values = groupBySynonym(counts, rows, SYNONYM_FIELD_MAP[field]);
