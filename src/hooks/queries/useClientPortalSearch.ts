@@ -50,6 +50,29 @@ export interface ClientSearchResult {
   credits_remaining: number;
 }
 
+/** Row shape returned by `client-revealed-candidates` -- always real (never
+ * masked) contact info, since every row here was already paid for. */
+export interface ClientRevealedRow {
+  id: string;
+  full_name: string;
+  phone: string | null;
+  email: string | null;
+  desired_position: string | null;
+  nationality: string | null;
+  preferred_city: string | null;
+  current_city: string | null;
+  education_level: string | null;
+  years_experience: string | null;
+  has_resume: boolean;
+  resume_url: string | null;
+  revealed_at: string;
+}
+
+export interface ClientRevealedResult {
+  rows: ClientRevealedRow[];
+  total: number;
+}
+
 export const CLIENT_PORTAL_PAGE_SIZE = 20;
 
 interface EdgeFunctionErrorInfo {
@@ -120,6 +143,31 @@ export function useClientSearchQuery(
     },
     staleTime: 30 * 1000,
     placeholderData: (prev) => prev, // keep the previous page on screen while a new page/filter loads
+  });
+}
+
+/**
+ * The org's full reveal history via `client-revealed-candidates` -- every
+ * candidate ever unlocked, independent of the current search/filter state,
+ * so a client user can come back and find someone they already paid for
+ * without re-running the search that originally found them.
+ */
+export function useClientRevealedCandidatesQuery(page: number, lang: "ar" | "en" = "ar") {
+  return useQuery({
+    queryKey: queryKeys.clientPortal.revealed(page),
+    queryFn: async (): Promise<ClientRevealedResult> => {
+      const { data, error } = await supabase.functions.invoke("client-revealed-candidates", {
+        body: { page },
+      });
+      if (error) {
+        const { message } = await extractEdgeFunctionError(error);
+        toast.error(message || (lang === "ar" ? "تعذر تحميل قائمة المكشوفين" : "Failed to load revealed candidates"));
+        throw new Error(message);
+      }
+      return data as ClientRevealedResult;
+    },
+    staleTime: 30 * 1000,
+    placeholderData: (prev) => prev,
   });
 }
 
@@ -220,6 +268,11 @@ export function useRevealCandidateMutation(lang: "ar" | "en" = "ar") {
           };
         }
       );
+      // Not patched in place like the search cache above (the revealed-list
+      // shape/order depends on the DB's reveal history, not something worth
+      // reconstructing client-side) -- just invalidate so it refetches next
+      // time that tab is viewed.
+      queryClient.invalidateQueries({ queryKey: ["clientPortal", "revealed"], exact: false });
       toast.success(
         ar
           ? `تم كشف بيانات الاتصال — الرصيد المتبقي: ${data.credits_remaining} كشف`
@@ -290,6 +343,7 @@ export function useBulkRevealCandidatesMutation(lang: "ar" | "en" = "ar") {
             };
           }
         );
+        queryClient.invalidateQueries({ queryKey: ["clientPortal", "revealed"], exact: false });
       }
 
       const noCreditsCount = data.failed.filter((f) => f.reason === "no_credits").length;
