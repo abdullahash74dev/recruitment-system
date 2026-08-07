@@ -193,17 +193,10 @@ export default function ClientResultsTable({
                   )}
                 </TableCell>
                 <TableCell>
-                  {row.is_revealed ? (
-                    <Button size="sm" variant="outline" onClick={() => onViewProfile(row.id)}>
-                      <UserRound className="h-3.5 w-3.5 ms-1.5" />
-                      {ar ? "عرض الملف الكامل" : "View full profile"}
-                    </Button>
-                  ) : (
-                    <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                      <Lock className="h-3.5 w-3.5 shrink-0" />
-                      {ar ? "بعد الكشف" : "After reveal"}
-                    </span>
-                  )}
+                  <Button size="sm" variant="outline" onClick={() => onViewProfile(row.id)}>
+                    <UserRound className="h-3.5 w-3.5 ms-1.5" />
+                    {ar ? "عرض الملف الكامل" : "View full profile"}
+                  </Button>
                 </TableCell>
               </TableRow>
             );

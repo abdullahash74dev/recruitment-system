@@ -73,16 +73,21 @@ export interface ClientRevealedResult {
   total: number;
 }
 
-/** Full profile returned by `client-applicant-profile` -- only ever fetchable
- * for an applicant this org has already revealed (enforced server-side, not
- * just hidden in the UI). Document fields are signed URLs, not raw storage
- * paths. Deliberately excludes internal-only columns (notes, status,
- * source/source_company, submission_token_hash, is_archived) -- see the edge
- * function's PROFILE_COLUMNS comment for why. */
+/** Full profile returned by `client-applicant-profile` -- viewable for ANY
+ * applicant (Bayt.com-style: browse the full CV for free), with only
+ * phone/email/résumé PDF credit-gated (masked/withheld until `is_revealed`).
+ * The 4 other supporting documents are always open. Deliberately excludes
+ * internal-only columns (notes, status, source/source_company,
+ * submission_token_hash, is_archived) -- see the edge function's
+ * PROFILE_COLUMNS comment for why. */
 export interface ClientApplicantProfile {
   id: string;
   full_name: string;
+  is_revealed: boolean;
+  has_resume: boolean;
+  /** Masked unless is_revealed. */
   phone: string | null;
+  /** Masked unless is_revealed. */
   email: string | null;
   gender: string | null;
   nationality: string | null;
@@ -219,12 +224,12 @@ export function useClientRevealedCandidatesQuery(page: number, lang: "ar" | "en"
 
 /**
  * The full structured profile for one applicant via `client-applicant-profile`
- * -- server-side enforces this only ever resolves for an applicant this org
- * has already revealed (`enabled` here is just UX gating, not the real
- * security boundary; the edge function checks candidate_reveals itself).
- * This is the client-facing replacement for handing out the raw uploaded
- * résumé PDF: a structured, always-legible view instead of an arbitrary
- * file, and the natural landing spot for AI-parsed résumé fields later.
+ * -- viewable for ANY applicant, not just revealed ones (Bayt.com-style
+ * browse). Only phone/email/résumé come back masked/withheld until
+ * `data.is_revealed`; everything else in the profile is always visible. The
+ * natural landing spot for AI-parsed résumé fields later, and the reason a
+ * client no longer needs the raw uploaded résumé PDF handed to them directly
+ * pre-reveal.
  */
 export function useClientApplicantProfileQuery(applicantId: string | null, lang: "ar" | "en" = "ar") {
   return useQuery({
@@ -347,6 +352,7 @@ export function useRevealCandidateMutation(lang: "ar" | "en" = "ar") {
       // reconstructing client-side) -- just invalidate so it refetches next
       // time that tab is viewed.
       queryClient.invalidateQueries({ queryKey: ["clientPortal", "revealed"], exact: false });
+      queryClient.invalidateQueries({ queryKey: ["clientPortal", "profile", applicantId] });
       toast.success(
         ar
           ? `تم كشف بيانات الاتصال — الرصيد المتبقي: ${data.credits_remaining} كشف`
@@ -418,6 +424,9 @@ export function useBulkRevealCandidatesMutation(lang: "ar" | "en" = "ar") {
           }
         );
         queryClient.invalidateQueries({ queryKey: ["clientPortal", "revealed"], exact: false });
+        for (const r of data.revealed) {
+          queryClient.invalidateQueries({ queryKey: ["clientPortal", "profile", r.applicant_id] });
+        }
       }
 
       const noCreditsCount = data.failed.filter((f) => f.reason === "no_credits").length;
