@@ -252,17 +252,21 @@ export function useClientApplicantProfileQuery(applicantId: string | null, lang:
 
 /**
  * Distinct-value counts for one filterable field via `client-portal-facets`,
- * scoped by every OTHER currently-applied filter (faceted counting — picking
- * a nationality narrows the counts shown for city, etc). `enabled` lets the
- * caller only fetch once a field's row is actually expanded in the UI.
+ * scoped by every OTHER currently-applied filter AND the current search box
+ * (faceted counting — picking a nationality, or typing a search term,
+ * narrows the counts shown for city, etc., to match what's actually on
+ * screen). `enabled` lets the caller only fetch once a field's row is
+ * actually expanded in the UI.
  */
 async function fetchFacetValues(
   field: string,
   otherFilters: ClientFilterValue[],
+  search: string,
+  searchMode: ClientSearchMode,
   lang: "ar" | "en",
 ): Promise<ClientFacetValue[]> {
   const { data, error } = await supabase.functions.invoke("client-portal-facets", {
-    body: { field, filters: otherFilters },
+    body: { field, filters: otherFilters, search, searchMode },
   });
   if (error) {
     const { message } = await extractEdgeFunctionError(error);
@@ -275,12 +279,14 @@ async function fetchFacetValues(
 export function useClientFacetsQuery(
   field: string,
   otherFilters: ClientFilterValue[],
+  search: string,
+  searchMode: ClientSearchMode,
   enabled: boolean,
   lang: "ar" | "en" = "ar",
 ) {
   return useQuery({
-    queryKey: queryKeys.clientPortal.facets(field, otherFilters),
-    queryFn: () => fetchFacetValues(field, otherFilters, lang),
+    queryKey: queryKeys.clientPortal.facets(field, otherFilters, search, searchMode),
+    queryFn: () => fetchFacetValues(field, otherFilters, search, searchMode, lang),
     enabled,
     staleTime: 5 * 60 * 1000,
   });
@@ -298,11 +304,13 @@ export function fetchClientFacets(
   queryClient: QueryClient,
   field: string,
   otherFilters: ClientFilterValue[],
+  search: string,
+  searchMode: ClientSearchMode,
   lang: "ar" | "en" = "ar",
 ) {
   return queryClient.fetchQuery({
-    queryKey: queryKeys.clientPortal.facets(field, otherFilters),
-    queryFn: () => fetchFacetValues(field, otherFilters, lang),
+    queryKey: queryKeys.clientPortal.facets(field, otherFilters, search, searchMode),
+    queryFn: () => fetchFacetValues(field, otherFilters, search, searchMode, lang),
     staleTime: 5 * 60 * 1000,
   });
 }
