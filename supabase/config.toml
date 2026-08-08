@@ -29,3 +29,6 @@ verify_jwt = true
 
 [functions.client-ai-job-match]
 verify_jwt = true
+
+[functions.extract-applicant-resume-data]
+verify_jwt = true
