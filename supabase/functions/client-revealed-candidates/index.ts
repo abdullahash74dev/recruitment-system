@@ -94,7 +94,7 @@ Deno.serve(async (req) => {
     // same round trip.
     const { data: reveals, count: total, error: revealsError } = await supabaseAdmin
       .from("candidate_reveals")
-      .select("applicant_id, revealed_at", { count: "exact" })
+      .select("applicant_id, revealed_at, revealed_by", { count: "exact" })
       .eq("client_organization_id", clientOrganizationId)
       .order("revealed_at", { ascending: false })
       .range(from, to);
@@ -108,6 +108,21 @@ Deno.serve(async (req) => {
 
     const ids = reveals.map((r) => r.applicant_id as string);
     const revealedAtByApplicantId = new Map(reveals.map((r) => [r.applicant_id as string, r.revealed_at as string]));
+    const revealedByByApplicantId = new Map(reveals.map((r) => [r.applicant_id as string, r.revealed_by as string | null]));
+
+    // Resolve revealer user ids to display names -- team activity ("who
+    // revealed what"), only meaningful for orgs with more than one login.
+    const revealerIds = [...new Set(reveals.map((r) => r.revealed_by).filter(Boolean))] as string[];
+    const revealerNameById = new Map<string, string>();
+    if (revealerIds.length > 0) {
+      const { data: revealerUsers } = await supabaseAdmin
+        .from("client_users")
+        .select("user_id, full_name, email")
+        .in("user_id", revealerIds);
+      for (const u of revealerUsers || []) {
+        revealerNameById.set(u.user_id as string, (u.full_name as string | null) || (u.email as string | null) || "");
+      }
+    }
 
     // Real contact info -- these are all already-paid-for reveals, no
     // masking needed.
@@ -151,6 +166,7 @@ Deno.serve(async (req) => {
             has_resume: !!a.resume_url,
             resume_url: resumeUrl,
             revealed_at: revealedAtByApplicantId.get(a.id as string) ?? null,
+            revealed_by_name: revealerNameById.get(revealedByByApplicantId.get(a.id as string) || "") || null,
           };
         })
     );

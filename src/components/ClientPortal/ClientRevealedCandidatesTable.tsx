@@ -41,11 +41,20 @@ export default function ClientRevealedCandidatesTable({ lang, rows, isLoading, o
     [rows]
   );
 
+  // Only worth a column when the org actually has more than one revealer --
+  // for a single-user org it'd just repeat the same name on every row.
+  const distinctRevealers = useMemo(
+    () => new Set(rows.map((r) => r.revealed_by_name).filter(Boolean)),
+    [rows]
+  );
+  const showRevealedBy = distinctRevealers.size > 1;
+
   const columns = [
     { key: "name", ar: "الاسم", en: "Name" },
     ...visibleDataColumns,
     { key: "contact", ar: "بيانات الاتصال", en: "Contact Info" },
     { key: "revealed_at", ar: "تاريخ الكشف", en: "Revealed On" },
+    ...(showRevealedBy ? [{ key: "revealed_by", ar: "كشف بواسطة", en: "Revealed By" }] : []),
     { key: "profile", ar: "الملف الكامل", en: "Full Profile" },
   ];
 
@@ -122,6 +131,9 @@ export default function ClientRevealedCandidatesTable({ lang, rows, isLoading, o
               <TableCell className="text-sm text-muted-foreground">
                 {new Date(row.revealed_at).toLocaleDateString(ar ? "ar-SA" : "en-US")}
               </TableCell>
+              {showRevealedBy && (
+                <TableCell className="text-sm text-muted-foreground">{dash(row.revealed_by_name)}</TableCell>
+              )}
               <TableCell>
                 <Button size="sm" variant="outline" onClick={() => onViewProfile(row.id)}>
                   <UserRound className="h-3.5 w-3.5 ms-1.5" />

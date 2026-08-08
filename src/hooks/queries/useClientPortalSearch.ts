@@ -69,6 +69,8 @@ export interface ClientRevealedRow {
   has_resume: boolean;
   resume_url: string | null;
   revealed_at: string;
+  /** Display name (or email) of the teammate who revealed this candidate, if resolvable. */
+  revealed_by_name: string | null;
 }
 
 export interface ClientRevealedResult {
