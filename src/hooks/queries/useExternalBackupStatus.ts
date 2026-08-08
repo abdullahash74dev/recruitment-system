@@ -9,6 +9,11 @@ const KIND_TO_COLUMN: Record<string, string> = {
   other: "other_docs_url",
 };
 
+// Destinations the shipped scripts/*-backup tools write to. Both write to
+// the same external_backups table, distinguished by this column, so they
+// can run independently without stepping on each other.
+export const EXTERNAL_BACKUP_DESTINATIONS = ["onedrive", "googledrive"] as const;
+
 export interface ExternalBackupKindStatus {
   kind: string;
   total: number;
@@ -16,7 +21,8 @@ export interface ExternalBackupKindStatus {
   failed: number;
 }
 
-export interface ExternalBackupStatus {
+export interface ExternalBackupDestinationStatus {
+  destination: string;
   byKind: ExternalBackupKindStatus[];
   lastBackedUpAt: string | null;
 }
@@ -29,43 +35,50 @@ async function countCandidates(column: string): Promise<number> {
   return count ?? 0;
 }
 
-async function countBackups(kind: string, status: "success" | "error"): Promise<number> {
+async function countBackups(destination: string, kind: string, status: "success" | "error"): Promise<number> {
   const { count } = await (supabase as any)
     .from("external_backups")
     .select("id", { count: "exact", head: true })
-    .eq("destination", "onedrive")
+    .eq("destination", destination)
     .eq("file_kind", kind)
     .eq("status", status);
   return count ?? 0;
 }
 
-async function fetchExternalBackupStatus(): Promise<ExternalBackupStatus> {
+async function fetchExternalBackupStatus(): Promise<ExternalBackupDestinationStatus[]> {
   const kinds = Object.keys(KIND_TO_COLUMN);
 
-  const [byKind, lastRes] = await Promise.all([
-    Promise.all(
-      kinds.map(async (kind) => {
-        const [total, backedUp, failed] = await Promise.all([
-          countCandidates(KIND_TO_COLUMN[kind]),
-          countBackups(kind, "success"),
-          countBackups(kind, "error"),
-        ]);
-        return { kind, total, backedUp, failed };
-      })
-    ),
-    (supabase as any)
-      .from("external_backups")
-      .select("backed_up_at")
-      .eq("destination", "onedrive")
-      .order("backed_up_at", { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-  ]);
+  const totals = await Promise.all(kinds.map((kind) => countCandidates(KIND_TO_COLUMN[kind])));
+  const totalByKind = Object.fromEntries(kinds.map((kind, i) => [kind, totals[i]]));
 
-  return {
-    byKind: byKind.filter((k) => k.total > 0 || k.backedUp > 0 || k.failed > 0),
-    lastBackedUpAt: lastRes?.data?.backed_up_at ?? null,
-  };
+  return Promise.all(
+    EXTERNAL_BACKUP_DESTINATIONS.map(async (destination) => {
+      const [byKind, lastRes] = await Promise.all([
+        Promise.all(
+          kinds.map(async (kind) => {
+            const [backedUp, failed] = await Promise.all([
+              countBackups(destination, kind, "success"),
+              countBackups(destination, kind, "error"),
+            ]);
+            return { kind, total: totalByKind[kind], backedUp, failed };
+          })
+        ),
+        (supabase as any)
+          .from("external_backups")
+          .select("backed_up_at")
+          .eq("destination", destination)
+          .order("backed_up_at", { ascending: false })
+          .limit(1)
+          .maybeSingle(),
+      ]);
+
+      return {
+        destination,
+        byKind: byKind.filter((k) => k.total > 0),
+        lastBackedUpAt: lastRes?.data?.backed_up_at ?? null,
+      };
+    })
+  );
 }
 
 export function useExternalBackupStatusQuery() {
