@@ -14,6 +14,7 @@ import {
   useSimilarCandidatesQuery,
   type ClientApplicantProfile,
 } from "@/hooks/queries/useClientPortalSearch";
+import ClientCandidateWorkspacePanel from "@/components/ClientPortal/ClientCandidateWorkspacePanel";
 
 interface ClientApplicantProfileDialogProps {
   lang: "ar" | "en";
@@ -218,6 +219,8 @@ export default function ClientApplicantProfileDialog({ lang, applicantId, onClos
                   </div>
                 )}
               </div>
+
+              <ClientCandidateWorkspacePanel lang={lang} applicantId={data.id} />
 
               {dash(data.self_summary) && (
                 <div>
