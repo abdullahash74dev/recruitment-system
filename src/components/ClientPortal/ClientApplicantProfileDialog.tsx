@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
@@ -6,10 +7,11 @@ import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Award, Briefcase, Calendar, Car, CircleGauge, Download, FileText, GraduationCap, Languages as LanguagesIcon,
-  Linkedin, Loader2, Mail, MapPin, MessageCircle, Phone, Unlock, User, Users, Wallet,
+  Linkedin, Loader2, Mail, MapPin, MessageCircle, Phone, Sparkles, Unlock, User, Users, Wallet,
 } from "lucide-react";
 import {
   useClientApplicantProfileQuery,
+  useClientResumeSummaryQuery,
   useRevealCandidateMutation,
   useSimilarCandidatesQuery,
   type ClientApplicantProfile,
@@ -100,6 +102,20 @@ export default function ClientApplicantProfileDialog({ lang, applicantId, onClos
   const similarField = data?.desired_position ? "desired_position" : data?.major ? "major" : data?.current_city ? "current_city" : null;
   const similarValue = similarField === "desired_position" ? data?.desired_position : similarField === "major" ? data?.major : data?.current_city;
   const { data: similarCandidates } = useSimilarCandidatesQuery(applicantId, similarField, similarValue ?? null, lang);
+
+  // Opt-in (not auto-fired on open) -- generation costs a real AI call the
+  // first time any org requests it for a given applicant+language; after
+  // that it's served from applicant_ai_summaries, essentially free. Resets
+  // when the dialog jumps to a different candidate via "similar candidates".
+  const [showAiSummary, setShowAiSummary] = useState(false);
+  useEffect(() => {
+    setShowAiSummary(false);
+  }, [applicantId]);
+  const { data: aiSummary, isFetching: aiSummaryLoading, isError: aiSummaryError } = useClientResumeSummaryQuery(
+    applicantId,
+    showAiSummary,
+    lang
+  );
 
   return (
     <Dialog open={!!applicantId} onOpenChange={(open) => !open && onClose()}>
@@ -221,6 +237,33 @@ export default function ClientApplicantProfileDialog({ lang, applicantId, onClos
               </div>
 
               <ClientCandidateWorkspacePanel lang={lang} applicantId={data.id} />
+
+              <div className="rounded-lg border bg-muted/20 p-3 space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="flex items-center gap-1.5 text-sm font-semibold text-primary">
+                    <Sparkles className="h-3.5 w-3.5" />
+                    {ar ? "ملخص ذكي (AI)" : "AI Summary"}
+                  </span>
+                  {!showAiSummary && (
+                    <Button size="sm" variant="outline" onClick={() => setShowAiSummary(true)}>
+                      {ar ? "توليد الملخص" : "Generate"}
+                    </Button>
+                  )}
+                </div>
+                {showAiSummary && (
+                  aiSummaryLoading ? (
+                    <div className="space-y-1.5">
+                      <Skeleton className="h-3 w-full" />
+                      <Skeleton className="h-3 w-full" />
+                      <Skeleton className="h-3 w-2/3" />
+                    </div>
+                  ) : aiSummaryError ? (
+                    <p className="text-xs text-destructive">{ar ? "تعذر توليد الملخص" : "Failed to generate summary"}</p>
+                  ) : aiSummary ? (
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{aiSummary.summary}</p>
+                  ) : null
+                )}
+              </div>
 
               {dash(data.self_summary) && (
                 <div>

@@ -11,7 +11,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
-  CheckSquare, ChevronLeft, ChevronRight, History, Loader2, LogOut, Save, Scale, Search, Trash2, Unlock, Wallet, X,
+  CheckSquare, ChevronLeft, ChevronRight, History, Loader2, LogOut, Save, Scale, Search, Sparkles, Trash2, Unlock, Wallet, X,
 } from "lucide-react";
 import {
   useClientSearchQuery,
@@ -37,6 +37,7 @@ import ClientRevealedCandidatesTable from "@/components/ClientPortal/ClientRevea
 import ClientApplicantProfileDialog from "@/components/ClientPortal/ClientApplicantProfileDialog";
 import ClientCompareDialog from "@/components/ClientPortal/ClientCompareDialog";
 import ClientExportButton from "@/components/ClientPortal/ClientExportButton";
+import ClientJobMatchDialog from "@/components/ClientPortal/ClientJobMatchDialog";
 
 // The same 19 fields the admin dashboard's ApplicantsAdvancedFilters exposes
 // (and the only ones client-search-applicants/client-portal-facets allow-list),
@@ -215,6 +216,7 @@ export default function ClientPortalPage() {
   // file -- see ClientApplicantProfileDialog). ----
   const [viewProfileId, setViewProfileId] = useState<string | null>(null);
   const [compareIds, setCompareIds] = useState<string[]>([]);
+  const [jobMatchOpen, setJobMatchOpen] = useState(false);
 
   return (
     <div dir={ar ? "rtl" : "ltr"} className="min-h-screen bg-muted/30">
@@ -234,6 +236,10 @@ export default function ClientPortalPage() {
                 ? "الرصيد: —"
                 : "Balance: —"}
             </Badge>
+            <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setJobMatchOpen(true)}>
+              <Sparkles className="h-3.5 w-3.5" />
+              {ar ? "بحث بوصف وظيفة" : "Search by job description"}
+            </Button>
             <Button variant="outline" size="sm" onClick={handleLogout}>
               <LogOut className="h-4 w-4 ms-1.5" />
               {ar ? "تسجيل الخروج" : "Logout"}
@@ -590,6 +596,12 @@ export default function ClientPortalPage() {
         onSelectApplicant={setViewProfileId}
       />
       <ClientCompareDialog lang={lang} applicantIds={compareIds} onClose={() => setCompareIds([])} />
+      <ClientJobMatchDialog
+        lang={lang}
+        open={jobMatchOpen}
+        onClose={() => setJobMatchOpen(false)}
+        onViewProfile={setViewProfileId}
+      />
     </div>
   );
 }
