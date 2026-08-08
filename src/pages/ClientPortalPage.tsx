@@ -36,6 +36,7 @@ import ClientResultsTable from "@/components/ClientPortal/ClientResultsTable";
 import ClientRevealedCandidatesTable from "@/components/ClientPortal/ClientRevealedCandidatesTable";
 import ClientApplicantProfileDialog from "@/components/ClientPortal/ClientApplicantProfileDialog";
 import ClientCompareDialog from "@/components/ClientPortal/ClientCompareDialog";
+import ClientExportButton from "@/components/ClientPortal/ClientExportButton";
 
 // The same 19 fields the admin dashboard's ApplicantsAdvancedFilters exposes
 // (and the only ones client-search-applicants/client-portal-facets allow-list),
@@ -260,10 +261,11 @@ export default function ClientPortalPage() {
 
         {activeTab === "revealed" ? (
           <Card>
-            <CardHeader className="pb-3">
+            <CardHeader className="flex flex-row items-center justify-between pb-3">
               <CardTitle className="text-base">
                 {ar ? `المرشحين المكشوفين (${revealedTotal})` : `Revealed Candidates (${revealedTotal})`}
               </CardTitle>
+              {revealedTotal > 0 && <ClientExportButton lang={lang} />}
             </CardHeader>
             <CardContent className="space-y-4">
               <ClientRevealedCandidatesTable
