@@ -5,12 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Award, Briefcase, Calendar, Car, Download, FileText, GraduationCap, Languages as LanguagesIcon,
-  Linkedin, Loader2, Mail, MapPin, Phone, Unlock, User, Wallet,
+  Award, Briefcase, Calendar, Car, CircleGauge, Download, FileText, GraduationCap, Languages as LanguagesIcon,
+  Linkedin, Loader2, Mail, MapPin, MessageCircle, Phone, Unlock, User, Wallet,
 } from "lucide-react";
 import {
   useClientApplicantProfileQuery,
   useRevealCandidateMutation,
+  type ClientApplicantProfile,
 } from "@/hooks/queries/useClientPortalSearch";
 
 interface ClientApplicantProfileDialogProps {
@@ -24,6 +25,32 @@ const dash = (v: string | null | undefined) => (v && String(v).trim() ? v : null
 function initials(name: string) {
   const parts = name.trim().split(/\s+/).filter(Boolean);
   return (parts[0]?.[0] || "") + (parts[1]?.[0] || "");
+}
+
+// Saudi local numbers are stored as "05XXXXXXXX" -- wa.me needs the full
+// international form with no leading zero (+966...).
+function toWhatsAppLink(phone: string): string {
+  const digits = phone.replace(/\D/g, "");
+  const international = digits.startsWith("0") ? `966${digits.slice(1)}` : digits.startsWith("966") ? digits : `966${digits}`;
+  return `https://wa.me/${international}`;
+}
+
+// A representative set of profile fields (mirrors what's actually rendered
+// below) used to compute a rough "how filled-in is this CV" percentage --
+// helps a client prioritize which candidates are worth revealing first.
+// Deliberately excludes phone/email/résumé (credit-gated, not filled-in-ness)
+// and internal fields.
+const COMPLETENESS_FIELDS: (keyof ClientApplicantProfile)[] = [
+  "gender", "nationality", "birth_date", "marital_status", "current_city", "preferred_city",
+  "has_transport", "linkedin", "education_level", "major", "university", "graduation_year", "gpa",
+  "desired_position", "job_type", "years_experience", "currently_employed", "current_title",
+  "current_salary", "expected_salary", "available_date", "current_tasks", "other_experience",
+  "arabic_level", "english_level", "other_language", "self_summary",
+];
+
+function profileCompleteness(data: ClientApplicantProfile): number {
+  const filled = COMPLETENESS_FIELDS.filter((f) => dash(data[f] as string | null)).length;
+  return Math.round((filled / COMPLETENESS_FIELDS.length) * 100);
 }
 
 /** One label/value row, only rendered when the value is present -- the profile
@@ -100,6 +127,10 @@ export default function ClientApplicantProfileDialog({ lang, applicantId, onClos
                     {dash(data.currently_employed) && (
                       <Badge variant="outline" className="text-[10px]">{data.currently_employed}</Badge>
                     )}
+                    <Badge variant="outline" className="text-[10px] gap-1">
+                      <CircleGauge className="h-3 w-3" />
+                      {ar ? `اكتمال الملف ${profileCompleteness(data)}%` : `${profileCompleteness(data)}% complete`}
+                    </Badge>
                   </div>
                 </div>
               </div>
@@ -107,7 +138,17 @@ export default function ClientApplicantProfileDialog({ lang, applicantId, onClos
               {/* Contact + résumé -- the only credit-gated part of this page.
                   Everything below is visible regardless of reveal status. */}
               <div className="rounded-lg border bg-muted/30 p-3 space-y-1">
-                <InfoRow icon={Phone} label={ar ? "الهاتف" : "Phone"} value={dash(data.phone)} />
+                <div className="flex items-center justify-between gap-2">
+                  <InfoRow icon={Phone} label={ar ? "الهاتف" : "Phone"} value={dash(data.phone)} />
+                  {data.is_revealed && dash(data.phone) && (
+                    <Button size="sm" variant="outline" className="shrink-0 gap-1.5 text-emerald-600 border-emerald-600/40 hover:bg-emerald-600/10" asChild>
+                      <a href={toWhatsAppLink(data.phone!)} target="_blank" rel="noopener noreferrer">
+                        <MessageCircle className="h-3.5 w-3.5" />
+                        {ar ? "واتساب" : "WhatsApp"}
+                      </a>
+                    </Button>
+                  )}
+                </div>
                 <InfoRow icon={Mail} label={ar ? "الإيميل" : "Email"} value={dash(data.email)} />
 
                 <div className="flex items-center gap-2.5 py-1.5">
