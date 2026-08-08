@@ -46,6 +46,10 @@ export const queryKeys = {
     log: () => ["aiUsage", "log"] as const,
     settings: () => ["aiUsage", "settings"] as const,
   },
+  resumeExtraction: {
+    settings: () => ["resumeExtraction", "settings"] as const,
+    forApplicant: (applicantId: string) => ["resumeExtraction", "applicant", applicantId] as const,
+  },
   backupRuns: {
     all: ["backupRuns"] as const,
     list: () => ["backupRuns", "list"] as const,

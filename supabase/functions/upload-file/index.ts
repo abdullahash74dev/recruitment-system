@@ -224,6 +224,38 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Kick off AI résumé-data extraction in the background -- best-effort,
+    // never blocks or fails the upload response the applicant is waiting
+    // on. Only for the actual résumé (not degree/training/other docs), and
+    // only when the admin hasn't disabled it via Settings.
+    if (kind === "resume") {
+      const extractionTask = (async () => {
+        try {
+          const { data: settings } = await supabase
+            .from("resume_extraction_settings")
+            .select("enabled")
+            .eq("id", true)
+            .maybeSingle();
+          if (settings?.enabled === false) return;
+          await fetch(`${Deno.env.get("SUPABASE_URL")}/functions/v1/extract-applicant-resume-data`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+            },
+            body: JSON.stringify({ applicant_id: applicantId }),
+          });
+        } catch (e) {
+          console.error("Résumé extraction trigger failed:", e);
+        }
+      })();
+      // deno-lint-ignore no-explicit-any
+      const rt = (globalThis as any).EdgeRuntime;
+      if (rt?.waitUntil) {
+        rt.waitUntil(extractionTask);
+      }
+    }
+
     return new Response(JSON.stringify({ path }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

@@ -50,6 +50,7 @@ import JobAdvertisements from "@/components/Dashboard/JobAdvertisements";
 import RecruitmentDashboard from "@/components/Dashboard/Recruitment/RecruitmentDashboard";
 import ApplicantEmailDialog from "@/components/Dashboard/ApplicantEmailDialog";
 import ApplicantEmailHistory from "@/components/Dashboard/ApplicantEmailHistory";
+import ApplicantResumeExtractionPanel from "@/components/Dashboard/ApplicantResumeExtractionPanel";
 import TransferToRecruitmentDialog from "@/components/Dashboard/TransferToRecruitmentDialog";
 import BulkSourceCorrectionDialog from "@/components/Dashboard/BulkSourceCorrectionDialog";
 import ApplicantsAdvancedFilters, { AdvancedFilter, applyAdvancedFilters } from "@/components/Dashboard/ApplicantsAdvancedFilters";
@@ -78,6 +79,7 @@ import EmailTemplates from "@/components/Dashboard/EmailTemplates";
 import IntegrationsHub from "@/components/Dashboard/IntegrationsHub";
 import { AiUsageMonitor } from "@/components/Dashboard/AiUsageMonitor";
 import AiProviderSettings from "@/components/Dashboard/AiProviderSettings";
+import ResumeExtractionSettings from "@/components/Dashboard/ResumeExtractionSettings";
 import AiInsightsPanel from "@/components/Dashboard/AiInsightsPanel";
 import NotificationsBell from "@/components/Dashboard/NotificationsBell";
 import ExecutiveKPIs from "@/components/Dashboard/ExecutiveKPIs";
@@ -1571,8 +1573,9 @@ const DashboardPage = () => {
             <AiUsageMonitor lang={lang} />
           </TabsContent>
 
-          <TabsContent value="ai_settings">
+          <TabsContent value="ai_settings" className="space-y-4">
             <AiProviderSettings />
+            <ResumeExtractionSettings />
           </TabsContent>
         </Tabs>
       </main>
@@ -1730,6 +1733,8 @@ const DashboardPage = () => {
                     </Button>
                   )}
                 </div>
+
+                <ApplicantResumeExtractionPanel lang={lang} applicantId={selectedApplicant.id} applicant={selectedApplicant} />
 
                 <ApplicantEmailHistory applicantId={selectedApplicant.id} />
               </div>
