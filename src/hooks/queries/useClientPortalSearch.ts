@@ -43,10 +43,13 @@ export interface ClientFacetValue {
 }
 
 export type ClientSearchMode = "any" | "all";
+export type ClientSortBy = "newest" | "oldest";
 
 export interface ClientSearchResult {
   rows: ClientApplicantRow[];
   total: number;
+  /** How many of ALL matching results (not just this page) this org has already revealed. */
+  revealed_in_results: number;
   credits_remaining: number;
 }
 
@@ -178,12 +181,13 @@ export function useClientSearchQuery(
   page: number,
   lang: "ar" | "en" = "ar",
   searchMode: ClientSearchMode = "any",
+  sortBy: ClientSortBy = "newest",
 ) {
   return useQuery({
-    queryKey: queryKeys.clientPortal.search(filters, search, page, searchMode),
+    queryKey: [...queryKeys.clientPortal.search(filters, search, page, searchMode), sortBy],
     queryFn: async (): Promise<ClientSearchResult> => {
       const { data, error } = await supabase.functions.invoke("client-search-applicants", {
-        body: { filters, search, searchMode, page, pageSize: CLIENT_PORTAL_PAGE_SIZE },
+        body: { filters, search, searchMode, page, pageSize: CLIENT_PORTAL_PAGE_SIZE, sortBy },
       });
       if (error) {
         const { message } = await extractEdgeFunctionError(error);

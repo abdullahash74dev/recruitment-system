@@ -260,6 +260,7 @@ Deno.serve(async (req) => {
       searchMode?: string;
       page?: number;
       pageSize?: number;
+      sortBy?: string;
     } = {};
     try {
       body = await req.json();
@@ -274,6 +275,7 @@ Deno.serve(async (req) => {
     const pageSize = clampInt(body.pageSize, 50, 1, 100); // never trust client pageSize blindly
     const from = (page - 1) * pageSize;
     const to = from + pageSize - 1;
+    const sortAscending = body.sortBy === "oldest";
 
     // Fetch synonym groups once per request (small table) so canonical
     // filter values can be expanded into their literal member strings.
@@ -289,7 +291,7 @@ Deno.serve(async (req) => {
     let dataQuery = supabaseAdmin.from("applicants").select(selectColumns);
     dataQuery = applyFieldFilters(dataQuery, filters);
     dataQuery = applySearch(dataQuery, search, searchMode);
-    dataQuery = dataQuery.order("created_at", { ascending: false }).range(from, to);
+    dataQuery = dataQuery.order("created_at", { ascending: sortAscending }).range(from, to);
 
     const { data: applicants, error: dataError } = await dataQuery;
     if (dataError) {
@@ -305,6 +307,22 @@ Deno.serve(async (req) => {
     const { count, error: countError } = await countQuery;
     if (countError) {
       return json({ error: countError.message }, 400);
+    }
+
+    // 5b. How many of ALL matching results (not just this page) has this org
+    // already revealed -- powers the "X revealed / Y total" stats summary.
+    // PostgREST embedded-resource filtering (candidate_reveals!inner) joins
+    // via the FK on candidate_reveals.applicant_id, so this counts without
+    // ever pulling the full id list client-side.
+    let revealedCountQuery = supabaseAdmin
+      .from("applicants")
+      .select("id, candidate_reveals!inner(id)", { count: "exact", head: true })
+      .eq("candidate_reveals.client_organization_id", clientOrganizationId);
+    revealedCountQuery = applyFieldFilters(revealedCountQuery, filters);
+    revealedCountQuery = applySearch(revealedCountQuery, search, searchMode);
+    const { count: revealedInResults, error: revealedCountError } = await revealedCountQuery;
+    if (revealedCountError) {
+      return json({ error: revealedCountError.message }, 400);
     }
 
     // 6. Which of these applicants has this org already revealed?
@@ -349,6 +367,7 @@ Deno.serve(async (req) => {
     return json({
       rows,
       total: count ?? 0,
+      revealed_in_results: revealedInResults ?? 0,
       credits_remaining: org.credits_remaining ?? 0,
     });
   } catch (e) {

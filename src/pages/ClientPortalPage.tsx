@@ -21,7 +21,10 @@ import {
   type ClientFilterValue,
   type ClientFacetValue,
   type ClientSearchMode,
+  type ClientSortBy,
 } from "@/hooks/queries/useClientPortalSearch";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import ClientSearchStatsPanel from "@/components/ClientPortal/ClientSearchStatsPanel";
 import {
   useClientSavedFiltersQuery,
   useSaveClientFilterMutation,
@@ -67,6 +70,7 @@ export default function ClientPortalPage() {
   const [searchInput, setSearchInput] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [searchMode, setSearchMode] = useState<ClientSearchMode>("any");
+  const [sortBy, setSortBy] = useState<ClientSortBy>("newest");
   const [filters, setFilters] = useState<ClientFilterValue[]>([]);
   const [page, setPage] = useState(1);
   const [facetsTick, setFacetsTick] = useState(0);
@@ -77,12 +81,12 @@ export default function ClientPortalPage() {
     return () => clearTimeout(t);
   }, [searchInput]);
 
-  // Reset back to page 1 whenever the effective query (search, mode, or any filter) changes.
+  // Reset back to page 1 whenever the effective query (search, mode, sort, or any filter) changes.
   useEffect(() => {
     setPage(1);
-  }, [debouncedSearch, searchMode, filters]);
+  }, [debouncedSearch, searchMode, sortBy, filters]);
 
-  const { data, isLoading, isFetching } = useClientSearchQuery(filters, debouncedSearch, page, lang, searchMode);
+  const { data, isLoading, isFetching } = useClientSearchQuery(filters, debouncedSearch, page, lang, searchMode, sortBy);
 
   // ---- Bulk selection (scoped to the current page only -- resets whenever
   // the page or the underlying result set changes, so a selection never
@@ -128,6 +132,7 @@ export default function ClientPortalPage() {
 
   const rows = data?.rows ?? [];
   const total = data?.total ?? 0;
+  const revealedInResults = data?.revealed_in_results ?? 0;
   const creditsRemaining = data?.credits_remaining;
   const pageSize = 20;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
@@ -340,6 +345,16 @@ export default function ClientPortalPage() {
                     </ToggleGroupItem>
                   </ToggleGroup>
 
+                  <Select value={sortBy} onValueChange={(v) => setSortBy(v as ClientSortBy)}>
+                    <SelectTrigger className="h-8 w-auto text-xs gap-1.5">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="newest">{ar ? "الأحدث تقديماً" : "Newest first"}</SelectItem>
+                      <SelectItem value="oldest">{ar ? "الأقدم تقديماً" : "Oldest first"}</SelectItem>
+                    </SelectContent>
+                  </Select>
+
                   <Button
                     variant="outline"
                     size="sm"
@@ -392,6 +407,17 @@ export default function ClientPortalPage() {
                 )}
               </CardContent>
             </Card>
+
+            {!isLoading && (
+              <ClientSearchStatsPanel
+                lang={lang}
+                filters={filters}
+                search={debouncedSearch}
+                searchMode={searchMode}
+                total={total}
+                revealedInResults={revealedInResults}
+              />
+            )}
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-3">
