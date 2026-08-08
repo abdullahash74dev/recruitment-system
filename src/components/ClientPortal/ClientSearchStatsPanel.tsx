@@ -28,6 +28,7 @@ interface StatBlockProps {
  * endpoint the sidebar filter picker uses, just rendered as a summary
  * instead of a checkbox list. No new backend endpoint needed. */
 function StatBlock({ title, field, filters, search, searchMode, lang, total }: StatBlockProps) {
+  const ar = lang === "ar";
   const { data, isLoading } = useClientFacetsQuery(field, filters, search, searchMode, true, lang);
   const top = (data || []).slice(0, 5);
 
@@ -53,7 +54,9 @@ function StatBlock({ title, field, filters, search, searchMode, lang, total }: S
             <div key={v.value} className="space-y-0.5">
               <div className="flex items-center justify-between text-xs">
                 <span className="truncate">{v.label}</span>
-                <span className="text-muted-foreground shrink-0 ms-2">{pct}%</span>
+                <span className="text-muted-foreground shrink-0 ms-2">
+                  {ar ? `${v.count.toLocaleString("ar")} (${pct}%)` : `${v.count.toLocaleString()} (${pct}%)`}
+                </span>
               </div>
               <div className="h-1.5 rounded-full bg-muted overflow-hidden">
                 <div className="h-full bg-primary rounded-full" style={{ width: `${pct}%` }} />

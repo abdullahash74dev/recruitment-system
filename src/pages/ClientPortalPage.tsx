@@ -11,7 +11,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
-  CheckSquare, ChevronLeft, ChevronRight, History, Loader2, LogOut, Save, Search, Trash2, Unlock, Wallet, X,
+  CheckSquare, ChevronLeft, ChevronRight, History, Loader2, LogOut, Save, Scale, Search, Trash2, Unlock, Wallet, X,
 } from "lucide-react";
 import {
   useClientSearchQuery,
@@ -35,6 +35,7 @@ import CategorizedFilterPanel, { type CategorizedFilterField } from "@/component
 import ClientResultsTable from "@/components/ClientPortal/ClientResultsTable";
 import ClientRevealedCandidatesTable from "@/components/ClientPortal/ClientRevealedCandidatesTable";
 import ClientApplicantProfileDialog from "@/components/ClientPortal/ClientApplicantProfileDialog";
+import ClientCompareDialog from "@/components/ClientPortal/ClientCompareDialog";
 
 // The same 19 fields the admin dashboard's ApplicantsAdvancedFilters exposes
 // (and the only ones client-search-applicants/client-portal-facets allow-list),
@@ -212,6 +213,7 @@ export default function ClientPortalPage() {
   // ---- Full applicant profile dialog (structured view, not the raw résumé
   // file -- see ClientApplicantProfileDialog). ----
   const [viewProfileId, setViewProfileId] = useState<string | null>(null);
+  const [compareIds, setCompareIds] = useState<string[]>([]);
 
   return (
     <div dir={ar ? "rtl" : "ltr"} className="min-h-screen bg-muted/30">
@@ -444,22 +446,30 @@ export default function ClientPortalPage() {
                     <span className="text-sm">
                       {ar ? `تم تحديد ${selectedIds.size} مرشح` : `${selectedIds.size} candidates selected`}
                     </span>
-                    <Button
-                      size="sm"
-                      className="ms-auto gap-1"
-                      disabled={bulkRevealMutation.isPending}
-                      onClick={() => setBulkConfirmOpen(true)}
-                    >
-                      {bulkRevealMutation.isPending ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      ) : (
-                        <Unlock className="h-3.5 w-3.5" />
+                    <div className="flex items-center gap-2 ms-auto">
+                      {selectedIds.size >= 2 && selectedIds.size <= 3 && (
+                        <Button size="sm" variant="outline" className="gap-1" onClick={() => setCompareIds([...selectedIds])}>
+                          <Scale className="h-3.5 w-3.5" />
+                          {ar ? "قارن" : "Compare"}
+                        </Button>
                       )}
-                      {ar ? "كشف المحدد" : "Reveal selected"}
-                    </Button>
-                    <Button variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())}>
-                      {ar ? "إلغاء التحديد" : "Clear selection"}
-                    </Button>
+                      <Button
+                        size="sm"
+                        className="gap-1"
+                        disabled={bulkRevealMutation.isPending}
+                        onClick={() => setBulkConfirmOpen(true)}
+                      >
+                        {bulkRevealMutation.isPending ? (
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        ) : (
+                          <Unlock className="h-3.5 w-3.5" />
+                        )}
+                        {ar ? "كشف المحدد" : "Reveal selected"}
+                      </Button>
+                      <Button variant="ghost" size="sm" onClick={() => setSelectedIds(new Set())}>
+                        {ar ? "إلغاء التحديد" : "Clear selection"}
+                      </Button>
+                    </div>
                   </div>
                 )}
 
@@ -571,7 +581,13 @@ export default function ClientPortalPage() {
         </DialogContent>
       </Dialog>
 
-      <ClientApplicantProfileDialog lang={lang} applicantId={viewProfileId} onClose={() => setViewProfileId(null)} />
+      <ClientApplicantProfileDialog
+        lang={lang}
+        applicantId={viewProfileId}
+        onClose={() => setViewProfileId(null)}
+        onSelectApplicant={setViewProfileId}
+      />
+      <ClientCompareDialog lang={lang} applicantIds={compareIds} onClose={() => setCompareIds([])} />
     </div>
   );
 }
