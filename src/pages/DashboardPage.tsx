@@ -29,6 +29,7 @@ import DropdownOptionsSettings from "@/components/Dashboard/DropdownOptionsSetti
 import BrandingSettings from "@/components/Dashboard/BrandingSettings";
 import BackupSettings from "@/components/Dashboard/BackupSettings";
 import ScheduledBackups from "@/components/Dashboard/ScheduledBackups";
+import ExternalBackupStatus from "@/components/Dashboard/ExternalBackupStatus";
 import FormFieldsSettings from "@/components/Dashboard/FormFieldsSettings";
 import SiteContentSettings from "@/components/Dashboard/SiteContentSettings";
 import AnalyticsHub from "@/components/Dashboard/AnalyticsHub";
@@ -1459,6 +1460,7 @@ const DashboardPage = () => {
                 <BackupSettings />
               </CardContent>
             </Card>
+            <ExternalBackupStatus />
           </TabsContent>
 
           <TabsContent value="auditlog">

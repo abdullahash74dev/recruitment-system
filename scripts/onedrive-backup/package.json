@@ -1,0 +1,17 @@
+{
+  "name": "onedrive-backup",
+  "private": true,
+  "type": "module",
+  "version": "1.0.0",
+  "description": "Standalone tool: copies every applicant résumé (and optionally other documents + a full data export) out of Supabase Storage into the operator's own OneDrive account, and tracks progress in the external_backups table so re-runs only pick up what's missing.",
+  "scripts": {
+    "auth": "node auth.mjs",
+    "backup": "node backup.mjs",
+    "status": "node backup.mjs --status"
+  },
+  "dependencies": {
+    "@azure/msal-node": "^2.13.1",
+    "@supabase/supabase-js": "^2.45.4",
+    "dotenv": "^16.4.5"
+  }
+}
