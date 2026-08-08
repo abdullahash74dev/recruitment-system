@@ -101,7 +101,9 @@ export interface ClientApplicantProfile {
   current_city: string | null;
   preferred_city: string | null;
   has_transport: string | null;
+  /** Withheld (null) unless is_revealed -- same credit gate as phone/email. */
   linkedin: string | null;
+  has_linkedin: boolean;
   education_level: string | null;
   major: string | null;
   university: string | null;
