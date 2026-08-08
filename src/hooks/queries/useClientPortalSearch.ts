@@ -516,3 +516,85 @@ export function useBulkRevealCandidatesMutation(lang: "ar" | "en" = "ar") {
     },
   });
 }
+
+interface ClientResumeSummaryResult {
+  summary: string;
+  cached: boolean;
+  generated_at: string;
+}
+
+/**
+ * AI-generated summary of a candidate's free (non-PII) profile fields via
+ * `client-ai-resume-summary`. Generated once ever per applicant+language
+ * (cached server-side in `applicant_ai_summaries`, shared across every
+ * client org), so this is `enabled`-gated behind actually opening the
+ * profile dialog rather than firing on every search result render.
+ */
+export function useClientResumeSummaryQuery(applicantId: string | null, enabled: boolean, lang: "ar" | "en" = "ar") {
+  return useQuery({
+    queryKey: ["clientPortal", "resumeSummary", applicantId, lang],
+    queryFn: async (): Promise<ClientResumeSummaryResult> => {
+      const { data, error } = await supabase.functions.invoke("client-ai-resume-summary", {
+        body: { applicant_id: applicantId, lang },
+      });
+      if (error) {
+        const { message } = await extractEdgeFunctionError(error);
+        throw new Error(message);
+      }
+      return data as ClientResumeSummaryResult;
+    },
+    enabled: enabled && !!applicantId,
+    staleTime: 30 * 60 * 1000, // effectively immutable once generated
+    retry: false,
+  });
+}
+
+export interface ClientJobMatchResult {
+  id: string;
+  full_name: string;
+  desired_position: string | null;
+  nationality: string | null;
+  current_city: string | null;
+  preferred_city: string | null;
+  education_level: string | null;
+  years_experience: string | null;
+  current_title: string | null;
+  job_type: string | null;
+  is_revealed: boolean;
+  has_resume: boolean;
+  phone: string | null;
+  email: string | null;
+  score: number;
+  reason: string;
+}
+
+/**
+ * AI job-description matching via `client-ai-job-match` -- a mutation (not a
+ * query) since it's a one-shot "run this search" action triggered by a
+ * button, not something that should auto-refetch on every keystroke of the
+ * job description textarea.
+ */
+export function useClientJobMatchMutation(lang: "ar" | "en" = "ar") {
+  const ar = lang === "ar";
+  return useMutation({
+    mutationFn: async (jobDescription: string) => {
+      const { data, error } = await supabase.functions.invoke("client-ai-job-match", {
+        body: { job_description: jobDescription, lang },
+      });
+      if (error) {
+        const { status, message } = await extractEdgeFunctionError(error);
+        const err = new Error(message) as Error & { status?: number };
+        err.status = status;
+        throw err;
+      }
+      return data as { results: ClientJobMatchResult[]; candidates_scanned: number };
+    },
+    onError: (error: Error & { status?: number }) => {
+      if (error.status === 403) {
+        toast.error(ar ? "انتهت صلاحية الاشتراك" : "Your subscription has expired");
+      } else {
+        toast.error(error.message || (ar ? "تعذر تنفيذ البحث الذكي" : "Smart match failed"));
+      }
+    },
+  });
+}
