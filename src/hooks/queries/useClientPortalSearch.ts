@@ -201,6 +201,53 @@ export function useClientSearchQuery(
   });
 }
 
+export interface SimilarCandidate {
+  id: string;
+  full_name: string;
+  desired_position: string | null;
+  current_city: string | null;
+  years_experience: string | null;
+}
+
+/**
+ * "Similar candidates" for a profile -- no AI, no new edge function: reuses
+ * client-search-applicants with a filter matching the anchor candidate's
+ * desired_position (falling back to major, then current_city, whichever the
+ * profile actually has), excluding the anchor itself from the results.
+ * Deliberately kept to a small pageSize since this is a "here are a few more
+ * like this one" suggestion strip, not a full search.
+ */
+export function useSimilarCandidatesQuery(
+  anchorId: string | null,
+  filterField: string | null,
+  filterValue: string | null,
+  lang: "ar" | "en" = "ar",
+) {
+  return useQuery({
+    queryKey: ["clientPortal", "similar", anchorId, filterField, filterValue],
+    queryFn: async (): Promise<SimilarCandidate[]> => {
+      if (!filterField || !filterValue) return [];
+      const { data, error } = await supabase.functions.invoke("client-search-applicants", {
+        body: { filters: [{ field: filterField, value: filterValue }], page: 1, pageSize: 6 },
+      });
+      if (error) {
+        const { message } = await extractEdgeFunctionError(error);
+        throw new Error(message);
+      }
+      const result = data as ClientSearchResult;
+      return result.rows.filter((r) => r.id !== anchorId).slice(0, 5).map((r) => ({
+        id: r.id,
+        full_name: r.full_name,
+        desired_position: r.desired_position,
+        current_city: r.current_city ?? r.preferred_city,
+        years_experience: r.years_experience,
+      }));
+    },
+    enabled: !!anchorId && !!filterField && !!filterValue,
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
 /**
  * The org's full reveal history via `client-revealed-candidates` -- every
  * candidate ever unlocked, independent of the current search/filter state,

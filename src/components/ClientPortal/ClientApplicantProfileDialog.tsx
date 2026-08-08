@@ -6,11 +6,12 @@ import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Award, Briefcase, Calendar, Car, CircleGauge, Download, FileText, GraduationCap, Languages as LanguagesIcon,
-  Linkedin, Loader2, Mail, MapPin, MessageCircle, Phone, Unlock, User, Wallet,
+  Linkedin, Loader2, Mail, MapPin, MessageCircle, Phone, Unlock, User, Users, Wallet,
 } from "lucide-react";
 import {
   useClientApplicantProfileQuery,
   useRevealCandidateMutation,
+  useSimilarCandidatesQuery,
   type ClientApplicantProfile,
 } from "@/hooks/queries/useClientPortalSearch";
 
@@ -18,6 +19,10 @@ interface ClientApplicantProfileDialogProps {
   lang: "ar" | "en";
   applicantId: string | null;
   onClose: () => void;
+  /** Lets the "similar candidates" strip swap the dialog to another applicant
+   * without closing it first -- omit to hide that affordance (e.g. if a host
+   * page doesn't want to support jumping between profiles). */
+  onSelectApplicant?: (id: string) => void;
 }
 
 const dash = (v: string | null | undefined) => (v && String(v).trim() ? v : null);
@@ -84,10 +89,16 @@ function SectionTitle({ children }: { children: React.ReactNode }) {
  * the dialog and go find the row again. Also the natural landing spot for
  * AI-extracted résumé fields later, without any layout rework.
  */
-export default function ClientApplicantProfileDialog({ lang, applicantId, onClose }: ClientApplicantProfileDialogProps) {
+export default function ClientApplicantProfileDialog({ lang, applicantId, onClose, onSelectApplicant }: ClientApplicantProfileDialogProps) {
   const ar = lang === "ar";
   const { data, isLoading } = useClientApplicantProfileQuery(applicantId, lang);
   const revealMutation = useRevealCandidateMutation(lang);
+
+  // Prefer matching by desired_position, then major, then current_city --
+  // whichever the profile actually has filled in first.
+  const similarField = data?.desired_position ? "desired_position" : data?.major ? "major" : data?.current_city ? "current_city" : null;
+  const similarValue = similarField === "desired_position" ? data?.desired_position : similarField === "major" ? data?.major : data?.current_city;
+  const { data: similarCandidates } = useSimilarCandidatesQuery(applicantId, similarField, similarValue ?? null, lang);
 
   return (
     <Dialog open={!!applicantId} onOpenChange={(open) => !open && onClose()}>
@@ -319,6 +330,36 @@ export default function ClientApplicantProfileDialog({ lang, applicantId, onClos
                           </a>
                         </Button>
                       )}
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {similarCandidates && similarCandidates.length > 0 && (
+                <>
+                  <Separator />
+                  <div>
+                    <SectionTitle>
+                      <span className="flex items-center gap-1.5">
+                        <Users className="h-3.5 w-3.5" />
+                        {ar ? "مرشحون مشابهون" : "Similar Candidates"}
+                      </span>
+                    </SectionTitle>
+                    <div className="space-y-1.5">
+                      {similarCandidates.map((c) => (
+                        <button
+                          key={c.id}
+                          type="button"
+                          disabled={!onSelectApplicant}
+                          onClick={() => onSelectApplicant?.(c.id)}
+                          className="w-full flex items-center justify-between gap-2 rounded-md border px-2.5 py-2 text-start text-sm hover:bg-muted disabled:cursor-default disabled:hover:bg-transparent"
+                        >
+                          <span className="font-medium truncate">{c.full_name}</span>
+                          <span className="text-xs text-muted-foreground shrink-0">
+                            {[c.current_city, c.years_experience].filter(Boolean).join(" · ")}
+                          </span>
+                        </button>
+                      ))}
                     </div>
                   </div>
                 </>
