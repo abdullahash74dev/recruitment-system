@@ -156,15 +156,22 @@ Deno.serve(async (req) => {
       docs[field] = await signIfNeeded(supabaseAdmin, a[field] as string | null);
     }
 
-    // Phone, email, and the résumé PDF itself are the only credit-gated
-    // fields -- withheld/masked until this org has revealed this applicant.
+    // Phone, email, LinkedIn, and the résumé PDF itself are the only
+    // credit-gated fields -- withheld/masked until this org has revealed
+    // this applicant. LinkedIn has no natural "masked" form (unlike
+    // phone/email), so it's withheld entirely pre-reveal, same as the
+    // résumé: `has_linkedin` tells the UI whether to show a locked
+    // placeholder or nothing at all.
     const rawResumePath = a.resume_url as string | null;
     const resumeUrl = isRevealed ? await signIfNeeded(supabaseAdmin, rawResumePath) : null;
+    const rawLinkedin = a.linkedin as string | null;
 
     return json({
       ...a,
       phone: isRevealed ? a.phone : maskPhone(a.phone as string | null),
       email: isRevealed ? a.email : maskEmail(a.email as string | null),
+      linkedin: isRevealed ? rawLinkedin : null,
+      has_linkedin: !!rawLinkedin,
       resume_url: resumeUrl,
       has_resume: !!rawResumePath,
       ...docs,
