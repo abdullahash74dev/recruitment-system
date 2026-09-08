@@ -15,6 +15,7 @@ export interface ClientSavedFilter {
   search: string;
   search_mode: ClientSearchMode;
   result_count: number | null;
+  alert_enabled: boolean;
   created_at: string;
 }
 
@@ -80,6 +81,40 @@ export function useSaveClientFilterMutation(lang: "ar" | "en" = "ar") {
     },
     onError: (error: Error) => {
       toast.error(error.message || (ar ? "تعذر حفظ الفلتر" : "Failed to save filter"));
+    },
+  });
+}
+
+// Toggles the standing "email me when a new candidate matches this filter"
+// alert (checked hourly by the check-saved-filter-alerts cron function).
+// The alert always goes to whoever created the filter (client_users.email
+// looked up by created_by), not the whole org, so turning it on never
+// surprises a teammate who didn't ask for it.
+export function useToggleClientSavedFilterAlertMutation(lang: "ar" | "en" = "ar") {
+  const queryClient = useQueryClient();
+  const ar = lang === "ar";
+  return useMutation({
+    mutationFn: async ({ id, alertEnabled }: { id: string; alertEnabled: boolean }) => {
+      const { error } = await (supabase as any)
+        .from("client_saved_filters")
+        .update({ alert_enabled: alertEnabled })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: (_data, { alertEnabled }) => {
+      queryClient.invalidateQueries({ queryKey: CLIENT_SAVED_FILTERS_QUERY_KEY });
+      toast.success(
+        alertEnabled
+          ? ar
+            ? "تم تفعيل التنبيه البريدي لهذا الفلتر"
+            : "Email alert enabled for this filter"
+          : ar
+            ? "تم إيقاف التنبيه البريدي"
+            : "Email alert disabled"
+      );
+    },
+    onError: (error: Error) => {
+      toast.error(error.message || (ar ? "تعذر تحديث التنبيه" : "Failed to update the alert"));
     },
   });
 }

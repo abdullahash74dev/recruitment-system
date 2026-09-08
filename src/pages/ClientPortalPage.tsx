@@ -11,7 +11,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
-  CheckSquare, ChevronLeft, ChevronRight, History, Loader2, LogOut, Save, Scale, Search, Sparkles, Trash2, Unlock, Wallet, X,
+  Bell, BellOff, CheckSquare, ChevronLeft, ChevronRight, History, Loader2, LogOut, Save, Scale, Search, Sparkles, Trash2, Unlock, Wallet, X,
 } from "lucide-react";
 import {
   useClientSearchQuery,
@@ -29,6 +29,7 @@ import {
   useClientSavedFiltersQuery,
   useSaveClientFilterMutation,
   useDeleteClientSavedFilterMutation,
+  useToggleClientSavedFilterAlertMutation,
 } from "@/hooks/queries/useClientSavedFilters";
 import { queryKeys } from "@/lib/queryKeys";
 import CategorizedFilterPanel, { type CategorizedFilterField } from "@/components/Dashboard/CategorizedFilterPanel";
@@ -175,6 +176,7 @@ export default function ClientPortalPage() {
   const { data: savedFilters = [] } = useClientSavedFiltersQuery();
   const saveFilterMutation = useSaveClientFilterMutation(lang);
   const deleteSavedFilterMutation = useDeleteClientSavedFilterMutation(lang);
+  const toggleAlertMutation = useToggleClientSavedFilterAlertMutation(lang);
   const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [saveFilterName, setSaveFilterName] = useState("");
 
@@ -400,6 +402,25 @@ export default function ClientPortalPage() {
                         {typeof saved.result_count === "number" && (
                           <span className="text-muted-foreground">({saved.result_count})</span>
                         )}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleAlertMutation.mutate({ id: saved.id, alertEnabled: !saved.alert_enabled });
+                          }}
+                          className={`rounded p-0.5 ${saved.alert_enabled ? "text-primary hover:bg-primary/20" : "hover:bg-muted"}`}
+                          title={
+                            saved.alert_enabled
+                              ? ar
+                                ? "تنبيه بريدي مُفعّل — اضغط للإيقاف"
+                                : "Email alert on — click to disable"
+                              : ar
+                                ? "فعّل تنبيهاً بريدياً عند ظهور مرشح جديد يطابق هذا الفلتر"
+                                : "Enable an email alert when a new matching candidate appears"
+                          }
+                        >
+                          {saved.alert_enabled ? <Bell className="h-3 w-3" /> : <BellOff className="h-3 w-3" />}
+                        </button>
                         <button
                           type="button"
                           onClick={(e) => {

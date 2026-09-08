@@ -25,6 +25,7 @@ See [DEPLOYMENT.md](./DEPLOYMENT.md) for Vercel + Supabase setup.
 ## Development
 
 ```bash
+cp .env.example .env   # fill in your Supabase project's URL + anon key
 npm install
 npm run dev      # local dev server
 npm run test     # vitest

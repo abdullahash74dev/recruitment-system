@@ -310,6 +310,38 @@ export function useUpdateCampaignMutation() {
   });
 }
 
+/**
+ * Actually sends a draft/scheduled campaign via the send-email-campaign edge
+ * function (Resend under the hood) -- resolves the real audience from
+ * target_filter, sends, and updates recipient_count/sent_count/failed_count/
+ * status server-side in one shot.
+ */
+export function useSendCampaignMutation() {
+  const queryClient = useQueryClient();
+  const { lang } = useLanguage();
+  const ar = lang === "ar";
+
+  return useMutation({
+    mutationFn: async (campaignId: string) => {
+      const { data, error } = await supabase.functions.invoke("send-email-campaign", {
+        body: { campaignId },
+      });
+      if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || (ar ? "فشل إرسال الحملة" : "Campaign send failed"));
+      return data as { recipients: number; sent: number; failed: number };
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.emailTemplates.all });
+      toast.success(
+        ar
+          ? `تم الإرسال: ${data.sent} نجح، ${data.failed} فشل من أصل ${data.recipients}`
+          : `Sent: ${data.sent} succeeded, ${data.failed} failed out of ${data.recipients}`
+      );
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+}
+
 export function useDeleteCampaignMutation() {
   const queryClient = useQueryClient();
   const { lang } = useLanguage();
