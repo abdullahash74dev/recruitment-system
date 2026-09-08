@@ -40,7 +40,9 @@ export default function ApplicantEmailHistory({ applicantId }: { applicantId: st
             <div className="flex flex-wrap items-center gap-2 mb-1">
               <Badge>{r.template_key}</Badge>
               <Badge variant="outline">{r.language}</Badge>
-              <Badge variant={r.send_status === "sent" ? "default" : "secondary"}>{r.send_status}</Badge>
+              <Badge variant={r.send_status === "sent" ? "default" : r.send_status === "failed" ? "destructive" : "secondary"}>
+                {r.send_status}
+              </Badge>
               <span className="text-xs text-muted-foreground ms-auto">
                 {new Date(r.created_at).toLocaleString("ar-SA")}
               </span>

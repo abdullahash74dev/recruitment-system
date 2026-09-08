@@ -27,7 +27,33 @@ reachable through short-lived signed URLs.
    npx supabase functions deploy
    ```
 
-4. In Supabase Auth settings, add your Vercel domain to the allowed redirect
+4. **Edge function secrets (required for AI features and system health to
+   work)** — `SUPABASE_URL`, `SUPABASE_ANON_KEY` and
+   `SUPABASE_SERVICE_ROLE_KEY` are injected automatically by Supabase into
+   every edge function; nothing to do for those. Everything below needs to
+   be set explicitly, or the corresponding feature fails silently (AI calls
+   return "No AI key configured", System Health checks report unavailable,
+   emails never actually send):
+
+   ```bash
+   npx supabase secrets set \
+     ANTHROPIC_API_KEY=sk-ant-... \
+     GEMINI_API_KEY=AIza... \
+     SUPABASE_MGMT_TOKEN=sbp_... \
+     RESEND_API_KEY=re_... \
+     RESEND_FROM_EMAIL="Your Company <no-reply@yourdomain.com>"
+   ```
+
+   | Secret | Powers | Get it from |
+   |---|---|---|
+   | `ANTHROPIC_API_KEY` | AI resume analysis, AI job-match, AI resume summaries, smart AI search filters (one of Anthropic/Gemini is required — the admin's AI Settings picks the active provider and falls back to whichever key is present) | [console.anthropic.com](https://console.anthropic.com) |
+   | `GEMINI_API_KEY` | Résumé data extraction, applicant/job-title analysis, import assistant, logo background removal, and the same AI features as above when Gemini is the selected provider | [aistudio.google.com](https://aistudio.google.com/app/apikey) |
+   | `SUPABASE_MGMT_TOKEN` | Dashboard → System Health's live project-health checks (optional — only that one panel degrades without it) | [supabase.com/dashboard/account/tokens](https://supabase.com/dashboard/account/tokens) (personal access token) |
+   | `RESEND_API_KEY` | Actually sending application-confirmation emails and HR-to-candidate status emails (without it, sends fail with "RESEND_API_KEY is not configured" and the failure is logged, not silently dropped) | [resend.com](https://resend.com) — add and verify your sending domain first, then create an API key |
+   | `RESEND_FROM_EMAIL` | Optional but recommended: the "from" address emails are sent as, e.g. `"AlKholi Group <no-reply@alkholigroup.com>"`. Without it, emails send from Resend's own shared test address (works immediately, no domain needed, but is rate-limited and shows "via resend.dev" to recipients) | must be on a domain you verified in Resend |
+   | `ALLOWED_ORIGIN` | Optional, recommended once you know your final domain: restricts every edge function's CORS response to this one origin instead of `*` (e.g. `https://your-app.vercel.app`). Not required to launch — every sensitive function already checks the caller's Bearer token regardless, and this is only an extra layer on top | your production URL |
+
+5. In Supabase Auth settings, add your Vercel domain to the allowed redirect
    URLs.
 
 ## 2. Vercel (hosting)
@@ -70,7 +96,24 @@ reachable through short-lived signed URLs.
    seeded templates are already published and ready; add employees (manually
    or via Bulk Excel → Employee Master Import) and start issuing forms.
 
-## 4. Data protection notes
+## 4. Before you announce the site publicly
+
+`index.html`'s `<title>`/description/`og:*` tags currently say "NexHire AI" as
+a placeholder brand name -- update them to your real company name once
+you've set Branding above, since search engines and link-preview crawlers
+(WhatsApp, Twitter, LinkedIn...) only ever see this static file, not the
+name configured live in the dashboard. While you're in there:
+
+- Replace `<title>`, `og:title`, `twitter:title`, and both description tags
+  with your real name/description.
+- Add `og:image` / `twitter:image` pointing to a real 1200×630 brand image
+  (a plain screenshot of the homepage works fine to start).
+- Add `og:url` with your final domain.
+- Add a `public/sitemap.xml` listing your public routes (`/`, `/apply`,
+  `/jobs`, `/training`, `/track`) with `<loc>` set to your final domain, and
+  a `Sitemap: https://your-domain/sitemap.xml` line in `public/robots.txt`.
+
+## 5. Data protection notes
 
 - All HR tables enforce RLS: only the `admin` role can manage templates,
   employees, approvals and issuances; other users see only what they were

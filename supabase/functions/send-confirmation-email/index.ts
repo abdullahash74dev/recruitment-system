@@ -1,8 +1,11 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
+import { ALLOW_ORIGIN } from "../_shared/cors.ts";
+import { sendEmail } from "../_shared/resend.ts";
+
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Origin": ALLOW_ORIGIN,
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
@@ -41,14 +44,34 @@ serve(async (req) => {
     }
 
     const applicant = recent[0];
-    console.log(`Confirmation email queued for applicant ${applicant.id}: ${normalizedEmail}`);
+    const position = applicant.desired_position || "الوظيفة المطلوبة";
+    const subject = "تم استلام طلبك بنجاح";
+    const text =
+      `الأستاذ/ة ${applicant.full_name}،\n\n` +
+      `نشكر تقدمك لشاغر "${position}".\n` +
+      `تم استلام طلبك بنجاح وسيقوم فريق التوظيف بمراجعته، وسنتواصل معك في حال وجود أي مستجدات.\n\n` +
+      `مع التقدير،\nفريق التوظيف`;
+
+    const result = await sendEmail({ to: normalizedEmail, subject, text });
+
+    await admin.from("applicant_emails").insert({
+      applicant_id: applicant.id,
+      template_key: "application_received",
+      status_at_send: "new",
+      recipient_email: normalizedEmail,
+      language: "ar",
+      subject,
+      body_preview: text,
+      send_status: result.ok ? "sent" : "failed",
+      error_message: result.ok ? null : result.error,
+    });
+
+    if (!result.ok) {
+      console.error(`Confirmation email failed for applicant ${applicant.id}: ${result.error}`);
+    }
 
     return new Response(
-      JSON.stringify({
-        success: true,
-        message: "Confirmation email queued",
-        note: "Email sending will activate once email domain is configured",
-      }),
+      JSON.stringify({ success: true, message: result.ok ? "Confirmation email sent" : "Confirmation email failed" }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {

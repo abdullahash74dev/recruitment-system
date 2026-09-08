@@ -182,19 +182,26 @@ export interface BackupSecretsSettings {
 // for this entity yet.
 const backupSecretsKey = ["backupRuns", "secrets"] as const;
 
+// Secret keys (offsite_supabase_service_key in particular is a raw
+// Supabase service-role key for another project) are only ever checked for
+// *presence* here -- `select("key")`, never `select("value")` -- so the
+// admin's browser/network tab never receives the actual secret material.
+// offsite_include_files is a plain boolean flag, not a secret, so its value
+// is fetched separately and is safe to read directly.
+const SECRET_ONLY_KEYS = [BACKUP_SECRET_KEYS.webhook, BACKUP_SECRET_KEYS.offsiteUrl, BACKUP_SECRET_KEYS.offsiteKey];
+
 async function fetchBackupSecretsSettings(): Promise<BackupSecretsSettings> {
-  const { data, error } = await supabase
-    .from("app_secrets")
-    .select("key, value")
-    .in("key", Object.values(BACKUP_SECRET_KEYS));
-  if (error) throw error;
+  const [presenceRes, flagRes] = await Promise.all([
+    supabase.from("app_secrets").select("key").in("key", SECRET_ONLY_KEYS),
+    supabase.from("app_secrets").select("value").eq("key", BACKUP_SECRET_KEYS.offsiteIncludeFiles).maybeSingle(),
+  ]);
+  if (presenceRes.error) throw presenceRes.error;
+  if (flagRes.error) throw flagRes.error;
   const configured: Record<string, boolean> = {};
-  let offsiteIncludeFiles = false;
-  (data || []).forEach((row) => {
-    if (row.key === BACKUP_SECRET_KEYS.offsiteIncludeFiles) offsiteIncludeFiles = row.value === "true";
-    else configured[row.key] = true;
+  (presenceRes.data || []).forEach((row) => {
+    configured[row.key] = true;
   });
-  return { configured, offsiteIncludeFiles };
+  return { configured, offsiteIncludeFiles: flagRes.data?.value === "true" };
 }
 
 export function useBackupSecretsSettingsQuery() {

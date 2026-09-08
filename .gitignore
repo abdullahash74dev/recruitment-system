@@ -12,6 +12,13 @@ dist
 dist-ssr
 *.local
 
+# Local environment files -- copy .env.example instead of committing real
+# values. Only VITE_* (publicly-shipped anon key + project URL) belong
+# here anyway, but real secrets must never land in this file either.
+.env
+.env.*
+!.env.example
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
