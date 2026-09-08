@@ -11,24 +11,32 @@ import AdminGuard from "@/components/AdminGuard";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { logClientError } from "@/lib/errorLog";
 import { queryClient } from "@/lib/queryClient";
+import { lazy, Suspense, useEffect } from "react";
 import Index from "./pages/Index.tsx";
-import ApplyPage from "./pages/ApplyPage.tsx";
-import JobsPage from "./pages/JobsPage.tsx";
-import JobDetailPage from "./pages/JobDetailPage.tsx";
-import TrainingPage from "./pages/TrainingPage.tsx";
-import TrackApplicationPage from "./pages/TrackApplicationPage.tsx";
-import AdminLoginPage from "./pages/AdminLoginPage.tsx";
-import AdminVerifyPage from "./pages/AdminVerifyPage.tsx";
-import ForgotPasswordPage from "./pages/ForgotPasswordPage.tsx";
-import ResetPasswordPage from "./pages/ResetPasswordPage.tsx";
-import DashboardPage from "./pages/DashboardPage.tsx";
-import HrFormsShell from "./pages/HrForms/HrFormsShell.tsx";
-import ExecutiveRecruitmentPage from "./pages/ExecutiveRecruitmentPage.tsx";
-import ClientPortalLoginPage from "./pages/ClientPortalLoginPage.tsx";
-import ClientPortalPage from "./pages/ClientPortalPage.tsx";
-import ClientPortalGuard from "@/components/ClientPortal/ClientPortalGuard";
 import NotFound from "./pages/NotFound.tsx";
-import { useEffect } from "react";
+import ClientPortalGuard from "@/components/ClientPortal/ClientPortalGuard";
+
+// Route-level code splitting: "/" (the public landing page) and the 404
+// page are the only pages every visitor is likely to hit, so they stay in
+// the main bundle for the fastest first paint. Everything else -- and
+// especially the admin dashboard and HR forms shell, which used to pull
+// dozens of feature components (AI settings, interview scheduling, email
+// campaigns...) into the bundle every job-seeker downloaded just to view
+// the landing/apply pages -- now loads on demand.
+const ApplyPage = lazy(() => import("./pages/ApplyPage.tsx"));
+const JobsPage = lazy(() => import("./pages/JobsPage.tsx"));
+const JobDetailPage = lazy(() => import("./pages/JobDetailPage.tsx"));
+const TrainingPage = lazy(() => import("./pages/TrainingPage.tsx"));
+const TrackApplicationPage = lazy(() => import("./pages/TrackApplicationPage.tsx"));
+const AdminLoginPage = lazy(() => import("./pages/AdminLoginPage.tsx"));
+const AdminVerifyPage = lazy(() => import("./pages/AdminVerifyPage.tsx"));
+const ForgotPasswordPage = lazy(() => import("./pages/ForgotPasswordPage.tsx"));
+const ResetPasswordPage = lazy(() => import("./pages/ResetPasswordPage.tsx"));
+const DashboardPage = lazy(() => import("./pages/DashboardPage.tsx"));
+const HrFormsShell = lazy(() => import("./pages/HrForms/HrFormsShell.tsx"));
+const ExecutiveRecruitmentPage = lazy(() => import("./pages/ExecutiveRecruitmentPage.tsx"));
+const ClientPortalLoginPage = lazy(() => import("./pages/ClientPortalLoginPage.tsx"));
+const ClientPortalPage = lazy(() => import("./pages/ClientPortalPage.tsx"));
 import { loadUIStyles, applyUIStyles } from "@/components/Dashboard/UIStylingSettings";
 import { DeletePinProvider } from "@/components/DeletePinDialog";
 
@@ -43,6 +51,12 @@ const persister = createAsyncStoragePersister({
   storage: localforage,
   key: "akg-query-cache",
 });
+
+const RouteLoadingFallback = () => (
+  <div className="min-h-screen flex items-center justify-center">
+    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary" />
+  </div>
+);
 
 const UIStylesLoader = () => {
   useEffect(() => {
@@ -104,6 +118,7 @@ const App = () => (
               <UIStylesLoader />
               <GlobalErrorListener />
               <DeletePinProvider>
+              <Suspense fallback={<RouteLoadingFallback />}>
               <Routes>
                 {/* Public applicant-facing routes */}
                 <Route path="/" element={<Index />} />
@@ -131,6 +146,7 @@ const App = () => (
 
                 <Route path="*" element={<NotFound />} />
               </Routes>
+              </Suspense>
               </DeletePinProvider>
             </TooltipProvider>
           </LanguageProvider>

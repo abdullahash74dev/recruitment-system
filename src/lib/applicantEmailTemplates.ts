@@ -1,5 +1,6 @@
 // قوالب إيميلات المرشحين — عربي/إنجليزي لكل حالة
-// لا يتم الإرسال الفعلي حتى يتم ربط الدومين
+// النصوص هنا تُعرض للتعديل قبل الإرسال في ApplicantEmailDialog، والإرسال
+// الفعلي يتم عبر Edge Function send-applicant-email (Resend)
 
 export type ApplicantEmailStatus =
   | "reviewing"

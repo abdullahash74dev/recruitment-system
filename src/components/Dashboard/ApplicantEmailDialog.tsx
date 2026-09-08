@@ -7,8 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Mail, AlertTriangle } from "lucide-react";
+import { Mail } from "lucide-react";
 import { toast } from "sonner";
 import { logAudit } from "@/lib/audit";
 import {
@@ -94,46 +93,35 @@ export default function ApplicantEmailDialog({
     }
     setSending(true);
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      let userEmail: string | null = null;
-      if (user) {
-        const { data: prof } = await supabase
-          .from("profiles")
-          .select("email")
-          .eq("user_id", user.id)
-          .maybeSingle();
-        userEmail = prof?.email ?? user.email ?? null;
-      }
-
-      const { error } = await (supabase as any).from("applicant_emails").insert({
-        applicant_id: applicantId,
-        template_key: status,
-        status_at_send: status,
-        recipient_email: applicantEmail,
-        language,
-        subject,
-        body_preview: body,
-        rejection_reason_id: status === "rejected" ? reasonId || null : null,
-        rejection_note: status === "rejected" ? note || null : null,
-        send_status: "queued_pending_domain",
-        sent_by: user?.id ?? null,
-        sent_by_email: userEmail,
+      const { data, error } = await supabase.functions.invoke("send-applicant-email", {
+        body: {
+          applicantId,
+          templateKey: status,
+          statusAtSend: status,
+          recipientEmail: applicantEmail,
+          language,
+          subject,
+          emailBody: body,
+          rejectionReasonId: status === "rejected" ? reasonId || null : null,
+          rejectionNote: status === "rejected" ? note || null : null,
+        },
       });
       if (error) throw error;
+      if (!data?.success) throw new Error(data?.error || "فشل إرسال الإيميل");
 
       await logAudit({
         action: "CUSTOM",
-        summary: `تم تجهيز إيميل (${status}) للمرشح ${applicantName}`,
+        summary: `تم إرسال إيميل (${status}) للمرشح ${applicantName}`,
         table_name: "applicant_emails",
         record_id: applicantId,
         metadata: { status, language, has_reason: !!reasonId },
       });
 
-      toast.success("تم تسجيل الإيميل في السجل (الإرسال الفعلي معطّل حتى ربط الدومين)");
+      toast.success("تم إرسال الإيميل بنجاح");
       if (onConfirmed) await onConfirmed();
       onOpenChange(false);
     } catch (e: any) {
-      toast.error(e?.message || "فشل تسجيل الإيميل");
+      toast.error(e?.message || "فشل إرسال الإيميل");
     } finally {
       setSending(false);
     }
@@ -158,13 +146,6 @@ export default function ApplicantEmailDialog({
             <Badge variant="secondary">{applicantEmail || "بدون بريد"}</Badge>
             <Badge>{status}</Badge>
           </div>
-
-          <Alert>
-            <AlertTriangle className="w-4 h-4" />
-            <AlertDescription>
-              الإرسال الفعلي معطّل مؤقتاً حتى يتم ربط الدومين. سيتم تسجيل الإيميل في السجل (queued).
-            </AlertDescription>
-          </Alert>
 
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1">
@@ -222,7 +203,7 @@ export default function ApplicantEmailDialog({
             إلغاء
           </Button>
           <Button onClick={handleConfirm} disabled={sending || !applicantEmail}>
-            {sending ? "جارٍ التسجيل..." : "تأكيد وتسجيل الإيميل"}
+            {sending ? "جارٍ الإرسال..." : "إرسال الإيميل"}
           </Button>
         </DialogFooter>
       </DialogContent>

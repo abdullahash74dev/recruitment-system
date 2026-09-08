@@ -9,8 +9,10 @@ import * as XLSX from "https://esm.sh/xlsx@0.18.5";
 import { loadSynonymMap, normalizeValue, Lang } from "../_shared/normalize.ts";
 import { callAI } from "../_shared/ai-helper.ts";
 
+import { ALLOW_ORIGIN } from "../_shared/cors.ts";
+
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Origin": ALLOW_ORIGIN,
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
