@@ -37,6 +37,7 @@ import {
   useCreateCampaignMutation,
   useUpdateCampaignMutation,
   useDeleteCampaignMutation,
+  useSendCampaignMutation,
   renderPreview,
   TEMPLATE_CATEGORIES,
   TEMPLATE_PLACEHOLDERS,
@@ -156,6 +157,7 @@ export default function EmailTemplates() {
   const createCampaign = useCreateCampaignMutation();
   const updateCampaign = useUpdateCampaignMutation();
   const deleteCampaign = useDeleteCampaignMutation();
+  const sendCampaign = useSendCampaignMutation();
 
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -465,12 +467,12 @@ export default function EmailTemplates() {
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="flex items-start gap-2 rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-sm">
-                <Send className="w-4 h-4 mt-0.5 shrink-0 text-amber-600" />
+              <div className="flex items-start gap-2 rounded-md border border-border bg-muted/50 p-3 text-sm">
+                <Send className="w-4 h-4 mt-0.5 shrink-0 text-muted-foreground" />
                 <p className="text-muted-foreground">
                   {ar
-                    ? "الإرسال الفعلي يتطلب مزود بريد بمفاتيح محفوظة كأسرار في وظائف Edge. حتى ذلك الحين تُدار الحملات هنا كسجل رسمي: يتم تحديث الحالة والأعداد يدوياً."
-                    : "Actual delivery requires a mail provider whose keys live as edge-function secrets. Until then campaigns are tracked here as the system of record — statuses and counts are updated manually."}
+                    ? "«إرسال الآن» يرسل فعلياً عبر البريد للمرشحين المطابقين لفلتر الحملة (حتى 300 مستلم لكل إرسال، فلتر فارغ = كل المرشحين غير المؤرشفين ولديهم بريد). فلتر الحملة صيغته field=value مفصولة بفواصل، على الحقول: status, desired_position, nationality, preferred_city, current_city, job_type."
+                    : "\"Send now\" actually emails every applicant matching the campaign's filter (up to 300 recipients per send; an empty filter means every non-archived applicant with an email). The filter format is comma-separated field=value pairs over: status, desired_position, nationality, preferred_city, current_city, job_type."}
                 </p>
               </div>
 
@@ -529,6 +531,18 @@ export default function EmailTemplates() {
                           </TableCell>
                           <TableCell className="text-end">
                             <div className="flex items-center justify-end gap-1">
+                              {(c.status === "draft" || c.status === "scheduled") && (
+                                <Button
+                                  size="sm"
+                                  className="h-7 px-2 gap-1"
+                                  disabled={sendCampaign.isPending}
+                                  onClick={() => sendCampaign.mutate(c.id)}
+                                  title={ar ? "يرسل فعلياً للمستلمين المطابقين عبر البريد" : "Actually sends to matching recipients by email"}
+                                >
+                                  <Send className="w-3.5 h-3.5" />
+                                  <span className="hidden sm:inline">{ar ? "إرسال الآن" : "Send now"}</span>
+                                </Button>
+                              )}
                               {c.status === "draft" && (
                                 <Button
                                   size="sm"
@@ -546,9 +560,14 @@ export default function EmailTemplates() {
                                   variant="outline"
                                   className="h-7 px-2 gap-1"
                                   onClick={() => complete(c)}
+                                  title={
+                                    ar
+                                      ? "سجّل الحملة كمكتملة يدوياً (لأنك أرسلتها بطريقة أخرى خارج النظام)"
+                                      : "Manually mark as completed (you sent it another way outside the system)"
+                                  }
                                 >
                                   <CheckCircle2 className="w-3.5 h-3.5" />
-                                  <span className="hidden sm:inline">{ar ? "إكمال" : "Complete"}</span>
+                                  <span className="hidden sm:inline">{ar ? "إكمال يدوي" : "Manual complete"}</span>
                                 </Button>
                               )}
                               {c.status !== "completed" && c.status !== "cancelled" && (
