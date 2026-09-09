@@ -98,11 +98,12 @@ reachable through short-lived signed URLs.
 
 ## 4. Before you announce the site publicly
 
-`index.html`'s `<title>`/description/`og:*` tags currently say "NexHire AI" as
-a placeholder brand name -- update them to your real company name once
-you've set Branding above, since search engines and link-preview crawlers
-(WhatsApp, Twitter, LinkedIn...) only ever see this static file, not the
-name configured live in the dashboard. While you're in there:
+`index.html`'s `<title>`/description/`og:*` tags are set to "Sadaawah Talent
+AI" / "صداوة للمواهب". If that ever changes, update them (and the
+`site_name_ar`/`site_name_en` row in `site_settings` -- see the note below)
+together, since search engines and link-preview crawlers (WhatsApp, Twitter,
+LinkedIn...) only ever see this static file, not the name configured live in
+the dashboard. While you're in there:
 
 - Replace `<title>`, `og:title`, `twitter:title`, and both description tags
   with your real name/description.
@@ -112,6 +113,16 @@ name configured live in the dashboard. While you're in there:
 - Add a `public/sitemap.xml` listing your public routes (`/`, `/apply`,
   `/jobs`, `/training`, `/track`) with `<loc>` set to your final domain, and
   a `Sitemap: https://your-domain/sitemap.xml` line in `public/robots.txt`.
+
+**`site_settings` must always hold exactly one row.** Branding, colors, the
+live site name shown everywhere (`site_name_ar`/`site_name_en`), and more all
+come from this single row. Every read uses `.single()`, which fails (falling
+back to hardcoded defaults, e.g. "Sadaawah Talent AI") the moment there are
+zero rows *or more than one* -- and Branding Settings' Save button then
+fails outright with `invalid input syntax for type uuid: ''`, since the
+fallback object has no real `id` to update. If that ever happens again,
+check `SELECT id, site_name_ar, created_at FROM public.site_settings;` in the
+SQL Editor, keep the one row with your real settings, and delete the rest.
 
 ## 5. Data protection notes
 
