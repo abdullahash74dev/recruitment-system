@@ -88,29 +88,42 @@ Deno.serve(async (req) => {
       });
     }
 
-    // SSRF guard: only allow https + reject private/loopback hostnames
-    let parsed: URL;
-    try { parsed = new URL(imageUrl); } catch {
-      return new Response(JSON.stringify({ error: "Invalid imageUrl" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-    if (parsed.protocol !== "https:") {
-      return new Response(JSON.stringify({ error: "Only https URLs are allowed" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-    if (!(await isSafeRemoteUrl(parsed))) {
-      return new Response(JSON.stringify({ error: "Blocked host" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
+    // The Branding Settings uploader (readImageAsDataUrl) never uploads to
+    // storage -- a freshly-picked logo is always a "data:" URL, held only in
+    // browser/component state until Save. That's the common case here, and
+    // it carries no SSRF risk at all (no network fetch involved), so it
+    // skips the URL/SSRF checks below entirely and is used as-is.
+    let srcDataUrl: string;
+    if (imageUrl.startsWith("data:")) {
+      if (imageUrl.length > 20 * 1024 * 1024) {
+        return new Response(JSON.stringify({ error: "Source image too large" }), { status: 413, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      srcDataUrl = imageUrl;
+    } else {
+      // SSRF guard: only allow https + reject private/loopback hostnames
+      let parsed: URL;
+      try { parsed = new URL(imageUrl); } catch {
+        return new Response(JSON.stringify({ error: "Invalid imageUrl" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      if (parsed.protocol !== "https:") {
+        return new Response(JSON.stringify({ error: "Only https URLs are allowed" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      if (!(await isSafeRemoteUrl(parsed))) {
+        return new Response(JSON.stringify({ error: "Blocked host" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
 
-    const srcResp = await fetch(imageUrl, { signal: AbortSignal.timeout(15000) });
-    const srcLen = Number(srcResp.headers.get("content-length") || "0");
-    if (srcLen && srcLen > 20 * 1024 * 1024) {
-      return new Response(JSON.stringify({ error: "Source image too large" }), { status: 413, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      const srcResp = await fetch(imageUrl, { signal: AbortSignal.timeout(15000) });
+      const srcLen = Number(srcResp.headers.get("content-length") || "0");
+      if (srcLen && srcLen > 20 * 1024 * 1024) {
+        return new Response(JSON.stringify({ error: "Source image too large" }), { status: 413, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      if (!srcResp.ok) throw new Error(`Failed to fetch source image (${srcResp.status})`);
+      const srcBuf = new Uint8Array(await srcResp.arrayBuffer());
+      const srcMime = srcResp.headers.get("content-type") || "image/png";
+      let bin = "";
+      for (let i = 0; i < srcBuf.length; i++) bin += String.fromCharCode(srcBuf[i]);
+      srcDataUrl = `data:${srcMime};base64,${btoa(bin)}`;
     }
-    if (!srcResp.ok) throw new Error(`Failed to fetch source image (${srcResp.status})`);
-    const srcBuf = new Uint8Array(await srcResp.arrayBuffer());
-    const srcMime = srcResp.headers.get("content-type") || "image/png";
-    let bin = "";
-    for (let i = 0; i < srcBuf.length; i++) bin += String.fromCharCode(srcBuf[i]);
-    const srcDataUrl = `data:${srcMime};base64,${btoa(bin)}`;
 
     const aiResp = await fetch("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", {
       method: "POST",
