@@ -88,7 +88,7 @@ export const PREVIEW_SAMPLE: Record<string, { ar: string; en: string }> = {
   "{{name}}": { ar: "أحمد العتيبي", en: "Ahmed Al-Otaibi" },
   "{{position}}": { ar: "محاسب أول", en: "Senior Accountant" },
   "{{date}}": { ar: "١٠ أغسطس ٢٠٢٦، ١٠:٠٠ ص", en: "10 August 2026, 10:00 AM" },
-  "{{company}}": { ar: "منصة التوظيف الذكية", en: "NexHire AI" },
+  "{{company}}": { ar: "صداوة للمواهب", en: "Sadaawah Talent AI" },
 };
 
 /**

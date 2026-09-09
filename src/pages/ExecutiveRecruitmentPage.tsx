@@ -59,7 +59,7 @@ const T = {
     saveDefaults: "حفظ كإعدادات افتراضية",
     savedOk: "تم حفظ الإعدادات الافتراضية للرابط",
     saveFail: "تعذّر الحفظ — يتطلب صلاحية مسؤول",
-    footer: "منصة التوظيف الذكية — تقرير سري للعرض التنفيذي",
+    footer: "صداوة للمواهب — تقرير سري للعرض التنفيذي",
   },
   en: {
     title: "Executive Recruitment Report", subtitle: "تقرير التوظيف التنفيذي",
@@ -82,7 +82,7 @@ const T = {
     saveDefaults: "Save as defaults",
     savedOk: "Default preferences saved for this link",
     saveFail: "Save failed — admin access required",
-    footer: "NexHire AI — Confidential Executive Report",
+    footer: "Sadaawah Talent AI — Confidential Executive Report",
   },
 };
 

@@ -1616,7 +1616,7 @@ const AdRenderer = (props: AdRendererProps) => {
     logoOffsetX = 0, logoOffsetY = 0, logoAlign = "start", logoBgColor = "#ffffff", logoUseCustomBg = false,
     fontFamily: fontKey = "system",
     titleAlignAr = "end", titleAlignEn = "start", titleOffsetX = 0, titleOffsetY = 0,
-    companyAr = "منصة التوظيف الذكية", companyEn = "NexHire AI",
+    companyAr = "صداوة للمواهب", companyEn = "Sadaawah Talent AI",
   } = props;
 
   const headerTitle = pickHeader(titleAr, titleEn, bilingualMode);
@@ -2282,7 +2282,7 @@ const CompactMeta = ({ job, ar, accent, fs = 10 }: { job: RenderJob; ar: boolean
   );
 };
 
-const Footer = ({ accent, secondary, ar, showQr, qrUrl, totalVacancies, companyAr = "منصة التوظيف الذكية", companyEn = "NexHire AI" }: { accent: string; secondary: string; ar: boolean; showQr: boolean; qrUrl: string; totalVacancies: number | null; companyAr?: string; companyEn?: string }) => (
+const Footer = ({ accent, secondary, ar, showQr, qrUrl, totalVacancies, companyAr = "صداوة للمواهب", companyEn = "Sadaawah Talent AI" }: { accent: string; secondary: string; ar: boolean; showQr: boolean; qrUrl: string; totalVacancies: number | null; companyAr?: string; companyEn?: string }) => (
   <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, padding: "14px 36px", borderTop: `3px solid ${accent}`, background: "#f8fafc", fontSize: 11, color: "#475569", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
     <div>
       <div style={{ fontWeight: 800, color: accent, fontSize: 14 }}>{ar ? companyAr : companyEn}</div>

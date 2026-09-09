@@ -72,8 +72,8 @@ const TrainingPage = () => {
     ? ((settings as any).training_page_title_ar || "فرص التدريب التعاوني وتمهير")
     : ((settings as any).training_page_title_en || "Co-op Training & Tamheer Opportunities");
   const trainingDesc = lang === "ar"
-    ? ((settings as any).training_page_desc_ar || "انضم لبرامج التدريب التعاوني وتمهير في منصة التوظيف الذكية")
-    : ((settings as any).training_page_desc_en || "Join our Co-op and Tamheer training programs at NexHire AI");
+    ? ((settings as any).training_page_desc_ar || "انضم لبرامج التدريب التعاوني وتمهير في صداوة للمواهب")
+    : ((settings as any).training_page_desc_en || "Join our Co-op and Tamheer training programs at Sadaawah Talent AI");
 
   return (
     <div className="min-h-screen bg-background relative" dir={dir}>
