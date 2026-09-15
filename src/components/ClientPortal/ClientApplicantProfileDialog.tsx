@@ -7,7 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 import {
   Award, Briefcase, Calendar, Car, Download, FileText, GraduationCap, Languages as LanguagesIcon,
-  Linkedin, Loader2, Lock, Mail, MapPin, MessageCircle, Phone, Sparkles, Unlock, User, Users, Wallet,
+  Linkedin, Loader2, Lock, Mail, MapPin, MessageCircle, Phone, PhoneCall, Sparkles, Unlock, User, Users, Wallet,
 } from "lucide-react";
 import {
   useClientApplicantProfileQuery,
@@ -16,7 +16,9 @@ import {
   useSimilarCandidatesQuery,
   type ClientApplicantProfile,
 } from "@/hooks/queries/useClientPortalSearch";
+import { useMyClientOrganizationId } from "@/hooks/queries/useMyClientOrganization";
 import ClientCandidateWorkspacePanel from "@/components/ClientPortal/ClientCandidateWorkspacePanel";
+import PhoneScreeningDialog from "@/components/PhoneScreeningDialog";
 
 interface ClientApplicantProfileDialogProps {
   lang: "ar" | "en";
@@ -147,6 +149,8 @@ export default function ClientApplicantProfileDialog({ lang, applicantId, onClos
   const ar = lang === "ar";
   const { data, isLoading } = useClientApplicantProfileQuery(applicantId, lang);
   const revealMutation = useRevealCandidateMutation(lang);
+  const { data: myOrgId } = useMyClientOrganizationId();
+  const [screeningOpen, setScreeningOpen] = useState(false);
 
   // Prefer matching by desired_position, then major, then current_city --
   // whichever the profile actually has filled in first.
@@ -257,6 +261,12 @@ export default function ClientApplicantProfileDialog({ lang, applicantId, onClos
                             <MessageCircle className="h-3.5 w-3.5" />
                             {ar ? "واتساب" : "WhatsApp"}
                           </a>
+                        </Button>
+                      )}
+                      {data.is_revealed && dash(data.phone) && myOrgId && (
+                        <Button size="sm" variant="outline" className="w-full gap-1.5" onClick={() => setScreeningOpen(true)}>
+                          <PhoneCall className="h-3.5 w-3.5" />
+                          {ar ? "تقييم مكالمة هاتفية" : "Phone screening"}
                         </Button>
                       )}
                       {dash(data.email) ? (
@@ -486,6 +496,17 @@ export default function ClientApplicantProfileDialog({ lang, applicantId, onClos
           </ScrollArea>
         )}
       </DialogContent>
+
+      {data && myOrgId && (
+        <PhoneScreeningDialog
+          open={screeningOpen}
+          onOpenChange={setScreeningOpen}
+          applicantId={data.id}
+          applicantName={data.full_name}
+          applicantPhone={data.phone}
+          clientOrganizationId={myOrgId}
+        />
+      )}
     </Dialog>
   );
 }

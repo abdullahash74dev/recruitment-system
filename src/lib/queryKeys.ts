@@ -53,6 +53,12 @@ export const queryKeys = {
   externalBackups: {
     status: () => ["externalBackups", "status"] as const,
   },
+  phoneScreening: {
+    settings: (clientOrganizationId?: string) => ["phoneScreening", "settings", clientOrganizationId ?? "internal"] as const,
+    questions: (clientOrganizationId?: string) => ["phoneScreening", "questions", clientOrganizationId ?? "internal"] as const,
+    forApplicant: (applicantId: string, clientOrganizationId?: string) =>
+      ["phoneScreening", "forApplicant", applicantId, clientOrganizationId ?? "internal"] as const,
+  },
   backupRuns: {
     all: ["backupRuns"] as const,
     list: () => ["backupRuns", "list"] as const,
