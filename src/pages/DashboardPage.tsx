@@ -50,6 +50,8 @@ import RejectionReasonsSettings from "@/components/Dashboard/RejectionReasonsSet
 import JobAdvertisements from "@/components/Dashboard/JobAdvertisements";
 import RecruitmentDashboard from "@/components/Dashboard/Recruitment/RecruitmentDashboard";
 import ApplicantEmailDialog from "@/components/Dashboard/ApplicantEmailDialog";
+import PhoneScreeningDialog from "@/components/PhoneScreeningDialog";
+import PhoneScreeningSettingsPanel from "@/components/PhoneScreeningSettingsPanel";
 import ApplicantEmailHistory from "@/components/Dashboard/ApplicantEmailHistory";
 import ApplicantResumeExtractionPanel from "@/components/Dashboard/ApplicantResumeExtractionPanel";
 import TransferToRecruitmentDialog from "@/components/Dashboard/TransferToRecruitmentDialog";
@@ -93,7 +95,7 @@ import AINetworkBackground from "@/components/AINetworkBackground";
 import AuroraBackground from "@/components/AuroraBackground";
 import type { ApplicantEmailStatus } from "@/lib/applicantEmailTemplates";
 import { STATUSES_WITH_EMAIL } from "@/lib/applicantEmailTemplates";
-import { Mail, Activity, Bot, UserCog, Target, Globe, Menu, Palette, ListChecks, FlaskConical, CalendarDays, Star, FileCheck, Users2, UserPlus2, ClipboardList, Timer, UserCog2, GraduationCap, DollarSign, ShieldCheck, Zap, FileQuestion, MessageSquare, Video, Share2, MailPlus, Plug, Building2 } from "lucide-react";
+import { Mail, Activity, Bot, UserCog, Target, Globe, Menu, Palette, ListChecks, FlaskConical, CalendarDays, Star, FileCheck, Users2, UserPlus2, ClipboardList, Timer, UserCog2, GraduationCap, DollarSign, ShieldCheck, Zap, FileQuestion, MessageSquare, Video, Share2, MailPlus, Plug, Building2, PhoneCall } from "lucide-react";
 import DashboardSidebar, { type DashboardNavGroup } from "@/components/Dashboard/DashboardSidebar";
 import DashboardSidebarFuturistic from "@/components/Dashboard/DashboardSidebarFuturistic";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -245,6 +247,7 @@ const DashboardPage = () => {
 
   // حوار إيميل المرشح (تأكيد + معاينة)
   const [emailDialog, setEmailDialog] = useState<{ applicantId: string; status: ApplicantEmailStatus } | null>(null);
+  const [screeningDialogOpen, setScreeningDialogOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [showTransferDialog, setShowTransferDialog] = useState(false);
   const [showSourceCorrectionDialog, setShowSourceCorrectionDialog] = useState(false);
@@ -1382,6 +1385,9 @@ const DashboardPage = () => {
                 <TabsTrigger value="security" className="gap-1.5">
                   <Shield className="w-3.5 h-3.5" />{lang === "ar" ? "الأمان" : "Security"}
                 </TabsTrigger>
+                <TabsTrigger value="phone_screening" className="gap-1.5">
+                  <PhoneCall className="w-3.5 h-3.5" />{lang === "ar" ? "تقييم المكالمات الهاتفية" : "Phone Screening"}
+                </TabsTrigger>
               </TabsList>
 
               <TabsContent value="appearance" className="space-y-6 mt-4">
@@ -1437,6 +1443,14 @@ const DashboardPage = () => {
                 <Card>
                   <CardContent className="p-6">
                     <TwoFactorSettings />
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="phone_screening" className="space-y-6 mt-4">
+                <Card>
+                  <CardContent className="p-6">
+                    <PhoneScreeningSettingsPanel />
                   </CardContent>
                 </Card>
               </TabsContent>
@@ -1596,17 +1610,25 @@ const DashboardPage = () => {
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>{STATUSES.map(s => <SelectItem key={s} value={s}>{t(`status.${s}`)}</SelectItem>)}</SelectContent>
                   </Select>
-                  {(STATUSES_WITH_EMAIL as string[]).includes(selectedApplicant.status) && selectedApplicant.email && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="gap-2"
-                      onClick={() => setEmailDialog({ applicantId: selectedApplicant.id, status: selectedApplicant.status as ApplicantEmailStatus })}
-                    >
-                      <Mail className="w-4 h-4" />
-                      {lang === "ar" ? "إرسال إيميل للمرشح" : "Send email to candidate"}
-                    </Button>
-                  )}
+                  <div className="flex flex-wrap gap-2">
+                    {(STATUSES_WITH_EMAIL as string[]).includes(selectedApplicant.status) && selectedApplicant.email && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="gap-2"
+                        onClick={() => setEmailDialog({ applicantId: selectedApplicant.id, status: selectedApplicant.status as ApplicantEmailStatus })}
+                      >
+                        <Mail className="w-4 h-4" />
+                        {lang === "ar" ? "إرسال إيميل للمرشح" : "Send email to candidate"}
+                      </Button>
+                    )}
+                    {selectedApplicant.phone && (
+                      <Button variant="outline" size="sm" className="gap-2" onClick={() => setScreeningDialogOpen(true)}>
+                        <PhoneCall className="w-4 h-4" />
+                        {lang === "ar" ? "تقييم مكالمة هاتفية" : "Phone screening"}
+                      </Button>
+                    )}
+                  </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3 text-sm">
                   {([
@@ -1763,6 +1785,16 @@ const DashboardPage = () => {
           />
         );
       })()}
+
+      {selectedApplicant && (
+        <PhoneScreeningDialog
+          open={screeningDialogOpen}
+          onOpenChange={setScreeningDialogOpen}
+          applicantId={selectedApplicant.id}
+          applicantName={selectedApplicant.full_name}
+          applicantPhone={selectedApplicant.phone}
+        />
+      )}
 
       {showTransferDialog && (
         <TransferToRecruitmentDialog
