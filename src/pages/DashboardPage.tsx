@@ -52,6 +52,7 @@ import RecruitmentDashboard from "@/components/Dashboard/Recruitment/Recruitment
 import ApplicantEmailDialog from "@/components/Dashboard/ApplicantEmailDialog";
 import PhoneScreeningDialog from "@/components/PhoneScreeningDialog";
 import PhoneScreeningSettingsPanel from "@/components/PhoneScreeningSettingsPanel";
+import TalentExchangeAdminPanel from "@/components/Dashboard/TalentExchangeAdminPanel";
 import ApplicantEmailHistory from "@/components/Dashboard/ApplicantEmailHistory";
 import ApplicantResumeExtractionPanel from "@/components/Dashboard/ApplicantResumeExtractionPanel";
 import TransferToRecruitmentDialog from "@/components/Dashboard/TransferToRecruitmentDialog";
@@ -734,6 +735,7 @@ const DashboardPage = () => {
   if (isAdmin) recruitmentItems.push({ value: "messaging", label: lang === "ar" ? "الرسائل النصية والواتساب" : "SMS & WhatsApp", icon: MessageSquare });
   if (isAdmin) recruitmentItems.push({ value: "video_interviews", label: lang === "ar" ? "مقابلات الفيديو" : "Video Interviews", icon: Video });
   if (isAdmin) recruitmentItems.push({ value: "job_boards", label: lang === "ar" ? "النشر على مواقع التوظيف" : "Job Board Publishing", icon: Share2 });
+  if (isAdmin) recruitmentItems.push({ value: "talent_exchange", label: lang === "ar" ? "سوق إعادة التوظيف" : "Redeployment Exchange", icon: Users2 });
   if (recruitmentItems.length) navGroups.push({ id: "recruitment", title: lang === "ar" ? "التوظيف" : "Recruitment", items: recruitmentItems });
 
   const managementItems: DashboardNavGroup["items"] = [];
@@ -1555,6 +1557,10 @@ const DashboardPage = () => {
 
           <TabsContent value="job_boards">
             <JobBoardPublishing />
+          </TabsContent>
+
+          <TabsContent value="talent_exchange">
+            <TalentExchangeAdminPanel />
           </TabsContent>
 
           <TabsContent value="email_templates">

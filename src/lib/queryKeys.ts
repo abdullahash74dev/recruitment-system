@@ -59,6 +59,11 @@ export const queryKeys = {
     forApplicant: (applicantId: string, clientOrganizationId?: string) =>
       ["phoneScreening", "forApplicant", applicantId, clientOrganizationId ?? "internal"] as const,
   },
+  talentExchange: {
+    mine: () => ["talentExchange", "mine"] as const,
+    browse: () => ["talentExchange", "browse"] as const,
+    all: () => ["talentExchange", "all"] as const,
+  },
   backupRuns: {
     all: ["backupRuns"] as const,
     list: () => ["backupRuns", "list"] as const,

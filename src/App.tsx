@@ -35,6 +35,7 @@ const ResetPasswordPage = lazy(() => import("./pages/ResetPasswordPage.tsx"));
 const DashboardPage = lazy(() => import("./pages/DashboardPage.tsx"));
 const HrFormsShell = lazy(() => import("./pages/HrForms/HrFormsShell.tsx"));
 const ExecutiveRecruitmentPage = lazy(() => import("./pages/ExecutiveRecruitmentPage.tsx"));
+const TalentExchangeConsentPage = lazy(() => import("./pages/TalentExchangeConsentPage.tsx"));
 const ClientPortalLoginPage = lazy(() => import("./pages/ClientPortalLoginPage.tsx"));
 const ClientPortalPage = lazy(() => import("./pages/ClientPortalPage.tsx"));
 import { loadUIStyles, applyUIStyles } from "@/components/Dashboard/UIStylingSettings";
@@ -128,6 +129,7 @@ const App = () => (
                 <Route path="/training" element={<TrainingPage />} />
                 <Route path="/track" element={<TrackApplicationPage />} />
                 <Route path="/executive/recruitment/:token" element={<ExecutiveRecruitmentPage />} />
+                <Route path="/talent-exchange/consent/:token" element={<TalentExchangeConsentPage />} />
 
                 {/* HR / Admin routes */}
                 <Route path="/admin/login" element={<AdminLoginPage />} />
