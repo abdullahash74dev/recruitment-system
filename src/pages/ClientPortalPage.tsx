@@ -11,7 +11,7 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import {
-  Bell, BellOff, CheckSquare, ChevronLeft, ChevronRight, History, Loader2, LogOut, PhoneCall, Save, Scale, Search, Sparkles, Trash2, Unlock, Wallet, X,
+  Bell, BellOff, CheckSquare, ChevronLeft, ChevronRight, History, Loader2, LogOut, PhoneCall, Save, Scale, Search, Sparkles, Trash2, Unlock, Users2, Wallet, X,
 } from "lucide-react";
 import {
   useClientSearchQuery,
@@ -34,6 +34,7 @@ import {
 import { queryKeys } from "@/lib/queryKeys";
 import { useMyClientOrganizationId } from "@/hooks/queries/useMyClientOrganization";
 import PhoneScreeningSettingsPanel from "@/components/PhoneScreeningSettingsPanel";
+import TalentExchangePanel from "@/components/TalentExchangePanel";
 import CategorizedFilterPanel, { type CategorizedFilterField } from "@/components/Dashboard/CategorizedFilterPanel";
 import ClientResultsTable from "@/components/ClientPortal/ClientResultsTable";
 import ClientRevealedCandidatesTable from "@/components/ClientPortal/ClientRevealedCandidatesTable";
@@ -209,7 +210,7 @@ export default function ClientPortalPage() {
 
   // ---- "المرشحين المكشوفين" tab: the org's full reveal history, independent
   // of the search tab's current filters/page. ----
-  const [activeTab, setActiveTab] = useState<"search" | "revealed" | "settings">("search");
+  const [activeTab, setActiveTab] = useState<"search" | "revealed" | "settings" | "talent_exchange">("search");
   const { data: myOrgId } = useMyClientOrganizationId();
   const [revealedPage, setRevealedPage] = useState(1);
   const { data: revealedData, isLoading: revealedLoading } = useClientRevealedCandidatesQuery(revealedPage, lang);
@@ -254,7 +255,7 @@ export default function ClientPortalPage() {
       </header>
 
       <main className="mx-auto max-w-7xl px-4 py-6">
-        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "search" | "revealed" | "settings")} className="mb-4">
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "search" | "revealed" | "settings" | "talent_exchange")} className="mb-4">
           <TabsList>
             <TabsTrigger value="search" className="gap-1.5">
               <Search className="h-3.5 w-3.5" />
@@ -267,6 +268,10 @@ export default function ClientPortalPage() {
                 <Badge variant="secondary" className="text-[10px] h-4 px-1.5">{revealedTotal}</Badge>
               )}
             </TabsTrigger>
+            <TabsTrigger value="talent_exchange" className="gap-1.5">
+              <Users2 className="h-3.5 w-3.5" />
+              {ar ? "سوق إعادة التوظيف" : "Redeployment Exchange"}
+            </TabsTrigger>
             <TabsTrigger value="settings" className="gap-1.5">
               <PhoneCall className="h-3.5 w-3.5" />
               {ar ? "تقييم المكالمات الهاتفية" : "Phone Screening"}
@@ -274,7 +279,13 @@ export default function ClientPortalPage() {
           </TabsList>
         </Tabs>
 
-        {activeTab === "settings" ? (
+        {activeTab === "talent_exchange" ? (
+          <Card>
+            <CardContent className="p-6">
+              <TalentExchangePanel />
+            </CardContent>
+          </Card>
+        ) : activeTab === "settings" ? (
           <Card>
             <CardContent className="p-6">
               {myOrgId ? (
