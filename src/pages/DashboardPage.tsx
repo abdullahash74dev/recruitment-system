@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, lazy, Suspense } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { supabase } from "@/integrations/supabase/client";
 import TopBar from "@/components/TopBar";
@@ -16,81 +16,79 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { Users, UserPlus, Phone, CheckCircle2, Download, LogOut, Search, Eye, BarChart3, Briefcase, FileText, ExternalLink, Plus, Pencil, Trash2, FolderOpen, Settings, Database, Archive, RotateCcw, Shield, Sparkles, Stethoscope, KeyRound, Tag } from "lucide-react";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from "recharts";
-import * as XLSX from "xlsx";
 import SiteLogo from "@/components/SiteLogo";
 import { MAX_INLINE_IMAGE_SIZE, readImageAsDataUrl } from "@/lib/imageUpload";
 import { Link, useNavigate } from "react-router-dom";
-import CustomQuestionsSettings from "@/components/Dashboard/CustomQuestionsSettings";
+const CustomQuestionsSettings = lazy(() => import("@/components/Dashboard/CustomQuestionsSettings"));
 import StorageImage from "@/components/StorageImage";
 import ProjectLogo from "@/components/ProjectLogo";
 import { Slider } from "@/components/ui/slider";
-import DropdownOptionsSettings from "@/components/Dashboard/DropdownOptionsSettings";
-import BrandingSettings from "@/components/Dashboard/BrandingSettings";
-import BackupSettings from "@/components/Dashboard/BackupSettings";
-import ScheduledBackups from "@/components/Dashboard/ScheduledBackups";
-import ExternalBackupStatus from "@/components/Dashboard/ExternalBackupStatus";
-import FormFieldsSettings from "@/components/Dashboard/FormFieldsSettings";
-import SiteContentSettings from "@/components/Dashboard/SiteContentSettings";
-import AnalyticsHub from "@/components/Dashboard/AnalyticsHub";
-import ApplicantsImport from "@/components/Dashboard/ApplicantsImport";
-import ApplicantsMappedImport from "@/components/Dashboard/ApplicantsMappedImport";
-import ApplicantsDuplicateCleanup from "@/components/Dashboard/ApplicantsDuplicateCleanup";
-import UIStylingSettings from "@/components/Dashboard/UIStylingSettings";
-import JobPageSettings from "@/components/Dashboard/JobPageSettings";
-import DeletePinSettings from "@/components/Dashboard/DeletePinSettings";
-import TwoFactorSettings from "@/components/Dashboard/TwoFactorSettings";
-import JobsExcelTools from "@/components/Dashboard/JobsExcelTools";
-import SystemLog from "@/components/Dashboard/SystemLog";
-import SystemHealth from "@/components/Dashboard/SystemHealth";
-import TrashBin from "@/components/Dashboard/TrashBin";
-import UserPermissionsDialog from "@/components/Dashboard/UserPermissionsDialog";
-import ResetPasswordDialog from "@/components/Dashboard/ResetPasswordDialog";
-import RejectionReasonsSettings from "@/components/Dashboard/RejectionReasonsSettings";
-import JobAdvertisements from "@/components/Dashboard/JobAdvertisements";
-import RecruitmentDashboard from "@/components/Dashboard/Recruitment/RecruitmentDashboard";
-import ApplicantEmailDialog from "@/components/Dashboard/ApplicantEmailDialog";
-import PhoneScreeningDialog from "@/components/PhoneScreeningDialog";
-import PhoneScreeningSettingsPanel from "@/components/PhoneScreeningSettingsPanel";
-import TalentExchangeAdminPanel from "@/components/Dashboard/TalentExchangeAdminPanel";
-import ApplicantEmailHistory from "@/components/Dashboard/ApplicantEmailHistory";
-import ApplicantResumeExtractionPanel from "@/components/Dashboard/ApplicantResumeExtractionPanel";
-import TransferToRecruitmentDialog from "@/components/Dashboard/TransferToRecruitmentDialog";
-import BulkSourceCorrectionDialog from "@/components/Dashboard/BulkSourceCorrectionDialog";
+const DropdownOptionsSettings = lazy(() => import("@/components/Dashboard/DropdownOptionsSettings"));
+const BrandingSettings = lazy(() => import("@/components/Dashboard/BrandingSettings"));
+const BackupSettings = lazy(() => import("@/components/Dashboard/BackupSettings"));
+const ScheduledBackups = lazy(() => import("@/components/Dashboard/ScheduledBackups"));
+const ExternalBackupStatus = lazy(() => import("@/components/Dashboard/ExternalBackupStatus"));
+const FormFieldsSettings = lazy(() => import("@/components/Dashboard/FormFieldsSettings"));
+const SiteContentSettings = lazy(() => import("@/components/Dashboard/SiteContentSettings"));
+const AnalyticsHub = lazy(() => import("@/components/Dashboard/AnalyticsHub"));
+const ApplicantsImport = lazy(() => import("@/components/Dashboard/ApplicantsImport"));
+const ApplicantsMappedImport = lazy(() => import("@/components/Dashboard/ApplicantsMappedImport"));
+const ApplicantsDuplicateCleanup = lazy(() => import("@/components/Dashboard/ApplicantsDuplicateCleanup"));
+const UIStylingSettings = lazy(() => import("@/components/Dashboard/UIStylingSettings"));
+const JobPageSettings = lazy(() => import("@/components/Dashboard/JobPageSettings"));
+const DeletePinSettings = lazy(() => import("@/components/Dashboard/DeletePinSettings"));
+const TwoFactorSettings = lazy(() => import("@/components/Dashboard/TwoFactorSettings"));
+const JobsExcelTools = lazy(() => import("@/components/Dashboard/JobsExcelTools"));
+const SystemLog = lazy(() => import("@/components/Dashboard/SystemLog"));
+const SystemHealth = lazy(() => import("@/components/Dashboard/SystemHealth"));
+const TrashBin = lazy(() => import("@/components/Dashboard/TrashBin"));
+const UserPermissionsDialog = lazy(() => import("@/components/Dashboard/UserPermissionsDialog"));
+const ResetPasswordDialog = lazy(() => import("@/components/Dashboard/ResetPasswordDialog"));
+const RejectionReasonsSettings = lazy(() => import("@/components/Dashboard/RejectionReasonsSettings"));
+const JobAdvertisements = lazy(() => import("@/components/Dashboard/JobAdvertisements"));
+const RecruitmentDashboard = lazy(() => import("@/components/Dashboard/Recruitment/RecruitmentDashboard"));
+const ApplicantEmailDialog = lazy(() => import("@/components/Dashboard/ApplicantEmailDialog"));
+const PhoneScreeningDialog = lazy(() => import("@/components/PhoneScreeningDialog"));
+const PhoneScreeningSettingsPanel = lazy(() => import("@/components/PhoneScreeningSettingsPanel"));
+const TalentExchangeAdminPanel = lazy(() => import("@/components/Dashboard/TalentExchangeAdminPanel"));
+const ApplicantEmailHistory = lazy(() => import("@/components/Dashboard/ApplicantEmailHistory"));
+const ApplicantResumeExtractionPanel = lazy(() => import("@/components/Dashboard/ApplicantResumeExtractionPanel"));
+const TransferToRecruitmentDialog = lazy(() => import("@/components/Dashboard/TransferToRecruitmentDialog"));
+const BulkSourceCorrectionDialog = lazy(() => import("@/components/Dashboard/BulkSourceCorrectionDialog"));
 import ApplicantsAdvancedFilters, { AdvancedFilter, applyAdvancedFilters } from "@/components/Dashboard/ApplicantsAdvancedFilters";
 import { Checkbox } from "@/components/ui/checkbox";
 import { useUserPermissions } from "@/hooks/useUserPermissions";
-import AiSystemDoctor from "@/components/Dashboard/AiSystemDoctor";
-import SystemTests from "@/components/Dashboard/SystemTests";
-import InterviewScheduler from "@/components/Dashboard/InterviewScheduler";
-import InterviewScorecards from "@/components/Dashboard/InterviewScorecards";
-import OfferLetters from "@/components/Dashboard/OfferLetters";
-import TalentPool from "@/components/Dashboard/TalentPool";
-import JobRequisitions from "@/components/Dashboard/JobRequisitions";
-import ReferralProgram from "@/components/Dashboard/ReferralProgram";
-import SLADashboard from "@/components/Dashboard/SLADashboard";
-import RecruiterAssignment from "@/components/Dashboard/RecruiterAssignment";
-import OnboardingModule from "@/components/Dashboard/OnboardingModule";
-import BudgetTracking from "@/components/Dashboard/BudgetTracking";
-import GDPRTools from "@/components/Dashboard/GDPRTools";
-import ClientRentalManagement from "@/components/Dashboard/ClientRentalManagement";
-import PipelineAutomation from "@/components/Dashboard/PipelineAutomation";
-import AssessmentsModule from "@/components/Dashboard/AssessmentsModule";
-import MessagingCenter from "@/components/Dashboard/MessagingCenter";
-import VideoInterviews from "@/components/Dashboard/VideoInterviews";
-import JobBoardPublishing from "@/components/Dashboard/JobBoardPublishing";
-import EmailTemplates from "@/components/Dashboard/EmailTemplates";
-import IntegrationsHub from "@/components/Dashboard/IntegrationsHub";
-import { AiUsageMonitor } from "@/components/Dashboard/AiUsageMonitor";
-import AiProviderSettings from "@/components/Dashboard/AiProviderSettings";
-import ResumeExtractionSettings from "@/components/Dashboard/ResumeExtractionSettings";
-import AiInsightsPanel from "@/components/Dashboard/AiInsightsPanel";
+const AiSystemDoctor = lazy(() => import("@/components/Dashboard/AiSystemDoctor"));
+const SystemTests = lazy(() => import("@/components/Dashboard/SystemTests"));
+const InterviewScheduler = lazy(() => import("@/components/Dashboard/InterviewScheduler"));
+const InterviewScorecards = lazy(() => import("@/components/Dashboard/InterviewScorecards"));
+const OfferLetters = lazy(() => import("@/components/Dashboard/OfferLetters"));
+const TalentPool = lazy(() => import("@/components/Dashboard/TalentPool"));
+const JobRequisitions = lazy(() => import("@/components/Dashboard/JobRequisitions"));
+const ReferralProgram = lazy(() => import("@/components/Dashboard/ReferralProgram"));
+const SLADashboard = lazy(() => import("@/components/Dashboard/SLADashboard"));
+const RecruiterAssignment = lazy(() => import("@/components/Dashboard/RecruiterAssignment"));
+const OnboardingModule = lazy(() => import("@/components/Dashboard/OnboardingModule"));
+const BudgetTracking = lazy(() => import("@/components/Dashboard/BudgetTracking"));
+const GDPRTools = lazy(() => import("@/components/Dashboard/GDPRTools"));
+const ClientRentalManagement = lazy(() => import("@/components/Dashboard/ClientRentalManagement"));
+const PipelineAutomation = lazy(() => import("@/components/Dashboard/PipelineAutomation"));
+const AssessmentsModule = lazy(() => import("@/components/Dashboard/AssessmentsModule"));
+const MessagingCenter = lazy(() => import("@/components/Dashboard/MessagingCenter"));
+const VideoInterviews = lazy(() => import("@/components/Dashboard/VideoInterviews"));
+const JobBoardPublishing = lazy(() => import("@/components/Dashboard/JobBoardPublishing"));
+const EmailTemplates = lazy(() => import("@/components/Dashboard/EmailTemplates"));
+const IntegrationsHub = lazy(() => import("@/components/Dashboard/IntegrationsHub"));
+const AiUsageMonitor = lazy(() => import("@/components/Dashboard/AiUsageMonitor").then(m => ({ default: m.AiUsageMonitor })));
+const AiProviderSettings = lazy(() => import("@/components/Dashboard/AiProviderSettings"));
+const ResumeExtractionSettings = lazy(() => import("@/components/Dashboard/ResumeExtractionSettings"));
+const AiInsightsPanel = lazy(() => import("@/components/Dashboard/AiInsightsPanel"));
 import NotificationsBell from "@/components/Dashboard/NotificationsBell";
-import ExecutiveKPIs from "@/components/Dashboard/ExecutiveKPIs";
-import ScheduledReports from "@/components/Dashboard/ScheduledReports";
-import ReportBuilder from "@/components/Dashboard/ReportBuilder";
-import SynonymsManager from "@/components/Dashboard/SynonymsManager";
-import JobCategoriesManager from "@/components/Dashboard/JobCategoriesManager";
+const ExecutiveKPIs = lazy(() => import("@/components/Dashboard/ExecutiveKPIs"));
+const ScheduledReports = lazy(() => import("@/components/Dashboard/ScheduledReports"));
+const ReportBuilder = lazy(() => import("@/components/Dashboard/ReportBuilder"));
+const SynonymsManager = lazy(() => import("@/components/Dashboard/SynonymsManager"));
+const JobCategoriesManager = lazy(() => import("@/components/Dashboard/JobCategoriesManager"));
 import { useDeletePin } from "@/components/DeletePinDialog";
 import AINetworkBackground from "@/components/AINetworkBackground";
 import AuroraBackground from "@/components/AuroraBackground";
@@ -309,6 +307,7 @@ const DashboardPage = () => {
   const exportExcel = async () => {
     setIsExporting(true);
     try {
+      const XLSX = await import("xlsx");
       const applicantIds = filtered.map(a => a.id);
       const [{ data: customQuestions }, { data: customAnswers }] = await Promise.all([
         supabase
@@ -889,6 +888,7 @@ const DashboardPage = () => {
         )}
 
         {/* Tabs */}
+        <Suspense fallback={<div className="flex items-center justify-center py-16"><div className="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent" /></div>}>
         <Tabs value={activeTab} onValueChange={(v) => (v === "hr_forms" ? navigate("/admin/hr-forms") : setActiveTab(v))}>
           {navStyle === "classic" && (
             <TabsList className="flex flex-wrap w-full h-auto gap-1.5 p-1.5 bg-muted/60 backdrop-blur-sm border border-border/50 rounded-xl justify-start shadow-sm">
@@ -1600,9 +1600,11 @@ const DashboardPage = () => {
             <ResumeExtractionSettings />
           </TabsContent>
         </Tabs>
+        </Suspense>
       </main>
       </div>
 
+      <Suspense fallback={null}>
       {/* Applicant Detail Dialog */}
       <Dialog open={!!selectedApplicant} onOpenChange={() => setSelectedApplicant(null)}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto" dir={dir}>
@@ -2158,6 +2160,7 @@ const DashboardPage = () => {
           onSubmit={(newPassword) => resetUserPassword(resetPasswordUser.id, newPassword)}
         />
       )}
+      </Suspense>
     </div>
   );
 };
