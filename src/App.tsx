@@ -102,7 +102,7 @@ const App = () => (
     client={queryClient}
     persistOptions={{
       persister,
-      maxAge: 24 * 60 * 60 * 1000,
+      maxAge: 7 * 24 * 60 * 60 * 1000,
       buster: CACHE_BUSTER,
       dehydrateOptions: {
         shouldDehydrateQuery: (query) => query.meta?.persist !== false,

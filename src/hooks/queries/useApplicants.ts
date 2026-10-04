@@ -164,7 +164,10 @@ async function fetchApplicantsProgressive(
  * exactly the "every dashboard open is slow" complaint this was causing when the
  * staleTime was 10 minutes. The cached table is trusted until an explicit
  * `refetch()` (manual refresh, or after an import completes) or a mutation
- * invalidates `queryKeys.applicants.all`.
+ * invalidates `queryKeys.applicants.all`. `gcTime` is set to a week (matching
+ * the persister's `maxAge` in App.tsx) rather than the default/a day, so that
+ * reopening the dashboard on the same device within that window reuses the
+ * already-downloaded table instead of re-running the full ~104-request fetch.
  */
 export function useApplicantsQuery(lang: "ar" | "en") {
   const queryClient = useQueryClient();
@@ -177,7 +180,7 @@ export function useApplicantsQuery(lang: "ar" | "en") {
       return fetchApplicantsProgressive(queryClient, setLoadProgress, () => {}, lang);
     },
     staleTime: Infinity,
-    gcTime: 24 * 60 * 60 * 1000,
+    gcTime: 7 * 24 * 60 * 60 * 1000,
   });
 
   const applicants = query.data ?? [];
