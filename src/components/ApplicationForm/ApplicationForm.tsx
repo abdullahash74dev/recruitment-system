@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, ArrowLeft, Send, Loader2, ListChecks } from "lucide-react";
@@ -114,6 +114,13 @@ const ApplicationForm = ({ preSelectedPosition }: Props) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const isPreparingFiles = pendingFileReads > 0;
+  // Guards against a second tap firing before React re-renders the
+  // disabled button.
+  const submitLockRef = useRef(false);
+  // Reused across retries of the same submission, so a retry after a lost
+  // response targets the row that may already exist instead of creating a
+  // second applicant.
+  const pendingSubmissionRef = useRef<{ applicantId: string; token: string; tokenHash: string } | null>(null);
 
   useEffect(() => {
     if (!preSelectedPosition) return;
@@ -168,6 +175,12 @@ const ApplicationForm = ({ preSelectedPosition }: Props) => {
       return lang === "ar"
         ? "تم تجاوز عدد محاولات التقديم من هذا الاتصال. يرجى الانتظار قليلاً ثم المحاولة مرة أخرى."
         : "Too many submissions from this network. Please wait a while before submitting again.";
+    }
+
+    if (normalized.includes("duplicate_submission")) {
+      return lang === "ar"
+        ? "تم استلام طلبك بالفعل قبل لحظات — لا داعي لإرساله مرة أخرى."
+        : "Your application was already received a moment ago — no need to submit it again.";
     }
 
     if (normalized.includes("too many requests")) {
@@ -400,10 +413,23 @@ const ApplicationForm = ({ preSelectedPosition }: Props) => {
       return;
     }
 
+    if (submitLockRef.current) return;
+    submitLockRef.current = true;
     setIsSubmitting(true);
     try {
-      const submissionToken = createSubmissionToken();
-      const submissionTokenHash = await hashSubmissionToken(submissionToken);
+      if (!pendingSubmissionRef.current) {
+        const token = createSubmissionToken();
+        pendingSubmissionRef.current = {
+          applicantId: crypto.randomUUID(),
+          token,
+          tokenHash: await hashSubmissionToken(token),
+        };
+      }
+      const {
+        applicantId: pendingApplicantId,
+        token: submissionToken,
+        tokenHash: submissionTokenHash,
+      } = pendingSubmissionRef.current;
 
       // Duplicate detection BEFORE creating new applicant
       if (formData.email && formData.phone && formData.fullName) {
@@ -413,7 +439,9 @@ const ApplicationForm = ({ preSelectedPosition }: Props) => {
           _full_name: formData.fullName,
         });
         const existing = Array.isArray(dup) && dup.length > 0 ? dup[0] : null;
-        if (existing) {
+        // A match on our own pending id means an earlier attempt of THIS
+        // submission already saved the row; just continue with it.
+        if (existing && existing.id !== pendingApplicantId) {
           const confirmUpdate = window.confirm(
             (lang === "ar"
               ? `تم اكتشاف تقديم سابق بنفس بياناتك (الاسم/الإيميل/الجوال).\n\nالطلب الأصلي: ${existing.desired_position || "—"}\nبتاريخ: ${new Date(existing.created_at).toLocaleDateString(lang === "ar" ? "ar-SA" : "en-US")}\n\nهل تريد تحديث طلبك السابق بدلاً من إنشاء طلب جديد؟`
@@ -464,11 +492,14 @@ const ApplicationForm = ({ preSelectedPosition }: Props) => {
             if (rpcErr) throw rpcErr;
 
             // Upload files (only for the ones the user re-uploaded). The upload service verifies this short-lived token.
-            if (files.resume) await uploadSelectedFile(files.resume, "resumes", { ar: "السيرة الذاتية", en: "resume" }, existing.id, submissionToken, "resume");
-            if (files.degreeCopy) await uploadSelectedFile(files.degreeCopy, "degrees", { ar: "صورة المؤهل", en: "degree copy" }, existing.id, submissionToken, "degree");
-            if (files.trainingCerts) await uploadSelectedFile(files.trainingCerts, "training", { ar: "شهادات التدريب", en: "training certificates" }, existing.id, submissionToken, "training");
-            if (files.otherDocs) await uploadSelectedFile(files.otherDocs, "other", { ar: "المستندات الأخرى", en: "other documents" }, existing.id, submissionToken, "other");
+            await Promise.all([
+              uploadSelectedFile(files.resume, "resumes", { ar: "السيرة الذاتية", en: "resume" }, existing.id, submissionToken, "resume"),
+              uploadSelectedFile(files.degreeCopy, "degrees", { ar: "صورة المؤهل", en: "degree copy" }, existing.id, submissionToken, "degree"),
+              uploadSelectedFile(files.trainingCerts, "training", { ar: "شهادات التدريب", en: "training certificates" }, existing.id, submissionToken, "training"),
+              uploadSelectedFile(files.otherDocs, "other", { ar: "المستندات الأخرى", en: "other documents" }, existing.id, submissionToken, "other"),
+            ]);
 
+            pendingSubmissionRef.current = null;
             setIsSubmitted(true);
             localStorage.removeItem(STORAGE_KEY);
             toast.success(t("dup.updated"));
@@ -479,7 +510,7 @@ const ApplicationForm = ({ preSelectedPosition }: Props) => {
         }
       }
 
-      const applicantId = crypto.randomUUID();
+      const applicantId = pendingApplicantId;
 
       const isEmployed = formData.currentlyEmployed === "نعم" || formData.currentlyEmployed === "Yes";
 
@@ -528,24 +559,21 @@ const ApplicationForm = ({ preSelectedPosition }: Props) => {
         submission_token_hash: submissionTokenHash,
       });
 
-      if (error) throw error;
+      if (error) {
+        // Primary-key conflict on our own id = a previous attempt of this
+        // same submission was saved but its response never arrived.
+        const alreadySaved =
+          (error as { code?: string }).code === "23505" &&
+          String((error as { message?: string }).message || "").includes("applicants_pkey");
+        if (!alreadySaved) throw error;
+      }
 
-      await uploadSelectedFile(files.resume, "resumes", {
-        ar: "السيرة الذاتية",
-        en: "resume",
-      }, applicantId, submissionToken, "resume");
-      await uploadSelectedFile(files.degreeCopy, "degrees", {
-        ar: "صورة المؤهل",
-        en: "degree copy",
-      }, applicantId, submissionToken, "degree");
-      await uploadSelectedFile(files.trainingCerts, "training", {
-        ar: "شهادات التدريب",
-        en: "training certificates",
-      }, applicantId, submissionToken, "training");
-      await uploadSelectedFile(files.otherDocs, "other", {
-        ar: "المستندات الأخرى",
-        en: "other documents",
-      }, applicantId, submissionToken, "other");
+      await Promise.all([
+        uploadSelectedFile(files.resume, "resumes", { ar: "السيرة الذاتية", en: "resume" }, applicantId, submissionToken, "resume"),
+        uploadSelectedFile(files.degreeCopy, "degrees", { ar: "صورة المؤهل", en: "degree copy" }, applicantId, submissionToken, "degree"),
+        uploadSelectedFile(files.trainingCerts, "training", { ar: "شهادات التدريب", en: "training certificates" }, applicantId, submissionToken, "training"),
+        uploadSelectedFile(files.otherDocs, "other", { ar: "المستندات الأخرى", en: "other documents" }, applicantId, submissionToken, "other"),
+      ]);
 
       const customAnswers = Object.entries(formData)
         .filter(([key, val]) => key.startsWith("custom_") && val)
@@ -572,6 +600,7 @@ const ApplicationForm = ({ preSelectedPosition }: Props) => {
         console.warn("Confirmation email failed (non-blocking):", emailErr);
       });
 
+      pendingSubmissionRef.current = null;
       setIsSubmitted(true);
       localStorage.removeItem(STORAGE_KEY);
       toast.success(t("validation.success"));
@@ -579,6 +608,7 @@ const ApplicationForm = ({ preSelectedPosition }: Props) => {
       console.error("Submit error:", err);
       toast.error(getSubmitErrorMessage(err));
     } finally {
+      submitLockRef.current = false;
       setIsSubmitting(false);
     }
   };

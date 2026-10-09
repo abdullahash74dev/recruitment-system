@@ -5,6 +5,26 @@ import type { Database } from './types';
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
+// Database (PostgREST) requests that stall on a dropped mobile connection
+// would otherwise hang forever with a spinner that never resolves. Uploads,
+// storage and edge functions (AI calls, imports) are left untimed since they
+// can legitimately run long.
+const REST_TIMEOUT_MS = 45_000;
+
+const fetchWithTimeout: typeof fetch = (input, init) => {
+  const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+  if (!url.includes("/rest/v1/") || typeof AbortSignal.timeout !== "function") return fetch(input, init);
+
+  const timeoutSignal = AbortSignal.timeout(REST_TIMEOUT_MS);
+  const existing = init?.signal;
+  let signal: AbortSignal = timeoutSignal;
+  if (existing) {
+    if (typeof (AbortSignal as any).any !== "function") return fetch(input, init);
+    signal = (AbortSignal as any).any([existing, timeoutSignal]);
+  }
+  return fetch(input, { ...init, signal });
+};
+
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
@@ -13,5 +33,8 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     storage: localStorage,
     persistSession: true,
     autoRefreshToken: true,
-  }
+  },
+  global: {
+    fetch: fetchWithTimeout,
+  },
 });

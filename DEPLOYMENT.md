@@ -134,3 +134,38 @@ SQL Editor, keep the one row with your real settings, and delete the rest.
 - Every insert/update/delete on HR tables is captured in `audit_log`
   automatically (with deleted rows snapshotted to the recoverable Trash),
   and every export/import is logged as an app-level audit event.
+
+## 6. Launch hardening (October 2026)
+
+### Error alerts (know when something breaks)
+The `error-alerts` function runs every 15 minutes. When there are at least
+5 new errors (or any marked critical) it emails every active admin and posts
+to a Slack/Discord channel if one is configured. Crashes on the public
+pages (job list, application form) are now recorded too.
+
+- To receive alerts in Slack/Discord as well, create an "Incoming Webhook"
+  in Slack or Discord, then run this in the Supabase SQL editor:
+  ```sql
+  INSERT INTO public.app_secrets (key, value) VALUES ('alert_webhook_url', 'https://hooks.slack.com/...')
+  ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value;
+  ```
+- To change the threshold, set the `ERROR_ALERT_MIN_COUNT` secret on the
+  edge functions (default 5).
+
+### Server-side 2FA
+When "two-factor authentication" is enabled in the admin settings, the
+database itself now refuses admin/HR data access to any session that only
+used a password (previously only the browser enforced it).
+
+**Emergency (admins locked out):** in the Supabase SQL editor run
+```sql
+UPDATE public.site_settings SET two_factor_enabled = false;
+```
+then sign in again and re-enable it from the dashboard.
+
+### Before going live
+- Set `ALLOWED_ORIGIN` (Supabase → Edge Functions → Secrets) to the final
+  production domain, e.g. `https://your-domain.com`.
+- Application rate limits are now 60 submissions per hour per network
+  (raised from 5 so applicants sharing a mobile-carrier IP aren't blocked).
+  If bots start spamming, add a CAPTCHA rather than lowering this.

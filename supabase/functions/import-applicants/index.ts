@@ -3,6 +3,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 import { ALLOW_ORIGIN } from "../_shared/cors.ts";
+import { fetchWithSafeRedirects } from "../_shared/safeFetch.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": ALLOW_ORIGIN,
@@ -163,7 +164,7 @@ async function downloadAttachment(supabase: any, url: string, applicantSlug: str
   try { parsed = new URL(trimmed); } catch { return trimmed; }
   if (!(await isSafeRemoteUrl(parsed))) return trimmed;
   try {
-    const r = await fetch(trimmed, { signal: AbortSignal.timeout(20000) });
+    const r = await fetchWithSafeRedirects(trimmed, isSafeRemoteUrl, { signal: AbortSignal.timeout(20000) });
     if (!r.ok) return trimmed;
     const ct = r.headers.get("content-type") || "application/octet-stream";
     const cl = Number(r.headers.get("content-length") || "0");

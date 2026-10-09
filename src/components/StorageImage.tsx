@@ -36,7 +36,7 @@ const StorageImage = ({ path, alt = "", className = "" }: Props) => {
   const src = !path ? null : isDirect ? path : signedUrl;
   if (!src) return null;
 
-  return <img src={src} alt={alt} className={className} onError={(e) => (e.currentTarget.style.display = "none")} />;
+  return <img src={src} alt={alt} className={className} loading="lazy" decoding="async" onError={(e) => (e.currentTarget.style.display = "none")} />;
 };
 
 export default StorageImage;

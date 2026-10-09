@@ -98,6 +98,7 @@ const GlobalErrorListener = () => {
 };
 
 const App = () => (
+  <ErrorBoundary>
   <PersistQueryClientProvider
     client={queryClient}
     persistOptions={{
@@ -109,7 +110,6 @@ const App = () => (
       },
     }}
   >
-    <ErrorBoundary>
       <BrowserRouter>
         <ThemeProvider>
           <LanguageProvider>
@@ -154,8 +154,8 @@ const App = () => (
           </LanguageProvider>
         </ThemeProvider>
       </BrowserRouter>
-    </ErrorBoundary>
   </PersistQueryClientProvider>
+  </ErrorBoundary>
 );
 
 export default App;
