@@ -18,6 +18,42 @@
 --    notification per admin instead of one row per applicant per admin.
 
 -- ---------------------------------------------------------------------------
+-- 0. Prerequisites
+-- ---------------------------------------------------------------------------
+-- This project's migration history was once repaired by marking migrations
+-- "applied" without running them, and production turned out to be missing
+-- site_settings.two_factor_enabled (20260612090000). Re-create everything
+-- this migration depends on idempotently instead of assuming it exists.
+ALTER TABLE public.site_settings
+  ADD COLUMN IF NOT EXISTS two_factor_enabled boolean NOT NULL DEFAULT false;
+
+CREATE TABLE IF NOT EXISTS public.error_log (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  severity text NOT NULL DEFAULT 'error' CHECK (severity IN ('debug', 'info', 'warning', 'error', 'critical')),
+  source text NOT NULL DEFAULT 'client' CHECK (source IN ('client', 'query', 'mutation', 'edge_function')),
+  message text NOT NULL,
+  stack text,
+  context jsonb,
+  url text,
+  user_id uuid,
+  user_email text,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+ALTER TABLE public.error_log ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Admin view error_log" ON public.error_log;
+CREATE POLICY "Admin view error_log" ON public.error_log
+  FOR SELECT TO authenticated USING (public.has_role(auth.uid(), 'admin'::app_role));
+
+DROP POLICY IF EXISTS "Authenticated can insert own error events" ON public.error_log;
+CREATE POLICY "Authenticated can insert own error events" ON public.error_log
+  FOR INSERT TO authenticated WITH CHECK (user_id = auth.uid() OR user_id IS NULL);
+
+CREATE INDEX IF NOT EXISTS idx_error_log_created ON public.error_log (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_error_log_severity ON public.error_log (severity, created_at DESC);
+
+-- ---------------------------------------------------------------------------
 -- 1. Rate limits
 -- ---------------------------------------------------------------------------
 
