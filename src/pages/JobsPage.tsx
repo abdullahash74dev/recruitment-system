@@ -1,7 +1,7 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { supabase } from "@/integrations/supabase/client";
+import { useJobPostingsQuery } from "@/hooks/queries/useJobPostings";
 import { useSiteSettings } from "@/hooks/useSiteSettings";
 import SiteLogo from "@/components/SiteLogo";
 import AuroraBackground from "@/components/AuroraBackground";
@@ -41,31 +41,20 @@ const JobsPage = () => {
   const showNat = (content as any).show_nationality_on_jobs;
   const groupByLocation = !!s.jobs_group_by_location;
   const showCompleted = !!s.jobs_show_completed;
-  const [jobs, setJobs] = useState<JobPosting[]>([]);
-  const [completedJobs, setCompletedJobs] = useState<JobPosting[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { data: allPostings, isLoading: loading } = useJobPostingsQuery();
   const [searchTerm, setSearchTerm] = useState("");
   const Arrow = lang === "ar" ? ArrowLeft : ArrowRight;
   const siteName = lang === "ar" ? settings.site_name_ar : settings.site_name_en;
 
-  useEffect(() => {
-    fetchJobs();
-  }, [showCompleted]);
-
-  const fetchJobs = async () => {
-    const { data, error } = await supabase
-      .from("job_postings")
-      .select("*")
-      .order("created_at", { ascending: false });
-    if (!error && data) {
-      const all = (data as any[]).filter(
-        (j) => !j.posting_category || j.posting_category === "job",
-      );
-      setJobs(all.filter((j) => j.is_active) as JobPosting[]);
-      setCompletedJobs(all.filter((j) => !j.is_active) as JobPosting[]);
-    }
-    setLoading(false);
-  };
+  const { jobs, completedJobs } = useMemo(() => {
+    const all = ((allPostings ?? []) as any[]).filter(
+      (j) => !j.posting_category || j.posting_category === "job",
+    );
+    return {
+      jobs: all.filter((j) => j.is_active) as JobPosting[],
+      completedJobs: all.filter((j) => !j.is_active) as JobPosting[],
+    };
+  }, [allPostings]);
 
   const matchesSearch = (job: JobPosting) => {
     const title = lang === "ar" ? job.title_ar : (job.title_en || job.title_ar);

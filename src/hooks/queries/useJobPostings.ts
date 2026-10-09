@@ -39,6 +39,24 @@ export function useJobPostingsQuery() {
   });
 }
 
+/** A single active posting for the public job detail page. */
+export function useActiveJobPostingQuery(id: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.jobPostings.activeDetail(id ?? ""),
+    enabled: !!id,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("job_postings")
+        .select("*")
+        .eq("id", id!)
+        .eq("is_active", true)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
 /**
  * Insert when `id` is absent, update when present — mirrors the original
  * `saveJob`'s `editingJob ? update : insert` branch.

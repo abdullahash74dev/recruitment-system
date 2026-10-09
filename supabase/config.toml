@@ -32,3 +32,36 @@ verify_jwt = true
 
 [functions.extract-applicant-resume-data]
 verify_jwt = true
+
+# Called by pg_cron with only an x-cron-secret header (no user JWT). Each of
+# these validates the shared secret itself (and, for manual runs, the
+# caller's admin role), so the gateway's JWT pre-check would only ever
+# reject the legitimate scheduled call.
+[functions.scheduled-backup]
+verify_jwt = false
+
+[functions.ai-system-doctor]
+verify_jwt = false
+
+[functions.check-saved-filter-alerts]
+verify_jwt = false
+
+[functions.check-client-billing-alerts]
+verify_jwt = false
+
+[functions.error-alerts]
+verify_jwt = false
+
+# Public, anonymous endpoints. Each authorizes the request itself (upload
+# token bound to a fresh applicant row / recent-submission check / consent
+# token). The gateway JWT check adds nothing here (the anon key is public)
+# and rejects callers outright once the project moves to the new
+# sb_publishable_ keys, which are not JWTs.
+[functions.upload-file]
+verify_jwt = false
+
+[functions.send-confirmation-email]
+verify_jwt = false
+
+[functions.talent-exchange-consent]
+verify_jwt = false

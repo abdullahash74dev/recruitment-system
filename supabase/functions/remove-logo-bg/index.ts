@@ -4,6 +4,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 import { ALLOW_ORIGIN } from "../_shared/cors.ts";
+import { fetchWithSafeRedirects } from "../_shared/safeFetch.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": ALLOW_ORIGIN,
@@ -112,7 +113,7 @@ Deno.serve(async (req) => {
         return new Response(JSON.stringify({ error: "Blocked host" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
-      const srcResp = await fetch(imageUrl, { signal: AbortSignal.timeout(15000) });
+      const srcResp = await fetchWithSafeRedirects(imageUrl, isSafeRemoteUrl, { signal: AbortSignal.timeout(15000) });
       const srcLen = Number(srcResp.headers.get("content-length") || "0");
       if (srcLen && srcLen > 20 * 1024 * 1024) {
         return new Response(JSON.stringify({ error: "Source image too large" }), { status: 413, headers: { ...corsHeaders, "Content-Type": "application/json" } });

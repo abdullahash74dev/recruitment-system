@@ -11,6 +11,7 @@ export const queryKeys = {
   jobPostings: {
     all: ["jobPostings"] as const,
     list: () => ["jobPostings", "list"] as const,
+    activeDetail: (id: string) => ["jobPostings", "activeDetail", id] as const,
   },
   jobAdvertisements: {
     all: ["jobAdvertisements"] as const,

@@ -52,6 +52,17 @@ const NotificationsBell = () => {
         );
         toast.info(payload.new.title, { description: payload.new.body });
       })
+      // New-applicant notifications are collapsed server-side into one
+      // rolling row that gets UPDATEd per applicant; refresh it in place
+      // without a toast per applicant.
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "notifications" }, (payload: any) => {
+        queryClient.setQueryData<Notification[]>(queryKeys.notifications.list(), (prev) => {
+          const rest = (prev ?? []).filter((n) => n.id !== payload.new.id);
+          return [payload.new, ...rest]
+            .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+            .slice(0, 30);
+        });
+      })
       .subscribe();
     return () => { supabase.removeChannel(ch); };
   }, [queryClient]);

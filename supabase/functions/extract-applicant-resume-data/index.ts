@@ -108,10 +108,10 @@ ${fieldList}
 
 async function callGeminiExtract(geminiKey: string, mimeType: string, base64: string) {
   const res = await fetch(
-    "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + geminiKey,
+    "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",
     {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "x-goog-api-key": geminiKey },
       body: JSON.stringify({
         systemInstruction: { parts: [{ text: "أنت مساعد دقيق لاستخراج بيانات هيكلية من الوثائق. لا تخترع معلومات." }] },
         contents: [{ role: "user", parts: [{ text: buildPrompt() }, { inlineData: { mimeType, data: base64 } }] }],

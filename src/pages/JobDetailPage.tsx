@@ -1,7 +1,6 @@
-import { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useLanguage } from "@/contexts/LanguageContext";
-import { supabase } from "@/integrations/supabase/client";
+import { useActiveJobPostingQuery } from "@/hooks/queries/useJobPostings";
 import TopBar from "@/components/TopBar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -21,25 +20,11 @@ const JobDetailPage = () => {
   const { settings } = useSiteSettings();
   const { content } = useSiteContent();
   const showNat = (content as any).show_nationality_on_jobs;
-  const [job, setJob] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
+  const { data: jobData, isLoading: loading } = useActiveJobPostingQuery(id);
+  const job: any = jobData ?? null;
 
   const BackArrow = lang === "ar" ? ArrowRight : ArrowLeft;
   const ForwardArrow = lang === "ar" ? ChevronLeft : ChevronRight;
-
-  useEffect(() => {
-    if (!id) return;
-    supabase
-      .from("job_postings")
-      .select("*")
-      .eq("id", id)
-      .eq("is_active", true)
-      .single()
-      .then(({ data, error }) => {
-        if (!error && data) setJob(data);
-        setLoading(false);
-      });
-  }, [id]);
 
   const bi = (ar: string | null, en: string | null) =>
     lang === "ar" ? (ar || en || "") : (en || ar || "");
