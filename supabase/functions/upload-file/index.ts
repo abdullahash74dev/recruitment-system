@@ -83,11 +83,13 @@ Deno.serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
     );
 
-    // Rate limit: at most 12 upload attempts per 15 minutes per source IP.
+    // Rate limit per source IP. Each application uploads up to 4 files and
+    // many applicants can share one mobile-carrier IP, so this is sized for
+    // ~20 full applications per 15 minutes per network.
     const clientIp = (req.headers.get("x-forwarded-for") || "unknown").split(",")[0].trim() || "unknown";
     const { data: withinLimit, error: rateLimitError } = await supabase.rpc("check_rate_limit", {
       _key: `upload:${clientIp}`,
-      _max_requests: 12,
+      _max_requests: 80,
       _window_seconds: 900,
     });
 
